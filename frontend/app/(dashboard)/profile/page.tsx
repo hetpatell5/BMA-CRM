@@ -73,9 +73,9 @@ function ProfileHeader({ user, refetch }: { user: any, refetch: () => void }) {
         if (!file) return
 
         setIsUploading(true)
-        try {
-            const reader = new FileReader()
-            reader.onloadend = async () => {
+        const reader = new FileReader()
+        reader.onloadend = async () => {
+            try {
                 const base64String = reader.result as string
                 const res = await authAPI.updateAvatar(base64String)
                 if (authUser) {
@@ -83,13 +83,13 @@ function ProfileHeader({ user, refetch }: { user: any, refetch: () => void }) {
                 }
                 refetch()
                 setIsAvatarModalOpen(false)
+            } catch (error) {
+                console.error('Failed to upload image', error)
+            } finally {
+                setIsUploading(false)
             }
-            reader.readAsDataURL(file)
-        } catch (error) {
-            console.error('Failed to upload image', error)
-        } finally {
-            setIsUploading(false)
         }
+        reader.readAsDataURL(file)
     }
 
     const handleSelectDefault = async (url: string) => {
@@ -113,8 +113,8 @@ function ProfileHeader({ user, refetch }: { user: any, refetch: () => void }) {
             {/* Avatar Section */}
             <div className="relative group shrink-0">
                 <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white dark:border-[#2A2A2D] bg-white dark:bg-[#2A2A2D] flex items-center justify-center relative shadow-sm">
-                    {user.avatar ? (
-                        <img src={user.avatar} alt={user.fullName} className="w-full h-full object-cover" />
+                    {(authUser?.avatar || user.avatar) ? (
+                        <img src={authUser?.avatar || user.avatar} alt={user.fullName} className="w-full h-full object-cover" />
                     ) : (
                         <div className="w-full h-full gradient-primary flex items-center justify-center text-4xl font-bold text-white">
                             {getInitials(user.fullName)}
