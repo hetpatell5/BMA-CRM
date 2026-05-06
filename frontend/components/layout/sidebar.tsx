@@ -1,0 +1,182 @@
+'use client'
+
+import Link from 'next/link'
+import { Manrope } from 'next/font/google'
+import { usePathname } from 'next/navigation'
+import {
+    LayoutDashboard,
+    Users,
+    UserPlus,
+    Upload,
+    FileBarChart,
+    Settings,
+    Target,
+    ClipboardList,
+    X,
+    Settings2,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useSidebarStore } from '@/stores/sidebarStore'
+import { useAuthStore } from '@/stores/authStore'
+
+const supportFont = Manrope({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
+
+function BrandMark() {
+    return (
+        <div className="flex h-[3rem] w-[3rem] shrink-0 items-center justify-center">
+            <img 
+                src="/logo.png" 
+                alt="BMA CRM Logo" 
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                }}
+            />
+        </div>
+    )
+}
+
+const navigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Orders', href: '/orders', icon: Users, roles: ['ADMIN', 'MANAGER', 'STAFF'] },
+    { name: 'Leads', href: '/leads', icon: Target, roles: ['ADMIN', 'MANAGER', 'STAFF'] },
+    { name: 'Import Data', href: '/import', icon: Upload, roles: ['ADMIN', 'MANAGER'] },
+    { name: 'Payments', href: '/payment', icon: Users, roles: ['ADMIN', 'MANAGER'] },
+    { name: 'Team Management', href: '/team', icon: UserPlus, roles: ['ADMIN', 'MANAGER'], exact: true },
+    { name: 'Form Templates', href: '/team/templates', icon: Settings, roles: ['ADMIN', 'MANAGER'] },
+    { name: 'Settings', href: '/settings', icon: Settings2, roles: ['ADMIN'], exact: true },
+]
+
+export function Sidebar() {
+    const pathname = usePathname()
+    const { isOpen, toggle, close } = useSidebarStore()
+    const { user } = useAuthStore()
+    const userRole = user?.role || 'STAFF'
+
+    const filteredNav = navigation.filter(item => {
+        if (!item.roles) return true
+        return item.roles.includes(userRole)
+    })
+
+    return (
+        <>
+            {isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+                    onClick={close}
+                />
+            )}
+
+            <aside
+                className={cn(
+                    "fixed left-0 top-0 h-full bg-background border-r border-border flex flex-col z-40 transition-all duration-300 ease-in-out",
+                    "max-lg:translate-x-[-100%]",
+                    isOpen && "max-lg:translate-x-0",
+                    "lg:translate-x-0",
+                    isOpen ? "lg:w-[240px]" : "lg:w-[68px]",
+                    "w-72 lg:w-auto"
+                )}
+            >
+                <div className={cn(
+                    "h-16 flex items-center border-b border-border transition-all duration-300",
+                    isOpen ? "gap-3 px-6 justify-between" : "lg:justify-center lg:px-0 px-6 gap-0"
+                )}>
+                    <div className={cn("flex items-center min-w-0", isOpen ? "gap-2" : "lg:justify-center w-full")}>
+                        <BrandMark />
+                        <div className={cn("overflow-hidden min-w-0 transition-opacity duration-300", !isOpen && "lg:opacity-0 lg:w-0 lg:hidden")}>
+                            <div className="flex items-center whitespace-nowrap">
+                                <span className={cn("text-[1.35rem] font-bold text-slate-800 dark:text-[#b8bfc6] leading-none", supportFont.className)}>BMA</span>
+                                <span className={cn("text-[1.35rem] font-bold text-slate-500 dark:text-[#b8bfc6] leading-none ml-1.5", supportFont.className)}>CRM</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={close}
+                        className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <nav className={cn(
+                    "flex-1 space-y-1 overflow-y-auto scrollbar-thin transition-all duration-300",
+                    isOpen ? "p-4" : "lg:p-2 p-4"
+                )}>
+                    {filteredNav.map((item) => {
+                        const isActive = item.exact
+                            ? pathname === item.href
+                            : pathname === item.href || pathname.startsWith(item.href + '/')
+
+                        return (
+                            <Link
+                                key={item.name}
+                                href={item.href}
+                                prefetch={true}
+                                onClick={() => {
+                                    if (window.innerWidth < 1024) close()
+                                }}
+                                title={!isOpen ? item.name : undefined}
+                                className={cn(
+                                    'flex items-center rounded-xl text-sm font-medium transition-all duration-200',
+                                    isOpen ? 'gap-3 px-4 py-3' : 'lg:justify-center lg:p-3 gap-3 px-4 py-3',
+                                    isActive
+                                        ? 'bg-primary/10 text-primary shadow-lg shadow-primary/10'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                                )}
+                            >
+                                <item.icon className={cn(
+                                    'w-5 h-5 transition-colors flex-shrink-0',
+                                    isActive ? 'text-primary' : 'text-muted-foreground'
+                                )} />
+                                <span className={cn(
+                                    "flex-1 truncate text-left",
+                                    !isOpen && "lg:hidden"
+                                )}>
+                                    {item.name}
+                                </span>
+                            </Link>
+                        )
+                    })}
+                </nav>
+
+                {(userRole === 'ADMIN' || userRole === 'MANAGER') && (
+                    <div className={cn(
+                        "border-t border-border transition-all duration-300",
+                        isOpen ? "p-4" : "lg:p-2 p-4"
+                    )}>
+                        <div className={cn("glass rounded-xl p-4", !isOpen && "lg:hidden")}>
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-lg gradient-success flex items-center justify-center flex-shrink-0">
+                                    <UserPlus className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium">Quick Import</p>
+                                    <p className="text-xs text-muted-foreground">Upload Excel file</p>
+                                </div>
+                            </div>
+                            <Link
+                                href="/import"
+                                onClick={() => {
+                                    if (window.innerWidth < 1024) close()
+                                }}
+                                className="block w-full py-2 text-center text-sm font-medium rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                            >
+                                Import Now
+                            </Link>
+                        </div>
+                        {!isOpen && (
+                            <Link
+                                href="/import"
+                                title="Quick Import"
+                                className="hidden lg:flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-200"
+                            >
+                                <UserPlus className="w-5 h-5" />
+                            </Link>
+                        )}
+                    </div>
+                )}
+            </aside>
+        </>
+    )
+}
+

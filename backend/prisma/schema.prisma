@@ -1,0 +1,580 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  fullName     String    @map("full_name")
+  role         UserRole  @default(STAFF)
+  status       UserStatus @default(ACTIVE)
+  avatar       String?
+  lastLogin    DateTime? @map("last_login")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Added Fields
+  degree       String?
+  staffRole    String?   @map("staff_role") // "GUIDE", "EXPERT", "BOTH"
+  
+  // Payment Details
+  bankName     String?   @map("bank_name")
+  bankAccName  String?   @map("bank_acc_name")
+  bankAccNo    String?   @map("bank_acc_no")
+  ifscCode     String?   @map("ifsc_code")
+  bankBranch   String?   @map("bank_branch")
+  upiId        String?   @map("upi_id")
+  qrScannerUrl    String?   @map("qr_scanner_url")
+  bankPassbookUrl String?   @map("bank_passbook_url")
+
+  // Relations
+  pricing          MemberPricing[]
+  paymentRecords   PaymentRecord[] @relation("UserPayments")
+  createdPayments  PaymentRecord[] @relation("PaymentCreatedBy")
+
+  // Relations
+  assignedLeads    Lead[]          @relation("AssignedLeads")
+  createdLeads     Lead[]          @relation("CreatedLeads")
+  leadActivities   LeadActivity[]
+  createdStudents  Student[]       @relation("CreatedStudents")
+  imports          ImportHistory[]
+  
+  // Task Management Relations
+  assignedTasks     Task[]          @relation("AssignedTasks")
+  createdTasks      Task[]          @relation("CreatedTasks")
+  taskUpdates       TaskUpdate[]    @relation("TaskUpdates")
+  taskComments      TaskComment[]   @relation("TaskComments")
+  createdTemplates  TaskTemplate[]  @relation("CreatedTemplates")
+  availability      UserAvailability?
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+  
+  // Team Hierarchy
+  leaderId          Int?            @map("leader_id")
+  leader            User?           @relation("TeamMembers", fields: [leaderId], references: [id])
+  teamMembers       User[]          @relation("TeamMembers")
+
+  // Students assigned to this guide/expert
+  assignedStudents  Student[]       @relation("AssignedToGuide")
+  assignedByStudents Student[]      @relation("AssignedBy")
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ============================================
+// STUDENTS
+// ============================================
+
+model Student {
+  id             BigInt   @id @default(autoincrement())
+  
+  // Identification
+  controlNumber  String?  @map("control_number")
+  enrollmentNo   String?  @unique @map("enrollment_no")
+  fullName       String   @map("full_name")
+  
+  // Contact Info
+  email          String?
+  alternateEmail String?  @map("alternate_email")
+  phone          String?
+  alternatePhone String?  @map("alternate_phone")
+  
+  // Personal Info
+  dateOfBirth    DateTime? @map("date_of_birth")
+  gender         String?
+
+  // Academic Info
+  programme      String?  // e.g., BTTM, BCOMF, MSCIS
+  course         String?  // Can be used for specific course within programme
+  specialization String?
+  batchYear      Int?     @map("batch_year")
+  semester       Int?
+  admissionDate  DateTime? @map("admission_date")
+  regionalCenter String?  @map("regional_center") // e.g., KHANNA, VADAKARA, PATNA
+
+  // Subjects (CRS1, CRS2, ... CRS25)
+  subjects       Json?    // Array of subject codes
+
+  // Address
+  address        String?
+  city           String?
+  state          String?
+  pincode        String?
+  country        String   @default("India")
+
+  // Status
+  status         StudentStatus @default(NEW_LEAD)
+
+  // Source tracking
+  leadId         BigInt?  @map("lead_id")
+  lead           Lead?    @relation(fields: [leadId], references: [id])
+  source         String?  // excel_import, manual, website, referral
+  importBatchId  BigInt?  @map("import_batch_id")
+  importBatch    ImportHistory? @relation(fields: [importBatchId], references: [id])
+
+  // Guide/Expert assignment
+  assignedGuideId Int?    @map("assigned_guide_id")
+  assignedGuide   User?   @relation("AssignedToGuide", fields: [assignedGuideId], references: [id])
+
+  // Telecaller who assigned
+  assignedById    Int?    @map("assigned_by_id")
+  assignedBy      User?   @relation("AssignedBy", fields: [assignedById], references: [id])
+
+  // Metadata
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdById    Int?     @map("created_by")
+  createdBy      User?    @relation("CreatedStudents", fields: [createdById], references: [id])
+
+  // Custom fields stored as JSON
+  customFields   Json?    @map("custom_fields")
+
+  @@index([controlNumber])
+  @@index([enrollmentNo])
+  @@index([fullName])
+  @@index([email])
+  @@index([phone])
+  @@index([programme])
+  @@index([course, batchYear])
+  @@index([status])
+  @@index([regionalCenter])
+  @@index([city, state])
+  @@map("students")
+}
+
+enum StudentStatus {
+  NEW_LEAD
+  SYNOPSIS_SENT
+  GUIDE_ASSIGNED
+  REPORT_IN_PROGRESS
+  SHIPPED
+  ALL_DONE
+}
+
+// ============================================
+// LEADS
+// ============================================
+
+model Lead {
+  id              BigInt    @id @default(autoincrement())
+  
+  // Contact Info
+  fullName        String    @map("full_name")
+  email           String?
+  phone           String
+  alternatePhone  String?   @map("alternate_phone")
+
+  // Lead Details
+  interestedCourse String?  @map("interested_course")
+  source          LeadSource @default(MANUAL)
+  sourceDetails   String?   @map("source_details")
+
+  // Pipeline
+  stage           LeadStage @default(NEW)
+  priority        LeadPriority @default(MEDIUM)
+  score           Int       @default(0) // 0-100
+
+  // Assignment
+  assignedToId    Int?      @map("assigned_to")
+  assignedTo      User?     @relation("AssignedLeads", fields: [assignedToId], references: [id])
+
+  // Follow-up
+  lastContactDate DateTime? @map("last_contact_date")
+  nextFollowUp    DateTime? @map("next_follow_up")
+  followUpNotes   String?   @map("follow_up_notes")
+
+  // Conversion
+  convertedAt     DateTime? @map("converted_at")
+  lostReason      String?   @map("lost_reason")
+
+  // Metadata
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdById     Int?      @map("created_by")
+  createdBy       User?     @relation("CreatedLeads", fields: [createdById], references: [id])
+
+  // Custom fields
+  customFields    Json?     @map("custom_fields")
+
+  // Relations
+  activities      LeadActivity[]
+  convertedStudents Student[]
+
+  @@index([phone])
+  @@index([email])
+  @@index([stage])
+  @@index([assignedToId])
+  @@index([nextFollowUp])
+  @@index([priority])
+  @@map("leads")
+}
+
+enum LeadSource {
+  WEBSITE
+  REFERRAL
+  SOCIAL_MEDIA
+  EXCEL_IMPORT
+  WALK_IN
+  PHONE_INQUIRY
+  MANUAL
+}
+
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum LeadPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ============================================
+// LEAD ACTIVITIES
+// ============================================
+
+model LeadActivity {
+  id           BigInt       @id @default(autoincrement())
+  leadId       BigInt       @map("lead_id")
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  activityType ActivityType @map("activity_type")
+  description  String?
+  outcome      String?
+
+  // For stage changes
+  previousStage LeadStage?  @map("previous_stage")
+  newStage      LeadStage?  @map("new_stage")
+
+  createdAt    DateTime     @default(now()) @map("created_at")
+  createdById  Int?         @map("created_by")
+  createdBy    User?        @relation(fields: [createdById], references: [id])
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("lead_activities")
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  NOTE
+  STAGE_CHANGE
+  ASSIGNMENT
+  FOLLOW_UP
+}
+
+// ============================================
+// IMPORT HISTORY
+// ============================================
+
+model ImportHistory {
+  id            BigInt       @id @default(autoincrement())
+  
+  fileName      String       @map("file_name")
+  filePath      String?      @map("file_path")
+  fileSize      BigInt?      @map("file_size")
+  importType    ImportType   @map("import_type")
+
+  totalRecords  Int          @default(0) @map("total_records")
+  importedCount Int          @default(0) @map("imported_count")
+  updatedCount  Int          @default(0) @map("updated_count")
+  skippedCount  Int          @default(0) @map("skipped_count")
+  failedCount   Int          @default(0) @map("failed_count")
+
+  status        ImportStatus @default(PENDING)
+  errorLog      Json?        @map("error_log")
+  columnMapping Json?        @map("column_mapping")
+
+  startedAt     DateTime?    @map("started_at")
+  completedAt   DateTime?    @map("completed_at")
+  importedById  Int?         @map("imported_by")
+  importedBy    User?        @relation(fields: [importedById], references: [id])
+
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  students      Student[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("import_history")
+}
+
+enum ImportType {
+  STUDENTS
+  LEADS
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// TASK MANAGEMENT
+// ============================================
+
+// Dynamic Task Form Templates (Admin creates these)
+model TaskTemplate {
+  id          Int       @id @default(autoincrement())
+  name        String    // e.g., "Development Task", "Support Ticket"
+  description String?
+  fields      Json      // Array of field definitions
+  isActive    Boolean   @default(true)
+  createdById Int       @map("created_by")
+  createdBy   User      @relation("CreatedTemplates", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  tasks       Task[]
+  
+  @@map("task_templates")
+}
+
+// Main Task Model
+model Task {
+  id              BigInt      @id @default(autoincrement())
+  title           String
+  description     String?
+  
+  // Dynamic fields from template
+  templateId      Int?        @map("template_id")
+  template        TaskTemplate? @relation(fields: [templateId], references: [id])
+  customFieldData Json?       @map("custom_field_data") // Stores dynamic field values
+  
+  // Task Status (Kanban columns)
+  status          TaskStatus  @default(TODO)
+  priority        TaskPriority @default(MEDIUM)
+  
+  // Assignment
+  assignedToId    Int         @map("assigned_to")
+  assignedTo      User        @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  assignedById    Int         @map("assigned_by")
+  assignedBy      User        @relation("CreatedTasks", fields: [assignedById], references: [id])
+  
+  // Deadlines
+  dueDate         DateTime?   @map("due_date")
+  startedAt       DateTime?   @map("started_at")
+  completedAt     DateTime?   @map("completed_at")
+  
+  // Progress tracking
+  estimatedHours  Float?      @map("estimated_hours")
+  actualHours     Float?      @map("actual_hours")
+  lastUpdateAt    DateTime    @default(now()) @map("last_update_at")
+  
+  // Attachments
+  attachments     Json?       // Array of file URLs
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  updates         TaskUpdate[]
+  comments        TaskComment[]
+  
+  @@index([assignedToId])
+  @@index([assignedById])
+  @@index([status])
+  @@index([dueDate])
+  @@index([lastUpdateAt])
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Task Progress Updates (for hourly tracking)
+model TaskUpdate {
+  id          BigInt    @id @default(autoincrement())
+  taskId      BigInt    @map("task_id")
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  message     String    // What was done
+  hoursSpent  Float?    @map("hours_spent")
+  attachments Json?     // Files/screenshots
+  
+  createdById Int       @map("created_by")
+  createdBy   User      @relation("TaskUpdates", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  
+  @@index([taskId])
+  @@index([createdAt])
+  @@map("task_updates")
+}
+
+// Task Comments
+model TaskComment {
+  id          BigInt    @id @default(autoincrement())
+  taskId      BigInt    @map("task_id")
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  content     String
+  
+  createdById Int       @map("created_by")
+  createdBy   User      @relation("TaskComments", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([taskId])
+  @@map("task_comments")
+}
+
+// Employee Availability Status
+model UserAvailability {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+  
+  status      AvailabilityStatus @default(AVAILABLE)
+  statusNote  String?   @map("status_note") // "Back at 3 PM", "On lunch"
+  lastSeen    DateTime  @default(now()) @map("last_seen")
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("user_availability")
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  BUSY
+  ON_BREAK
+  SHORT_LEAVE
+  OFFLINE
+}
+
+// Activity Log for Real-time Monitoring
+model ActivityLog {
+  id          BigInt    @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+  
+  action      String    // "started_task", "updated_task", "completed_task", "went_on_break"
+  entityType  String?   // "task", "status"
+  entityId    String?   // ID of the related entity
+  metadata    Json?     // Additional data
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// ============================================
+// TEAM MEMBER PRICING
+// ============================================
+
+model MemberPricing {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String   // e.g. "COMPLETE PROJECT (SYNOPSIS + PROJECT)"
+  price       Float    // e.g. 800.0
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("member_pricing")
+}
+
+// ============================================
+// PAYMENT RECORDS
+// ============================================
+
+model PaymentRecord {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  user        User     @relation("UserPayments", fields: [userId], references: [id])
+  amount      Float
+  note        String?
+  paidAt      DateTime @default(now()) @map("paid_at")
+  invoiceUrl  String?  @map("invoice_url")
+  createdById Int      @map("created_by")
+  createdBy   User     @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+
+  // Snapshot of what this payment covered
+  studentIds  Json     @map("student_ids")  // Array of student IDs
+  breakdown   Json     // Snapshot: [{studentName, requirement, amount}]
+
+  @@index([userId])
+  @@map("payment_records")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id        BigInt   @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // NEW_LEAD | LEAD_ASSIGNED | STUDENT_ASSIGNED | IMPORT_DONE | TASK_ASSIGNED | NEW_ORDER | TASK_UPDATED
+  title     String
+  message   String   @db.Text
+  link      String?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ============================================
+// ORDER FORM CONFIG
+// ============================================
+
+model OrderFormConfig {
+  id        Int      @id @default(autoincrement())
+  config    Json
+  updatedAt DateTime @updatedAt
+
+  @@map("order_form_config")
+}

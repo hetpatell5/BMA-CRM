@@ -1,0 +1,7 @@
+app/(dashboard)/settings/page.tsx(129,13): error TS2304: Cannot find name 'setSelectedUser'.
+app/(dashboard)/settings/page.tsx(183,31): error TS2345: Argument of type '{ email: string; password: string; fullName: string; degree: string; role: string; staffRole: string | null; }' is not assignable to parameter of type '{ email: string; password: string; fullName: string; degree: string; combinedRole: string; }'.
+  Property 'combinedRole' is missing in type '{ email: string; password: string; fullName: string; degree: string; role: string; staffRole: string | null; }' but required in type '{ email: string; password: string; fullName: string; degree: string; combinedRole: string; }'.
+app/(dashboard)/settings/page.tsx(188,13): error TS2304: Cannot find name 'selectedUser'.
+app/(dashboard)/settings/page.tsx(197,41): error TS2304: Cannot find name 'selectedUser'.
+app/(dashboard)/settings/page.tsx(202,9): error TS2304: Cannot find name 'setSelectedUser'.
+app/(dashboard)/settings/page.tsx(651,41): error TS2304: Cannot find name 'setSelectedUser'.

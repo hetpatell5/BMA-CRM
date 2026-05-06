@@ -1,0 +1,24 @@
+{
+  "shiprocket": {
+    "email": "kiddosintellect369@gmail.com",
+    "password": "d4c99d8468833dfdb8066b7e0e9d1e72:0037ea352f16f0dd152d7134e4940fb18b07d_",
+    "pickupLocation": "Office",
+    "defaultWeight": "0.5",
+    "defaultLength": "25",
+    "defaultWidth": "20",
+    "defaultHeight": "5",
+    "defaultPaymentMethod": "Prepaid",
+    "hardCopyKeywords": [
+      "hard copy",
+      "hard-copy",
+      "hardcopy",
+      "printed copy",
+      "report"
+    ]
+  },
+  "emailConfig": {
+    "user": "bookmyassignmentss@gmail.com",
+    "pass": "pygafknnshpncgby",
+    "fromName": "BMA CRM"
+  }
+}

@@ -1,0 +1,238 @@
+import axios from 'axios'
+
+const api = axios.create({
+    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+    headers: {
+        'Content-Type': 'application/json',
+    },
+})
+
+// Request interceptor to add auth token
+api.interceptors.request.use(
+    (config) => {
+        // Get token from localStorage (where zustand persists it)
+        if (typeof window !== 'undefined') {
+            const authStorage = localStorage.getItem('auth-storage')
+            if (authStorage) {
+                try {
+                    const parsed = JSON.parse(authStorage)
+                    const token = parsed?.state?.token
+                    if (token) {
+                        config.headers.Authorization = `Bearer ${token}`
+                    }
+                } catch (e) {
+                    console.error('Failed to parse auth storage', e)
+                }
+            }
+        }
+        return config
+    },
+    (error) => {
+        return Promise.reject(error)
+    }
+)
+
+// Response interceptor to handle 401 and 403 errors (token missing or expired/invalid)
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        const status = error.response?.status
+        // 401 = no token, 403 = invalid/expired token (backend returns 403 for bad JWT)
+        if (status === 401 || status === 403) {
+            if (typeof window !== 'undefined') {
+                const authStorage = localStorage.getItem('auth-storage')
+                if (authStorage) {
+                    try {
+                        const parsed = JSON.parse(authStorage)
+                        // Only clear and redirect if user was previously authenticated
+                        // This prevents premature redirects during initial load
+                        if (parsed?.state?.isAuthenticated) {
+                            localStorage.removeItem('auth-storage')
+                            // Use replace to avoid back button issues
+                            window.location.replace('/login')
+                        }
+                    } catch (e) {
+                        // If parsing fails, do nothing - let the auth layout handle it
+                    }
+                }
+            }
+        }
+        return Promise.reject(error)
+    }
+)
+
+export default api
+
+// Auth API helpers (for login page which doesn't have token yet)
+export const authAPI = {
+    login: (email: string, password: string) =>
+        api.post('/auth/login', { email, password }),
+
+    register: (data: { email: string; password: string; fullName: string; role?: string }) =>
+        api.post('/auth/register', data),
+
+    me: () => api.get('/auth/me'),
+
+    changePassword: (currentPassword: string, newPassword: string) =>
+        api.put('/auth/change-password', { currentPassword, newPassword }),
+
+    updateProfile: (data: any) => api.put('/auth/me', data),
+    updateAvatar: (avatar: string) => api.put('/auth/me/avatar', { avatar }),
+}
+
+// Dashboard API
+export const dashboardAPI = {
+    getStats: () => api.get('/dashboard/stats'),
+    getTelecallerStats: () => api.get('/dashboard/telecaller-stats'),
+    getFollowUpsToday: () => api.get('/dashboard/follow-ups/today'),
+    getActivities: (limit = 10) => api.get(`/dashboard/activities?limit=${limit}`),
+    getTeamAvailability: () => api.get('/availability'),
+    getTasksOverview: () => api.get('/tasks/overview'),
+    getExpertWorkload: () => api.get('/dashboard/payments/expert-workload'),
+    getMonthlyTrends: () => api.get('/dashboard/charts/monthly-trends'),
+    getPaymentSummary: () => api.get('/dashboard/payment-summary'),
+}
+
+// Students API
+export const studentsAPI = {
+    getAll: (params?: any) => api.get('/students', { params }),
+    getById: (id: string | number) => api.get(`/students/${id}`),
+    create: (data: any) => api.post('/students', data),
+    update: (id: string | number, data: any) => api.put(`/students/${id}`, data),
+    delete: (id: string | number) => api.delete(`/students/${id}`),
+    search: (query: string) => api.get(`/students/search?q=${query}`),
+    getFilters: () => api.get('/students/meta/filters'),
+    bulkUpdate: (ids: string[], status: string) => api.post('/students/bulk-update', { ids, status }),
+    bulkDelete: (ids: string[]) => api.post('/students/bulk-delete', { ids }),
+    exportExcel: (params?: any) => api.get('/students/export/excel', { params, responseType: 'blob' }),
+    assignToGuide: (studentId: string, guideId: number | null, commission?: string | null) =>
+        api.post(`/students/assign/${studentId}`, { guideId, commission }),
+}
+
+// Leads API
+export const leadsAPI = {
+    getAll: (params?: any) => api.get('/leads', { params }),
+    getById: (id: string | number) => api.get(`/leads/${id}`),
+    create: (data: any) => api.post('/leads', data),
+    update: (id: string | number, data: any) => api.put(`/leads/${id}`, data),
+    delete: (id: string | number) => api.delete(`/leads/${id}`),
+    addActivity: (id: string | number, data: any) => api.post(`/leads/${id}/activities`, data),
+    convert: (id: string | number, data: any) => api.post(`/leads/${id}/convert`, data),
+    getPipeline: () => api.get('/leads/pipeline'),
+    getStats: () => api.get('/leads/stats/summary'),
+}
+
+// Import API
+export const importAPI = {
+    preview: (formData: FormData) => api.post('/import/preview', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    execute: (data: any) => api.post('/import/execute', data),
+    getHistory: (params?: any) => api.get('/import/history', { params }),
+    upload: (file: File, importType?: string) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        if (importType) formData.append('importType', importType)
+        return api.post('/import/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+    },
+    process: (importId: string, data?: any) => api.post(`/import/process/${importId}`, data),
+    delete: (importId: string, deleteRecords?: boolean) => api.delete(`/import/history/${importId}`, { params: { deleteRecords } }),
+    resume: (importId: string) => api.get(`/import/resume/${importId}`),
+    getDetails: (importId: string) => api.get(`/import/history/${importId}`),
+    saveMapping: (confirmedMappings: Record<string, string>) => api.post('/import/save-mapping', { confirmedMappings }),
+}
+
+// Tasks API
+export const tasksAPI = {
+    getAll: (params?: any) => api.get('/tasks', { params }),
+    getById: (id: string | number) => api.get(`/tasks/${id}`),
+    create: (data: any) => api.post('/tasks', data),
+    update: (id: string | number, data: any) => api.put(`/tasks/${id}`, data),
+    updateStatus: (id: string | number, status: string) => api.put(`/tasks/${id}`, { status }),
+    addUpdate: (id: string | number, data: any) => api.post(`/tasks/${id}/updates`, data),
+}
+
+// Availability API
+export const availabilityAPI = {
+    getAll: () => api.get('/availability'),
+    getMine: () => api.get('/availability/me'),
+    updateStatus: (status: string, statusNote?: string) =>
+        api.put('/availability/status', { status, statusNote }),
+    heartbeat: () => api.post('/availability/heartbeat'),
+}
+
+// Templates API
+export const templatesAPI = {
+    getAll: () => api.get('/templates'),
+    getById: (id: number) => api.get(`/templates/${id}`),
+    create: (data: any) => api.post('/templates', data),
+    update: (id: number, data: any) => api.put(`/templates/${id}`, data),
+    delete: (id: number) => api.delete(`/templates/${id}`),
+}
+
+// Team API
+export const teamAPI = {
+    getAll: () => api.get('/team'),
+    getById: (id: number) => api.get(`/team/${id}`),
+    create: (data: any) => api.post('/team', data),
+    update: (id: number, data: any) => api.put(`/team/${id}`, data),
+    delete: (id: number) => api.delete(`/team/${id}`),
+    getManagers: () => api.get('/team/managers/available'),
+    getGuides: () => api.get('/team/guides/available'),
+    getPaymentDetails: (id: number) => api.get(`/team/${id}/payment-details`),
+    updatePaymentDetails: (id: number, data: any) => api.put(`/team/${id}/payment-details`, data),
+    getPaymentSummary: () => api.get('/team/payment-summary'),
+    getMemberDashboard: (id: number) => api.get(`/team/${id}/dashboard`),
+    getMemberPricing: (id: number) => api.get(`/team/${id}/pricing`),
+    updateMemberPricing: (id: number, pricing: any[]) => api.post(`/team/${id}/pricing`, { pricing }),
+    markPaymentDone: (id: number, data: any) => api.post(`/team/${id}/payment`, data),
+    uploadQrScanner: (id: number, file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post(`/team/${id}/upload/qr-scanner`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    uploadBankPassbook: (id: number, file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post(`/team/${id}/upload/bank-passbook`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    sendEmail: (id: number, data: { subject: string; body: string; invoiceUrl?: string | null }) =>
+        api.post(`/team/${id}/send-email`, data),
+}
+
+// Order Form Config API
+export const orderFormConfigAPI = {
+    get: () => api.get('/order-form-config'),
+    update: (config: any) => api.put('/order-form-config', { config }),
+}
+
+// Notifications API
+export const notificationsAPI = {
+    getAll: (params?: any) => api.get('/notifications', { params }),
+    getUnreadCount: () => api.get('/notifications/unread-count'),
+    markRead: (ids: string[]) => api.put('/notifications/mark-read', { ids }),
+    markAllRead: () => api.put('/notifications/mark-all-read'),
+    delete: (id: string) => api.delete(`/notifications/${id}`),
+}
+
+// Shiprocket API
+export const shiprocketAPI = {
+    getPickupAddresses: () => api.get('/shiprocket/pickup-addresses'),
+    createShipment: (studentId: string, payload: Record<string, any>) =>
+        api.post(`/shiprocket/create-shipment/${studentId}`, payload),
+    trackShipment: (studentId: string) =>
+        api.get(`/shiprocket/track/${studentId}`),
+    getConfig: () => api.get('/app-settings/shiprocket-config'),
+}
+
+// App Settings API (Admin only)
+export const appSettingsAPI = {
+    get: () => api.get('/app-settings'),
+    update: (settings: Record<string, any>) => api.put('/app-settings', settings),
+}

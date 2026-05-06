@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+.env.local
+*.log
+dist/
+build/
+uploads/
+.DS_Store
+Thumbs.db
+
+backend/prisma.zip
