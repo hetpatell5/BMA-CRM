@@ -8,9 +8,13 @@ import { NavigationProgress } from '@/components/layout/navigation-progress'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-    title: 'CRM Admin Panel | Student Management',
-    description: 'Powerful CRM for managing millions of student records with lead tracking and Excel import capabilities.',
-    keywords: ['CRM', 'Student Management', 'Admin Panel', 'Lead Management', 'Education'],
+    title: 'BMA CRM',
+    description: 'BMA CRM',
+    icons: {
+        icon: '/logo.png',
+        shortcut: '/logo.png',
+        apple: '/logo.png',
+    },
 }
 
 export default function RootLayout({
