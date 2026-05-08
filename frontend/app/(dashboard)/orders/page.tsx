@@ -31,6 +31,13 @@ type ColumnDef = {
     adminOnly?: boolean;      // only visible to admin/manager
 }
 
+type RequirementAssignment = {
+    id: number
+    name: string
+    assignedById?: number
+    assignedByName?: string
+} | null
+
 const DEFAULT_COLUMNS: ColumnDef[] = [
     { id: 'name',        label: 'Full Name',      locked: true,  coreField: 'name' },
     { id: 'phone',       label: 'Contact',        coreField: 'phone' },
@@ -123,8 +130,8 @@ function getStudentRow(s: any) {
         coHandledBy:            s.coHandledBy || null,
         customFields:           cf || {},
         requirementAssignments: (cf?.requirementAssignments && typeof cf.requirementAssignments === 'object')
-            ? cf.requirementAssignments as Record<string, { id: number; name: string } | null>
-            : {} as Record<string, { id: number; name: string } | null>,
+            ? cf.requirementAssignments as Record<string, RequirementAssignment>
+            : {} as Record<string, RequirementAssignment>,
     }
 }
 
@@ -193,7 +200,8 @@ export default function StudentsPage() {
     const [assignmentDraft, setAssignmentDraft] = useState<{ student: any; member: any } | null>(null)
     const [showReqModal, setShowReqModal] = useState(false)
     const [reqModalStudent, setReqModalStudent] = useState<ReturnType<typeof getStudentRow> | null>(null)
-    const [reqDraft, setReqDraft] = useState<Record<string, { id: number; name: string } | null>>({})
+    const [reqDraft, setReqDraft] = useState<Record<string, RequirementAssignment>>({})
+    const [selectedRequirementByOrder, setSelectedRequirementByOrder] = useState<Record<string, string>>({})
 
     // Dynamic Columns State
     const [activeColumns, setActiveColumns] = useState<ColumnDef[]>([])
@@ -473,7 +481,7 @@ export default function StudentsPage() {
 
     function saveRequirementAssignments(
         studentRow: ReturnType<typeof getStudentRow>,
-        nextAssignments: Record<string, { id: number; name: string } | null>
+        nextAssignments: Record<string, RequirementAssignment>
     ) {
         updateReqMutation.mutate({
             studentId: studentRow.id,
@@ -484,23 +492,48 @@ export default function StudentsPage() {
         })
     }
 
-    function handleAssignAllRequirements(studentRow: ReturnType<typeof getStudentRow>, guideId: string) {
-        if (!guideId) return
-        const guide = guides.find((g: any) => String(g.id) === guideId)
-        if (!guide) return
-
-        const nextAssignments: Record<string, { id: number; name: string }> = {}
-        studentRow.requirementList.forEach((req: string) => {
-            nextAssignments[req] = { id: guide.id, name: guide.fullName }
-        })
-        saveRequirementAssignments(studentRow, nextAssignments)
+    function assignmentForGuide(guide: any): Exclude<RequirementAssignment, null> {
+        return {
+            id: guide.id,
+            name: guide.fullName,
+            assignedById: currentUser?.id,
+            assignedByName: currentUser?.fullName,
+        }
     }
 
-    function handleAssignOneRequirement(studentRow: ReturnType<typeof getStudentRow>, requirement: string, guideId: string) {
-        const guide = guides.find((g: any) => String(g.id) === guideId)
+    function selectedRequirementFor(studentRow: ReturnType<typeof getStudentRow>) {
+        return selectedRequirementByOrder[studentRow.id] || 'all'
+    }
+
+    function handleRequirementTargetAssign(studentRow: ReturnType<typeof getStudentRow>, guide: any) {
+        const selectedRequirement = selectedRequirementFor(studentRow)
+        const assignment = assignmentForGuide(guide)
+
+        if (selectedRequirement === 'all') {
+            const nextAssignments: Record<string, RequirementAssignment> = {}
+            studentRow.requirementList.forEach((req: string) => {
+                nextAssignments[req] = assignment
+            })
+            saveRequirementAssignments(studentRow, nextAssignments)
+            return
+        }
+
         saveRequirementAssignments(studentRow, {
             ...studentRow.requirementAssignments,
-            [requirement]: guide ? { id: guide.id, name: guide.fullName } : null,
+            [selectedRequirement]: assignment,
+        })
+    }
+
+    function removeRequirementAssignments(studentRow: ReturnType<typeof getStudentRow>) {
+        const selectedRequirement = selectedRequirementFor(studentRow)
+        if (selectedRequirement === 'all') {
+            saveRequirementAssignments(studentRow, {})
+            return
+        }
+
+        saveRequirementAssignments(studentRow, {
+            ...studentRow.requirementAssignments,
+            [selectedRequirement]: null,
         })
     }
 
@@ -527,43 +560,36 @@ export default function StudentsPage() {
                 return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap text-center" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>{r.semester ? <span className="font-medium">{r.semester}</span> : <span className="text-muted-foreground">—</span>}</td>
             case 'requirement': {
                 if (hasFullStudentAccess && r.requirementList.length > 1) {
-                    return (
-                        <td key={col.id} className="p-2 text-[14px] border-r border-border min-w-[280px]" onClick={e => e.stopPropagation()}>
-                            <div className="space-y-1.5">
-                                <select
-                                    className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs font-semibold text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30"
-                                    defaultValue=""
-                                    disabled={updateReqMutation.isPending || guides.length === 0}
-                                    onChange={e => {
-                                        handleAssignAllRequirements(r, e.target.value)
-                                        e.currentTarget.value = ''
-                                    }}
-                                >
-                                    <option value="">Assign all requirements...</option>
-                                    {guides.map((g: any) => (
-                                        <option key={g.id} value={g.id}>{g.fullName} ({guideRoleLabel(g.staffRole)})</option>
-                                    ))}
-                                </select>
+                    const selectedRequirement = selectedRequirementFor(r)
+                    const selectedLabel = selectedRequirement === 'all' ? 'All' : selectedRequirement
 
-                                <div className="space-y-1">
-                                    {r.requirementList.map((req: string) => (
-                                        <div key={req} className="flex items-center gap-2">
-                                            <span className="min-w-0 flex-1 truncate font-medium text-foreground" title={req}>{req}</span>
-                                            <select
-                                                className="h-8 w-36 rounded-md border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
-                                                value={r.requirementAssignments[req]?.id ?? ''}
-                                                disabled={updateReqMutation.isPending || guides.length === 0}
-                                                onChange={e => handleAssignOneRequirement(r, req, e.target.value)}
+                    return (
+                        <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                            <DropdownMenu.Root>
+                                <DropdownMenu.Trigger className="outline-none focus:outline-none flex items-center gap-1 group/trigger">
+                                    <span className="px-2.5 py-1.5 flex whitespace-nowrap min-w-[132px] max-w-[190px] items-center justify-between gap-2 rounded border border-border bg-background text-[13px] font-semibold text-foreground hover:bg-muted/50 cursor-pointer">
+                                        <span className="truncate">{selectedLabel}</span>
+                                        <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
+                                    </span>
+                                </DropdownMenu.Trigger>
+                                <DropdownMenu.Portal>
+                                    <DropdownMenu.Content
+                                        align="start"
+                                        sideOffset={6}
+                                        className="z-[100] w-40 overflow-hidden rounded-md bg-zinc-800 text-zinc-100 border border-zinc-700 p-1 shadow-2xl animate-fade-in"
+                                    >
+                                        {[['all', 'All'], ...r.requirementList.map((req: string) => [req, req])].map(([value, label]) => (
+                                            <DropdownMenu.Item
+                                                key={value}
+                                                onSelect={() => setSelectedRequirementByOrder(prev => ({ ...prev, [r.id]: value }))}
+                                                className="outline-none cursor-pointer rounded px-2 py-1.5 text-[14px] data-[highlighted]:bg-zinc-700"
                                             >
-                                                <option value="">Unassigned</option>
-                                                {guides.map((g: any) => (
-                                                    <option key={g.id} value={g.id}>{g.fullName}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                                                {label}
+                                            </DropdownMenu.Item>
+                                        ))}
+                                    </DropdownMenu.Content>
+                                </DropdownMenu.Portal>
+                            </DropdownMenu.Root>
                         </td>
                     )
                 }
@@ -611,17 +637,21 @@ export default function StudentsPage() {
                     </td>
                 )
             case 'assignedTo': {
-                const hasReqAssignments = r.requirementList.length > 1 && Object.keys(r.requirementAssignments).length > 0
                 return (
                     <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
-                        {hasReqAssignments ? (
-                            <div className="flex flex-col gap-0.5">
+                        {r.requirementList.length > 1 ? (
+                            <div className="flex flex-col gap-1">
                                 {r.requirementList.map((req: string) => {
                                     const a = r.requirementAssignments[req]
                                     return (
-                                        <div key={req} className="flex items-center gap-1.5">
-                                            <span className="text-[10px] text-muted-foreground shrink-0 w-14 truncate" title={req}>{req}</span>
-                                            <span className="text-[12px] font-semibold text-foreground">{a?.name || <span className="text-muted-foreground italic font-normal">—</span>}</span>
+                                        <div key={req} className="text-[12px] font-medium text-foreground">
+                                            <span>{req}</span>
+                                            <span className="text-muted-foreground"> - </span>
+                                            {a?.name ? (
+                                                <span>Assigned to {a.name}</span>
+                                            ) : (
+                                                <span className="text-muted-foreground italic font-normal">Unassigned</span>
+                                            )}
                                         </div>
                                     )
                                 })}
@@ -657,11 +687,17 @@ export default function StudentsPage() {
                     </td>
                 )
             case 'assignedBy':
+                const reqAssignedBy = r.requirementList.length > 1
+                    ? Object.values(r.requirementAssignments).find((a) => a?.assignedByName)?.assignedByName
+                    : null
+                const shouldShowAssignedBy = r.requirementList.length > 1
+                    ? Boolean(reqAssignedBy)
+                    : Boolean(r.assignedGuideId && r.assignedBy)
                 return (
                     <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
-                        {r.assignedBy ? (
+                        {shouldShowAssignedBy ? (
                             <span className="text-muted-foreground text-[12px] font-bold uppercase tracking-tight">
-                                {r.assignedBy.fullName}
+                                {reqAssignedBy || r.assignedBy.fullName}
                             </span>
                         ) : (
                             <span className="text-muted-foreground text-xs">—</span>
@@ -679,64 +715,64 @@ export default function StudentsPage() {
                     <td key={col.id} className="p-2 border-l border-border sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900/80" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
                             {hasFullStudentAccess && (
-                                r.requirementList.length > 1 ? (
-                                    /* Multi-requirement: open dedicated modal */
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="gap-1 text-[11px] h-8 font-bold uppercase tracking-wider border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 max-w-[140px]"
-                                        title="Assign per requirement"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setReqModalStudent(r)
-                                            setReqDraft({ ...r.requirementAssignments })
-                                            setShowReqModal(true)
-                                        }}
-                                    >
-                                        <UserCheck className="w-3 h-3 shrink-0" />
-                                        <span className="truncate">Assign</span>
-                                        <Layers className="w-3 h-3 opacity-50 shrink-0" />
-                                    </Button>
-                                ) : (
-                                    /* Single requirement: original dropdown */
-                                    <DropdownMenu.Root>
-                                        <DropdownMenu.Trigger asChild>
-                                            <Button variant="outline" size="sm" className="gap-1 text-[11px] h-8 font-bold uppercase tracking-wider border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 max-w-[140px]" title="Assign staff member">
-                                                <UserCheck className="w-3 h-3 shrink-0" />
-                                                <span className="truncate">
-                                                    {guide ? guide.fullName : 'Assign'}
-                                                </span>
-                                                <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
-                                            </Button>
-                                        </DropdownMenu.Trigger>
-                                        <DropdownMenu.Portal>
-                                            <DropdownMenu.Content align="end" sideOffset={6} collisionPadding={12} className="z-[100] w-52 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in">
-                                                {guides.length === 0 ? (
-                                                    <div className="px-3 py-4 text-xs text-muted-foreground text-center">No staff members available.</div>
-                                                ) : (
-                                                    <div className="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto pr-0.5">
-                                                        {guides.map((g: any) => {
-                                                            const isSelected = r.assignedGuideId === g.id
-                                                            return (
-                                                                <DropdownMenu.Item key={g.id} onSelect={() => openAssignModal(r, g)} className={`w-full flex items-center justify-between outline-none transition-colors cursor-pointer rounded-lg px-3 py-2.5 mb-1 last:mb-0 ${isSelected ? 'bg-slate-100 dark:bg-slate-800 text-foreground font-medium' : 'text-muted-foreground data-[highlighted]:bg-slate-50 dark:data-[highlighted]:bg-slate-800/50 data-[highlighted]:text-foreground'}`}>
-                                                                    <div className="text-[14px] font-medium truncate">{g.fullName}</div>
-                                                                    <div className="text-[11px] text-muted-foreground shrink-0 ml-3 font-normal">{guideRoleLabel(g.staffRole)}</div>
-                                                                </DropdownMenu.Item>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                )}
-                                                {r.assignedGuideId && (
-                                                    <div className="mt-1 border-t border-border pt-1">
-                                                        <DropdownMenu.Item onSelect={() => assignMutation.mutate({ studentId: r.id, guideId: null })} className="w-full outline-none transition-colors cursor-pointer rounded-lg px-3 py-2.5 text-red-500 dark:text-red-400 data-[highlighted]:bg-red-50 dark:data-[highlighted]:bg-red-500/10 font-medium">
-                                                            Remove Assignment
-                                                        </DropdownMenu.Item>
-                                                    </div>
-                                                )}
-                                            </DropdownMenu.Content>
-                                        </DropdownMenu.Portal>
-                                    </DropdownMenu.Root>
-                                )
+                                <DropdownMenu.Root>
+                                    <DropdownMenu.Trigger asChild>
+                                        <Button variant="outline" size="sm" className="gap-1 text-[11px] h-8 font-bold uppercase tracking-wider border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 max-w-[140px]" title="Assign staff member">
+                                            <UserCheck className="w-3 h-3 shrink-0" />
+                                            <span className="truncate">
+                                                {guide ? guide.fullName : 'Assign'}
+                                            </span>
+                                            <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
+                                        </Button>
+                                    </DropdownMenu.Trigger>
+                                    <DropdownMenu.Portal>
+                                        <DropdownMenu.Content align="end" sideOffset={6} collisionPadding={12} className="z-[100] w-52 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in">
+                                            {guides.length === 0 ? (
+                                                <div className="px-3 py-4 text-xs text-muted-foreground text-center">No staff members available.</div>
+                                            ) : (
+                                                <div className="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto pr-0.5">
+                                                    {guides.map((g: any) => {
+                                                        const isSelected = r.requirementList.length > 1
+                                                            ? selectedRequirementFor(r) !== 'all' && r.requirementAssignments[selectedRequirementFor(r)]?.id === g.id
+                                                            : r.assignedGuideId === g.id
+                                                        return (
+                                                            <DropdownMenu.Item
+                                                                key={g.id}
+                                                                onSelect={() => {
+                                                                    if (r.requirementList.length > 1) {
+                                                                        handleRequirementTargetAssign(r, g)
+                                                                    } else {
+                                                                        openAssignModal(r, g)
+                                                                    }
+                                                                }}
+                                                                className={`w-full flex items-center justify-between outline-none transition-colors cursor-pointer rounded-lg px-3 py-2.5 mb-1 last:mb-0 ${isSelected ? 'bg-slate-100 dark:bg-slate-800 text-foreground font-medium' : 'text-muted-foreground data-[highlighted]:bg-slate-50 dark:data-[highlighted]:bg-slate-800/50 data-[highlighted]:text-foreground'}`}
+                                                            >
+                                                                <div className="text-[14px] font-medium truncate">{g.fullName}</div>
+                                                                <div className="text-[11px] text-muted-foreground shrink-0 ml-3 font-normal">{guideRoleLabel(g.staffRole)}</div>
+                                                            </DropdownMenu.Item>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                            {((r.requirementList.length > 1 && Object.values(r.requirementAssignments).some(Boolean)) || r.assignedGuideId) && (
+                                                <div className="mt-1 border-t border-border pt-1">
+                                                    <DropdownMenu.Item
+                                                        onSelect={() => {
+                                                            if (r.requirementList.length > 1) {
+                                                                removeRequirementAssignments(r)
+                                                            } else {
+                                                                assignMutation.mutate({ studentId: r.id, guideId: null })
+                                                            }
+                                                        }}
+                                                        className="w-full outline-none transition-colors cursor-pointer rounded-lg px-3 py-2.5 text-red-500 dark:text-red-400 data-[highlighted]:bg-red-50 dark:data-[highlighted]:bg-red-500/10 font-medium"
+                                                    >
+                                                        Remove Assignment
+                                                    </DropdownMenu.Item>
+                                                </div>
+                                            )}
+                                        </DropdownMenu.Content>
+                                    </DropdownMenu.Portal>
+                                </DropdownMenu.Root>
                             )}
                             {hasFullStudentAccess && (
                                 <Link href={`/orders/${r.id}/edit`}>
