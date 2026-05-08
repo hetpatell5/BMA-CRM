@@ -179,20 +179,32 @@ export default function StudentsPage() {
         subject:        searchParams.get('subject') || '',
     })
 
-    // Load columns correctly
+    // Load columns — merge saved prefs with DEFAULT_COLUMNS so new columns always appear
     useEffect(() => {
         if (!currentUser?.id) return;
+        const defaults = DEFAULT_COLUMNS.filter(c => c.adminOnly ? hasFullStudentAccess : true)
         const saved = localStorage.getItem(`crm_column_prefs_v1_${currentUser.id}`)
         if (saved) {
             try {
-                setActiveColumns(JSON.parse(saved))
+                const parsed: ColumnDef[] = JSON.parse(saved)
+                // Add any default columns missing from saved prefs (new columns added after save)
+                const missing = defaults.filter(d => !parsed.find(p => p.id === d.id))
+                if (missing.length > 0) {
+                    // Insert missing columns before 'actions'
+                    const actionsIdx = parsed.findIndex(c => c.id === 'actions')
+                    const merged = actionsIdx !== -1
+                        ? [...parsed.slice(0, actionsIdx), ...missing, ...parsed.slice(actionsIdx)]
+                        : [...parsed, ...missing]
+                    setActiveColumns(merged)
+                } else {
+                    setActiveColumns(parsed)
+                }
                 return
             } catch (e) {
                 console.error("Failed to parse saved columns", e)
             }
         }
-        
-        setActiveColumns(DEFAULT_COLUMNS.filter(c => c.adminOnly ? hasFullStudentAccess : true))
+        setActiveColumns(defaults)
     }, [currentUser?.id, hasFullStudentAccess])
 
     const saveColumnPrefs = (cols: ColumnDef[]) => {
@@ -569,8 +581,8 @@ export default function StudentsPage() {
                                     </Button>
                                 </Link>
                             )}
-                            {/* Take Over — show for telecallers who didn't create this order and haven't co-handled it yet */}
-                            {isTelecaller && r.createdById !== currentUser?.id && !r.coHandledById && (
+                            {/* Take Over — show for anyone who didn't create this order and it has no co-handler yet */}
+                            {hasFullStudentAccess && r.createdById !== currentUser?.id && !r.coHandledById && (
                                 <Button
                                     variant="ghost"
                                     size="icon"

@@ -258,22 +258,22 @@ router.post('/bulk-delete', async (req, res, next) => {
 // Co-handle an order (second telecaller takes over when primary is absent)
 router.post('/co-handle/:id', async (req, res, next) => {
     try {
-        const isTelecaller = req.user.role === 'STAFF' && req.user.staffRole === 'TELECALLER';
         const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
-        if (!isTelecaller && !isAdmin) {
-            return res.status(403).json({ success: false, message: 'Only telecallers can co-handle orders' });
+        const isTelecaller = req.user.role === 'STAFF' && req.user.staffRole === 'TELECALLER';
+        if (!isAdmin && !isTelecaller) {
+            return res.status(403).json({ success: false, message: 'Insufficient permissions' });
         }
 
         const studentId = BigInt(req.params.id);
-        const student = await prisma.student.findUnique({
-            where: { id: studentId },
-            select: { id: true, fullName: true, assignedById: true, coHandledById: true },
-        });
+        const [student] = await prisma.$queryRaw`
+            SELECT id, full_name as fullName, assigned_by_id as assignedById, co_handled_by_id as coHandledById
+            FROM students WHERE id = ${studentId}
+        `;
 
         if (!student) return res.status(404).json({ success: false, message: 'Order not found' });
 
         // Can't co-handle your own order
-        if (student.assignedById === req.user.id) {
+        if (student.assignedById === req.user.id || student.assignedById === BigInt(req.user.id)) {
             return res.status(400).json({ success: false, message: 'You are already the primary telecaller for this order' });
         }
 
@@ -282,10 +282,9 @@ router.post('/co-handle/:id', async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'This order already has a co-handler. A 3rd handler requires admin approval.' });
         }
 
-        await prisma.student.update({
-            where: { id: studentId },
-            data: { coHandledById: req.user.id, coHandledAt: new Date() },
-        });
+        await prisma.$executeRaw`
+            UPDATE students SET co_handled_by_id = ${req.user.id}, co_handled_at = NOW() WHERE id = ${studentId}
+        `;
 
         res.json({ success: true, message: 'You are now co-handling this order (50/50 commission split)' });
     } catch (error) {
@@ -474,7 +473,7 @@ router.get('/', async (req, res, next) => {
         let guideMap = {};
         if (studentIds.length > 0) {
             const rows = await prisma.$queryRaw`
-                SELECT s.id, s.assigned_guide_id, s.assigned_by_id, s.created_by_id,
+                SELECT s.id, s.assigned_guide_id, s.assigned_by_id, s.created_by_id, s.co_handled_by_id,
                        u.id as guide_id, u.full_name as guide_name,
                        u.staff_role as guide_staff_role, u.degree as guide_degree,
                        a.id as assigner_id, a.full_name as assigner_name, a.staff_role as assigner_staff_role,
@@ -506,6 +505,7 @@ router.get('/', async (req, res, next) => {
                         fullName: row.creator_name,
                         staffRole: row.creator_staff_role,
                     } : null,
+                    coHandledById: row.co_handled_by_id ? Number(row.co_handled_by_id) : null,
                 };
             });
         }
@@ -514,7 +514,7 @@ router.get('/', async (req, res, next) => {
         const serializedStudents = students.map(s => ({
             ...s,
             id: s.id.toString(),
-            ...(guideMap[s.id.toString()] || { assignedGuideId: null, assignedGuide: null, assignedById: null, assignedBy: null, createdById: null, createdBy: null }),
+            ...(guideMap[s.id.toString()] || { assignedGuideId: null, assignedGuide: null, assignedById: null, assignedBy: null, createdById: null, createdBy: null, coHandledById: null }),
         }));
 
         res.json({
