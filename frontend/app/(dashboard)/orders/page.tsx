@@ -471,6 +471,39 @@ export default function StudentsPage() {
         })
     }
 
+    function saveRequirementAssignments(
+        studentRow: ReturnType<typeof getStudentRow>,
+        nextAssignments: Record<string, { id: number; name: string } | null>
+    ) {
+        updateReqMutation.mutate({
+            studentId: studentRow.id,
+            customFields: {
+                ...studentRow.customFields,
+                requirementAssignments: nextAssignments,
+            },
+        })
+    }
+
+    function handleAssignAllRequirements(studentRow: ReturnType<typeof getStudentRow>, guideId: string) {
+        if (!guideId) return
+        const guide = guides.find((g: any) => String(g.id) === guideId)
+        if (!guide) return
+
+        const nextAssignments: Record<string, { id: number; name: string }> = {}
+        studentRow.requirementList.forEach((req: string) => {
+            nextAssignments[req] = { id: guide.id, name: guide.fullName }
+        })
+        saveRequirementAssignments(studentRow, nextAssignments)
+    }
+
+    function handleAssignOneRequirement(studentRow: ReturnType<typeof getStudentRow>, requirement: string, guideId: string) {
+        const guide = guides.find((g: any) => String(g.id) === guideId)
+        saveRequirementAssignments(studentRow, {
+            ...studentRow.requirementAssignments,
+            [requirement]: guide ? { id: guide.id, name: guide.fullName } : null,
+        })
+    }
+
     // Dynamic Row rendering
     const renderCell = (col: ColumnDef, r: ReturnType<typeof getStudentRow>, student: any) => {
         const src = sourceLabel(r.source)
@@ -492,8 +525,51 @@ export default function StudentsPage() {
                 return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>{r.programme || <span className="text-muted-foreground">—</span>}</td>
             case 'semester':
                 return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap text-center" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>{r.semester ? <span className="font-medium">{r.semester}</span> : <span className="text-muted-foreground">—</span>}</td>
-            case 'requirement':
+            case 'requirement': {
+                if (hasFullStudentAccess && r.requirementList.length > 1) {
+                    return (
+                        <td key={col.id} className="p-2 text-[14px] border-r border-border min-w-[280px]" onClick={e => e.stopPropagation()}>
+                            <div className="space-y-1.5">
+                                <select
+                                    className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs font-semibold text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                                    defaultValue=""
+                                    disabled={updateReqMutation.isPending || guides.length === 0}
+                                    onChange={e => {
+                                        handleAssignAllRequirements(r, e.target.value)
+                                        e.currentTarget.value = ''
+                                    }}
+                                >
+                                    <option value="">Assign all requirements...</option>
+                                    {guides.map((g: any) => (
+                                        <option key={g.id} value={g.id}>{g.fullName} ({guideRoleLabel(g.staffRole)})</option>
+                                    ))}
+                                </select>
+
+                                <div className="space-y-1">
+                                    {r.requirementList.map((req: string) => (
+                                        <div key={req} className="flex items-center gap-2">
+                                            <span className="min-w-0 flex-1 truncate font-medium text-foreground" title={req}>{req}</span>
+                                            <select
+                                                className="h-8 w-36 rounded-md border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
+                                                value={r.requirementAssignments[req]?.id ?? ''}
+                                                disabled={updateReqMutation.isPending || guides.length === 0}
+                                                onChange={e => handleAssignOneRequirement(r, req, e.target.value)}
+                                            >
+                                                <option value="">Unassigned</option>
+                                                {guides.map((g: any) => (
+                                                    <option key={g.id} value={g.id}>{g.fullName}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </td>
+                    )
+                }
+
                 return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>{r.requirement ? <span className="font-medium">{r.requirement}</span> : <span className="text-muted-foreground">—</span>}</td>
+            }
             case 'source':
                 return <td key={col.id} className="p-2 border-r border-border whitespace-nowrap text-center" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}><span className="text-[12px] uppercase tracking-wider text-muted-foreground font-bold">{src.label}</span></td>
             case 'status':
