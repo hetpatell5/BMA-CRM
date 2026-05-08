@@ -184,12 +184,26 @@ export default function ImportPage() {
         maxSize: 100 * 1024 * 1024,
     })
 
+    // Warn user if they try to leave during processing
+    useEffect(() => {
+        if (step !== 'processing') return
+        const handler = (e: BeforeUnloadEvent) => {
+            e.preventDefault()
+            e.returnValue = 'Import is in progress. Leaving now will not cancel it — it will continue on the server.'
+        }
+        window.addEventListener('beforeunload', handler)
+        return () => window.removeEventListener('beforeunload', handler)
+    }, [step])
+
     // Socket.IO for real-time progress
     useEffect(() => {
         if (step === 'processing' && uploadData?.importId) {
-            const backendHost = typeof window !== 'undefined'
-                ? `${window.location.protocol}//${window.location.hostname}:5000`
-                : 'http://localhost:5000'
+            const hostname = window.location.hostname
+            const isLocalDev = hostname === 'localhost' || hostname === '127.0.0.1'
+                || /^192\.168\./.test(hostname) || /^10\./.test(hostname)
+            const backendHost = isLocalDev
+                ? `${window.location.protocol}//${hostname}:5000`
+                : window.location.origin
 
             const socket = io(backendHost, {
                 transports: ['websocket', 'polling'],

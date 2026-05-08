@@ -40,6 +40,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     { id: 'source',      label: 'Source',         coreField: 'source' },
     { id: 'status',      label: 'Status',         locked: true, coreField: 'status' },
     { id: 'assignedTo',  label: 'Assigned To',    coreField: 'assignedGuide' },
+    { id: 'orderBy',     label: 'Order By',       coreField: 'createdBy', adminOnly: true },
     { id: 'assignedBy',  label: 'Assigned By',    coreField: 'assignedBy', adminOnly: true },
     { id: 'decidedPrice',label: 'Decided Price',  coreField: 'decidedPrice', adminOnly: true },
     { id: 'actions',     label: 'Actions',        locked: true },
@@ -94,6 +95,9 @@ function getStudentRow(s: any) {
         assignedGuideId: s.assignedGuideId || null,
         assignedBy:      s.assignedBy || null,
         assignedById:    s.assignedById || null,
+        createdBy:       s.createdBy || null,
+        createdById:     s.createdById || null,
+        coHandledById:   s.coHandledById || null,
     }
 }
 
@@ -323,6 +327,20 @@ export default function StudentsPage() {
         }),
     })
 
+    // Co-handle (Take Over)
+    const coHandleMutation = useMutation({
+        mutationFn: (studentId: string) => studentsAPI.coHandle(studentId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] })
+            toast({ title: 'Co-handling!', description: 'You are now co-handling this order (50/50 commission)', variant: 'success' })
+        },
+        onError: (error: any) => toast({
+            title: 'Cannot take over',
+            description: error?.response?.data?.message || 'Failed to co-handle order',
+            variant: 'destructive',
+        }),
+    })
+
     // Export
     const [isExporting, setIsExporting] = useState(false)
     const handleExport = async () => {
@@ -471,6 +489,18 @@ export default function StudentsPage() {
                         )}
                     </td>
                 )
+            case 'orderBy':
+                return (
+                    <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
+                        {r.createdBy ? (
+                            <span className="text-[13px] font-semibold text-cyan-600 dark:text-cyan-400">
+                                {r.createdBy.fullName} <span className="text-muted-foreground font-normal text-[11px]">#{r.createdById}</span>
+                            </span>
+                        ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                    </td>
+                )
             case 'assignedBy':
                 return (
                     <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
@@ -538,6 +568,19 @@ export default function StudentsPage() {
                                         <Edit className="w-4 h-4" />
                                     </Button>
                                 </Link>
+                            )}
+                            {/* Take Over — show for telecallers who didn't create this order and haven't co-handled it yet */}
+                            {isTelecaller && r.createdById !== currentUser?.id && !r.coHandledById && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-cyan-500 hover:text-cyan-400 hover:bg-cyan-500/10"
+                                    title="Take Over (co-handle 50/50)"
+                                    onClick={(e) => { e.stopPropagation(); coHandleMutation.mutate(r.id) }}
+                                    disabled={coHandleMutation.isPending}
+                                >
+                                    <Users className="w-4 h-4" />
+                                </Button>
                             )}
                             {hasFullStudentAccess && isHardCopyOrder(r) && (
                                 <Link href={`/orders/${r.id}`} title="Ship via Shiprocket">

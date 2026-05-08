@@ -30,7 +30,7 @@ router.get('/public/:id', async (req, res) => {
 router.post('/public/:id/submit', async (req, res) => {
     try {
         const { id } = req.params;
-        const { responses } = req.body; // { fieldLabel: value, ... }
+        const { responses, telecallerId } = req.body; // telecallerId = the staff member who shared the form
 
         const template = await prisma.taskTemplate.findUnique({
             where: { id: parseInt(id) },
@@ -55,7 +55,10 @@ router.post('/public/:id/submit', async (req, res) => {
         const city      = findVal(['city']);
         const state     = findVal(['state']);
 
-        // 1. Create Student record (existing behaviour)
+        // Validate telecallerId if provided
+        const tcId = telecallerId ? parseInt(telecallerId) : null;
+
+        // 1. Create Student record
         const student = await prisma.student.create({
             data: {
                 fullName,
@@ -66,7 +69,9 @@ router.post('/public/:id/submit', async (req, res) => {
                 state:     state     || null,
                 source:    'form_submission',
                 status:    'NEW_LEAD',
-                customFields: responses, // store raw form data
+                customFields: responses,
+                // Track which telecaller's form this came from
+                ...(tcId && { createdById: tcId, assignedById: tcId }),
             }
         });
 
@@ -82,7 +87,7 @@ router.post('/public/:id/submit', async (req, res) => {
                     stage:            'NEW',
                     priority:         'MEDIUM',
                     followUpNotes:    `Form: "${template.name}" | Responses: ${JSON.stringify(responses)}`,
-                    // No createdById — public form has no logged-in user
+                    ...(tcId && { createdById: tcId, assignedToId: tcId }),
                 }
             });
         } catch (leadErr) {

@@ -37,8 +37,9 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         const status = error.response?.status
-        // 401 = no token, 403 = invalid/expired token (backend returns 403 for bad JWT)
-        if (status === 401 || status === 403) {
+        // 401 = no token or invalid/expired token — auto logout
+        // 403 = valid token but insufficient permissions — do NOT logout (telecallers hit this on admin routes)
+        if (status === 401) {
             if (typeof window !== 'undefined') {
                 const authStorage = localStorage.getItem('auth-storage')
                 if (authStorage) {
@@ -107,6 +108,8 @@ export const studentsAPI = {
     exportExcel: (params?: any) => api.get('/students/export/excel', { params, responseType: 'blob' }),
     assignToGuide: (studentId: string, guideId: number | null, commission?: string | null) =>
         api.post(`/students/assign/${studentId}`, { guideId, commission }),
+    coHandle: (studentId: string | number) =>
+        api.post(`/students/co-handle/${studentId}`),
 }
 
 // Leads API

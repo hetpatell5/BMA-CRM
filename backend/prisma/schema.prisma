@@ -69,8 +69,9 @@ model User {
   teamMembers       User[]          @relation("TeamMembers")
 
   // Students assigned to this guide/expert
-  assignedStudents  Student[]       @relation("AssignedToGuide")
-  assignedByStudents Student[]      @relation("AssignedBy")
+  assignedStudents    Student[]     @relation("AssignedToGuide")
+  assignedByStudents  Student[]     @relation("AssignedBy")
+  coHandledStudents   Student[]     @relation("CoHandledStudents")
 
   @@map("users")
 }
@@ -141,9 +142,17 @@ model Student {
   assignedGuideId Int?    @map("assigned_guide_id")
   assignedGuide   User?   @relation("AssignedToGuide", fields: [assignedGuideId], references: [id])
 
-  // Telecaller who assigned
+  // Telecaller who assigned (primary owner)
   assignedById    Int?    @map("assigned_by_id")
   assignedBy      User?   @relation("AssignedBy", fields: [assignedById], references: [id])
+
+  // Co-handler telecaller (second telecaller when primary is absent - gets 50% commission)
+  coHandledById   Int?      @map("co_handled_by_id")
+  coHandledBy     User?     @relation("CoHandledStudents", fields: [coHandledById], references: [id])
+  coHandledAt     DateTime? @map("co_handled_at")
+
+  // Per-requirement assignments [{requirement, guideId, guideName, assignedById, assignedByName, assignedAt}]
+  requirementAssignments Json? @map("requirement_assignments")
 
   // Metadata
   createdAt      DateTime @default(now()) @map("created_at")

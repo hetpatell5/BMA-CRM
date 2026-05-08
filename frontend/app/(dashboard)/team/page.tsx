@@ -448,6 +448,7 @@ export default function SettingsPage() {
                                                 <div className="flex flex-col">
                                                     <span className="font-semibold text-foreground text-[14px] flex items-center gap-2 capitalize">
                                                         {member.fullName}
+                                                        <span className="text-[11px] text-muted-foreground font-normal normal-case">#{member.id}</span>
                                                     </span>
                                                     <span className="text-[12px] text-muted-foreground mt-0.5">{member.email}</span>
                                                 </div>

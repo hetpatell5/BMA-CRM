@@ -14,7 +14,7 @@ export const authenticateToken = (req, res, next) => {
 
     jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
         if (err) {
-            return res.status(403).json({
+            return res.status(401).json({
                 success: false,
                 message: 'Invalid or expired token'
             });
@@ -28,7 +28,7 @@ export const authenticateToken = (req, res, next) => {
             });
 
             if (!dbUser || dbUser.status !== 'ACTIVE') {
-                return res.status(403).json({
+                return res.status(401).json({
                     success: false,
                     message: 'User account is inactive or deleted'
                 });

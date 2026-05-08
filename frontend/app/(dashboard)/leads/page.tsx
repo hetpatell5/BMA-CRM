@@ -228,6 +228,7 @@ export default function LeadsPage() {
                                     <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Source</th>
                                     <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Stage</th>
                                     <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Priority</th>
+                                    {hasFullAccess && <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order By</th>}
                                     <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assigned</th>
                                     <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
                                 </tr>
@@ -243,7 +244,7 @@ export default function LeadsPage() {
                                     ))
                                 ) : leads.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="p-12 text-center">
+                                        <td colSpan={hasFullAccess ? 9 : 8} className="p-12 text-center">
                                             <Target className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
                                             <p className="text-lg font-medium mb-2">No leads found</p>
                                             <p className="text-muted-foreground mb-4">
@@ -323,6 +324,19 @@ export default function LeadsPage() {
                                                     {lead.priority}
                                                 </span>
                                             </td>
+
+                                            {/* Order By (telecaller who owns this lead) */}
+                                            {hasFullAccess && (
+                                                <td className="p-4 whitespace-nowrap">
+                                                    {lead.createdBy ? (
+                                                        <span className="text-[13px] font-semibold text-cyan-600 dark:text-cyan-400">
+                                                            {lead.createdBy.fullName} <span className="text-muted-foreground font-normal text-[11px]">#{lead.createdBy.id}</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground text-xs">—</span>
+                                                    )}
+                                                </td>
+                                            )}
 
                                             {/* Assigned — dropdown for admin/manager */}
                                             <td className="p-4">

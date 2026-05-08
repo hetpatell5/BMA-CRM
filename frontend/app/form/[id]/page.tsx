@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 import axios from 'axios'
 import { CheckCircle, AlertCircle, Loader2, Send, GraduationCap } from 'lucide-react'
 
@@ -30,6 +31,8 @@ interface FormTemplate {
 
 export default function PublicFormPage({ params }: { params: { id: string } }) {
     const { id } = params
+    const searchParams = useSearchParams()
+    const telecallerId = searchParams.get('ref')
     const [responses, setResponses] = useState<Record<string, any>>({})
     const [submitted, setSubmitted] = useState(false)
     const [errors, setErrors] = useState<Record<string, string>>({})
@@ -45,7 +48,10 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
 
     const submitMutation = useMutation({
         mutationFn: async (responses: Record<string, any>) => {
-            const res = await axios.post(`${API}/templates/public/${id}/submit`, { responses })
+            const res = await axios.post(`${API}/templates/public/${id}/submit`, {
+                responses,
+                ...(telecallerId && { telecallerId }),
+            })
             return res.data
         },
         onSuccess: () => setSubmitted(true),

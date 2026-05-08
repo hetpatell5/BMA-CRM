@@ -51,6 +51,9 @@ router.get('/', async (req, res, next) => {
                 assignedTo: {
                     select: { id: true, fullName: true, avatar: true },
                 },
+                createdBy: {
+                    select: { id: true, fullName: true, staffRole: true },
+                },
                 _count: {
                     select: { activities: true },
                 },
