@@ -8,7 +8,7 @@ import {
     List, Calendar, Image as ImageIcon, ExternalLink,
     Save, ArrowLeft, Eye, EyeOff, GripVertical, Copy,
     ClipboardList, ToggleLeft, AlignLeft, Hash, Radio,
-    X, ChevronUp, ChevronDown, Loader2, Share2, Link2
+    X, ChevronUp, ChevronDown, Loader2, Share2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -573,9 +573,10 @@ export default function FormTemplatesPage() {
     const [editing, setEditing] = useState<FormTemplate | null>(null)
     const [building, setBuilding] = useState(false)
 
-    // Share template — generate public URL and copy to clipboard
+    // Share template — generate public URL with ?ref=userId so responses are attributed to this telecaller
     const shareTemplate = (t: FormTemplate) => {
-        const url = `${window.location.origin}/form/${t.id}`
+        const ref = currentUser?.id ? `?ref=${currentUser.id}` : ''
+        const url = `${window.location.origin}/form/${t.id}${ref}`
         navigator.clipboard.writeText(url).then(() => {
             toast({ title: '🔗 Link copied!', description: url })
         }).catch(() => {
@@ -774,7 +775,7 @@ export default function FormTemplatesPage() {
                                 {/* Fields preview */}
                                 <div className="flex-1">
                                     <div className="space-y-1.5">
-                                        {t.fields.slice(0, 4).map((f, i) => {
+                                        {t.fields.slice(0, 4).map((f) => {
                                             const def = getFieldDef(f.type)
                                             const FieldIcon = def.icon
                                             return (
