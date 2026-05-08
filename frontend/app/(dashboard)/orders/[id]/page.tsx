@@ -21,17 +21,54 @@ import dynamic from 'next/dynamic'
 
 const ShiprocketModal = dynamic(() => import('@/components/shiprocket-modal'), { ssr: false })
 
+const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments'])
+
+function normalizeFieldKey(key: string) {
+    return key.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function valueToText(value: any): string {
+    if (value === null || value === undefined) return ''
+    if (Array.isArray(value)) return value.map(valueToText).filter(Boolean).join(', ')
+    if (typeof value === 'object') return ''
+    return String(value).trim()
+}
+
+function customFieldText(customFields: Record<string, any> | null | undefined, ...keywords: string[]): string {
+    if (!customFields || typeof customFields !== 'object') return ''
+
+    const entries = Object.entries(customFields)
+        .filter(([key, value]) => !INTERNAL_CUSTOM_FIELD_KEYS.has(normalizeFieldKey(key)) && valueToText(value))
+
+    for (const keyword of keywords) {
+        const normalizedKeyword = normalizeFieldKey(keyword)
+        const exact = entries.find(([key]) => normalizeFieldKey(key) === normalizedKeyword)
+        if (exact) return valueToText(exact[1])
+
+        const partial = entries.find(([key]) => key.toLowerCase().includes(keyword.toLowerCase()))
+        if (partial) return valueToText(partial[1])
+    }
+
+    return ''
+}
+
 // ─── Pretty-print a single custom field value ────────────────────────────────
 function FieldValue({ val }: { val: any }) {
     if (val === null || val === undefined || val === '') return <span className="text-muted-foreground italic">—</span>
     if (Array.isArray(val)) {
+        const values = val.map(valueToText).filter(Boolean)
+        if (values.length === 0) return <span className="text-muted-foreground italic">—</span>
         return (
             <div className="flex flex-wrap gap-1.5 mt-1">
-                {val.map((v, i) => (
+                {values.map((v, i) => (
                     <span key={i} className="px-2 py-0.5 bg-blue-500/15 text-blue-300 rounded text-xs">{v}</span>
                 ))}
             </div>
         )
+    }
+    if (typeof val === 'object') {
+        const text = valueToText(val)
+        return <span className="font-medium break-words">{text || JSON.stringify(val)}</span>
     }
     return <span className="font-medium break-words">{String(val)}</span>
 }
@@ -138,11 +175,13 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
     // Separate "extra" custom fields (all non-core ones, excluding price/commission managed fields)
     const decidedPrice = customFields['Decided Price'] || customFields.decidedPrice
     const commission   = customFields['Commission'] || customFields.commission
+    const requirementText = customFieldText(customFields, 'requirement of', 'requirement in', 'product type', 'requirement')
 
     const extraFields = Object.entries(customFields).filter(([k, v]) =>
+        !INTERNAL_CUSTOM_FIELD_KEYS.has(normalizeFieldKey(k)) &&
         !k.toLowerCase().includes('decided price') &&
         !k.toLowerCase().includes('commission') &&
-        v !== null && v !== undefined && String(v).trim() !== ''
+        valueToText(v) !== ''
     )
 
     const sourceLabel =
@@ -178,8 +217,8 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
                     {/* Shiprocket button or tracking badge */}
                     {(() => {
                         if (!student) return null
-                        const req = Object.entries(customFields || {}).find(([k]) => k.toLowerCase().includes('requirement'))?.[1] as string | undefined
-                        const reqLower = req ? req.toLowerCase() : ''
+                        const deliveryText = customFieldText(customFields, 'delivery type', 'delivery', 'copy type')
+                        const reqLower = `${deliveryText} ${requirementText}`.toLowerCase()
                         const isHardCopy = hardCopyKeywords.some(kw => reqLower.includes(kw.toLowerCase()))
                         const awb = customFields?.shiprocketAwb
                         const srStatus = customFields?.shiprocketStatus
@@ -367,7 +406,7 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
                     {(customFields['Require Assignments Subject Codes (Ex: ECO-01, BCS-011, etc.)'] ||
                       customFields['Total How Many Assignments (Ex: 4, 6, 8, 10, 14 etc.)'] ||
                       customFields['Assignment Language'] ||
-                      customFields['Requirement of...'] ||
+                      requirementText ||
                       customFields['Describe Requirement'] ||
                       commission) && (
                         <div className="glass rounded-xl p-6">
@@ -376,7 +415,7 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
                             </h3>
                             <div className="space-y-3 text-sm divide-y divide-white/5">
                                 {[
-                                    ['Requirement', customFields['Requirement of...'] || customFields['Requirement']],
+                                    ['Requirement', requirementText],
                                     ['Subject Codes', customFields['Require Assignments Subject Codes (Ex: ECO-01, BCS-011, etc.)'] || customFields['Subject Codes']],
                                     ['Total Assignments', customFields['Total How Many Assignments (Ex: 4, 6, 8, 10, 14 etc.)']],
                                     ['Language', customFields['Assignment Language'] || customFields['Language']],

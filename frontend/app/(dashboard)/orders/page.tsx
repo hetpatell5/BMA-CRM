@@ -47,17 +47,34 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 ]
 
 
+const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments'])
+
+function normalizeFieldKey(key: string) {
+    return key.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function customFieldValueToText(value: any): string {
+    if (value === null || value === undefined) return ''
+    if (Array.isArray(value)) return value.map(customFieldValueToText).filter(Boolean).join(', ')
+    if (typeof value === 'object') return ''
+    return String(value).trim()
+}
+
 // ─── Helper: read a value from customFields by matching label keywords ────────
 function cfGet(customFields: Record<string, any> | null | undefined, ...keywords: string[]): string {
     if (!customFields || typeof customFields !== 'object') return ''
-    const kws = keywords.map(k => k.toLowerCase())
-    for (const [key, val] of Object.entries(customFields)) {
-        const lk = key.toLowerCase()
-        if (kws.some(kw => lk.includes(kw) || kw === lk)) {
-            if (Array.isArray(val)) return val.join(', ')
-            return String(val ?? '').trim()
-        }
+    const entries = Object.entries(customFields)
+        .filter(([key, val]) => !INTERNAL_CUSTOM_FIELD_KEYS.has(normalizeFieldKey(key)) && customFieldValueToText(val))
+
+    for (const keyword of keywords) {
+        const normalizedKeyword = normalizeFieldKey(keyword)
+        const exact = entries.find(([key]) => normalizeFieldKey(key) === normalizedKeyword)
+        if (exact) return customFieldValueToText(exact[1])
+
+        const partial = entries.find(([key]) => key.toLowerCase().includes(keyword.toLowerCase()))
+        if (partial) return customFieldValueToText(partial[1])
     }
+
     return ''
 }
 
