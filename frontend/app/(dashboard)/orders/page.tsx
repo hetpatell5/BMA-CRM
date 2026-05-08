@@ -78,27 +78,36 @@ function formatPrice(value: string | null | undefined) {
 
 function getStudentRow(s: any) {
     const cf = s.customFields
+    const requirementStr = cfGet(cf, 'requirement of', 'requirement in', 'product type', 'requirement')
+    const requirementList = requirementStr
+        ? requirementStr.split(/[,\/]/).map((x: string) => x.trim()).filter(Boolean)
+        : []
     return {
-        name:            s.fullName || cfGet(cf, 'name', 'full name'),
-        email:           s.email || cfGet(cf, 'email'),
-        phone:           s.phone || cfGet(cf, 'contact number', 'contact', 'mobile', 'phone'),
-        programme:       s.programme || s.course || cfGet(cf, 'program name', 'programme', 'program', 'course'),
-        semester:        cfGet(cf, 'present semester', 'semester', 'year'),
-        requirement:     cfGet(cf, 'requirement of', 'requirement in', 'product type', 'requirement'),
-        deliveryType:    cfGet(cf, 'delivery type', 'delivery', 'copy type'),
-        decidedPrice:    cfGet(cf, 'decided price'),
-        source:          s.source || 'manual',
-        status:          s.status,
-        id:              s.id,
-        createdAt:       s.createdAt,
-        assignedGuide:   s.assignedGuide || null,
-        assignedGuideId: s.assignedGuideId || null,
-        assignedBy:      s.assignedBy || null,
-        assignedById:    s.assignedById || null,
-        createdBy:       s.createdBy || null,
-        createdById:     s.createdById || null,
-        coHandledById:   s.coHandledById || null,
-        coHandledBy:     s.coHandledBy || null,
+        name:                   s.fullName || cfGet(cf, 'name', 'full name'),
+        email:                  s.email || cfGet(cf, 'email'),
+        phone:                  s.phone || cfGet(cf, 'contact number', 'contact', 'mobile', 'phone'),
+        programme:              s.programme || s.course || cfGet(cf, 'program name', 'programme', 'program', 'course'),
+        semester:               cfGet(cf, 'present semester', 'semester', 'year'),
+        requirement:            requirementStr,
+        requirementList,
+        deliveryType:           cfGet(cf, 'delivery type', 'delivery', 'copy type'),
+        decidedPrice:           cfGet(cf, 'decided price'),
+        source:                 s.source || 'manual',
+        status:                 s.status,
+        id:                     s.id,
+        createdAt:              s.createdAt,
+        assignedGuide:          s.assignedGuide || null,
+        assignedGuideId:        s.assignedGuideId || null,
+        assignedBy:             s.assignedBy || null,
+        assignedById:           s.assignedById || null,
+        createdBy:              s.createdBy || null,
+        createdById:            s.createdById || null,
+        coHandledById:          s.coHandledById || null,
+        coHandledBy:            s.coHandledBy || null,
+        customFields:           cf || {},
+        requirementAssignments: (cf?.requirementAssignments && typeof cf.requirementAssignments === 'object')
+            ? cf.requirementAssignments as Record<string, { id: number; name: string } | null>
+            : {} as Record<string, { id: number; name: string } | null>,
     }
 }
 
@@ -165,6 +174,9 @@ export default function StudentsPage() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [showAssignModal, setShowAssignModal] = useState(false)
     const [assignmentDraft, setAssignmentDraft] = useState<{ student: any; member: any } | null>(null)
+    const [showReqModal, setShowReqModal] = useState(false)
+    const [reqModalStudent, setReqModalStudent] = useState<ReturnType<typeof getStudentRow> | null>(null)
+    const [reqDraft, setReqDraft] = useState<Record<string, { id: number; name: string } | null>>({})
 
     // Dynamic Columns State
     const [activeColumns, setActiveColumns] = useState<ColumnDef[]>([])
@@ -354,6 +366,22 @@ export default function StudentsPage() {
         }),
     })
 
+    // Per-requirement assignment
+    const updateReqMutation = useMutation({
+        mutationFn: ({ studentId, customFields }: { studentId: string; customFields: any }) =>
+            studentsAPI.update(studentId, { customFields }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] })
+            setShowReqModal(false)
+            toast({ title: 'Saved!', description: 'Requirement assignments updated', variant: 'success' })
+        },
+        onError: (err: any) => toast({
+            title: 'Error',
+            description: err?.response?.data?.message || 'Failed to update',
+            variant: 'destructive',
+        }),
+    })
+
     // Export
     const [isExporting, setIsExporting] = useState(false)
     const handleExport = async () => {
@@ -489,10 +517,23 @@ export default function StudentsPage() {
                         </DropdownMenu.Root>
                     </td>
                 )
-            case 'assignedTo':
+            case 'assignedTo': {
+                const hasReqAssignments = r.requirementList.length > 1 && Object.keys(r.requirementAssignments).length > 0
                 return (
                     <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
-                        {guide ? (
+                        {hasReqAssignments ? (
+                            <div className="flex flex-col gap-0.5">
+                                {r.requirementList.map((req: string) => {
+                                    const a = r.requirementAssignments[req]
+                                    return (
+                                        <div key={req} className="flex items-center gap-1.5">
+                                            <span className="text-[10px] text-muted-foreground shrink-0 w-14 truncate" title={req}>{req}</span>
+                                            <span className="text-[12px] font-semibold text-foreground">{a?.name || <span className="text-muted-foreground italic font-normal">—</span>}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : guide ? (
                             <div className="flex items-center gap-2">
                                 <span className="text-[14px] font-bold text-foreground">{guide.fullName}</span>
                                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground px-1.5 py-0.5 border border-border rounded bg-muted/30">{guideRoleLabel(guide.staffRole)}</span>
@@ -502,6 +543,7 @@ export default function StudentsPage() {
                         )}
                     </td>
                 )
+            }
             case 'orderBy':
                 return (
                     <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
@@ -544,43 +586,64 @@ export default function StudentsPage() {
                     <td key={col.id} className="p-2 border-l border-border sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900/80" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
                             {hasFullStudentAccess && (
-                                <DropdownMenu.Root>
-                                    <DropdownMenu.Trigger asChild>
-                                        <Button variant="outline" size="sm" className="gap-1 text-[11px] h-8 font-bold uppercase tracking-wider border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 max-w-[140px]" title="Assign staff member">
-                                            <UserCheck className="w-3 h-3 shrink-0" />
-                                            <span className="truncate">
-                                                {guide ? guide.fullName : 'Assign'}
-                                            </span>
-                                            <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
-                                        </Button>
-                                    </DropdownMenu.Trigger>
-                                    <DropdownMenu.Portal>
-                                        <DropdownMenu.Content align="end" sideOffset={6} collisionPadding={12} className="z-[100] w-52 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in">
-                                            {guides.length === 0 ? (
-                                                <div className="px-3 py-4 text-xs text-muted-foreground text-center">No staff members available.</div>
-                                            ) : (
-                                                <div className="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto pr-0.5">
-                                                    {guides.map((g: any) => {
-                                                        const isSelected = r.assignedGuideId === g.id
-                                                        return (
-                                                            <DropdownMenu.Item key={g.id} onSelect={() => openAssignModal(r, g)} className={`w-full flex items-center justify-between outline-none transition-colors cursor-pointer rounded-lg px-3 py-2.5 mb-1 last:mb-0 ${isSelected ? 'bg-slate-100 dark:bg-slate-800 text-foreground font-medium' : 'text-muted-foreground data-[highlighted]:bg-slate-50 dark:data-[highlighted]:bg-slate-800/50 data-[highlighted]:text-foreground'}`}>
-                                                                <div className="text-[14px] font-medium truncate">{g.fullName}</div>
-                                                                <div className="text-[11px] text-muted-foreground shrink-0 ml-3 font-normal">{guideRoleLabel(g.staffRole)}</div>
-                                                            </DropdownMenu.Item>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-                                            {r.assignedGuideId && (
-                                                <div className="mt-1 border-t border-border pt-1">
-                                                    <DropdownMenu.Item onSelect={() => assignMutation.mutate({ studentId: r.id, guideId: null })} className="w-full outline-none transition-colors cursor-pointer rounded-lg px-3 py-2.5 text-red-500 dark:text-red-400 data-[highlighted]:bg-red-50 dark:data-[highlighted]:bg-red-500/10 font-medium">
-                                                        Remove Assignment
-                                                    </DropdownMenu.Item>
-                                                </div>
-                                            )}
-                                        </DropdownMenu.Content>
-                                    </DropdownMenu.Portal>
-                                </DropdownMenu.Root>
+                                r.requirementList.length > 1 ? (
+                                    /* Multi-requirement: open dedicated modal */
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1 text-[11px] h-8 font-bold uppercase tracking-wider border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 max-w-[140px]"
+                                        title="Assign per requirement"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setReqModalStudent(r)
+                                            setReqDraft({ ...r.requirementAssignments })
+                                            setShowReqModal(true)
+                                        }}
+                                    >
+                                        <UserCheck className="w-3 h-3 shrink-0" />
+                                        <span className="truncate">Assign</span>
+                                        <Layers className="w-3 h-3 opacity-50 shrink-0" />
+                                    </Button>
+                                ) : (
+                                    /* Single requirement: original dropdown */
+                                    <DropdownMenu.Root>
+                                        <DropdownMenu.Trigger asChild>
+                                            <Button variant="outline" size="sm" className="gap-1 text-[11px] h-8 font-bold uppercase tracking-wider border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 max-w-[140px]" title="Assign staff member">
+                                                <UserCheck className="w-3 h-3 shrink-0" />
+                                                <span className="truncate">
+                                                    {guide ? guide.fullName : 'Assign'}
+                                                </span>
+                                                <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
+                                            </Button>
+                                        </DropdownMenu.Trigger>
+                                        <DropdownMenu.Portal>
+                                            <DropdownMenu.Content align="end" sideOffset={6} collisionPadding={12} className="z-[100] w-52 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in">
+                                                {guides.length === 0 ? (
+                                                    <div className="px-3 py-4 text-xs text-muted-foreground text-center">No staff members available.</div>
+                                                ) : (
+                                                    <div className="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto pr-0.5">
+                                                        {guides.map((g: any) => {
+                                                            const isSelected = r.assignedGuideId === g.id
+                                                            return (
+                                                                <DropdownMenu.Item key={g.id} onSelect={() => openAssignModal(r, g)} className={`w-full flex items-center justify-between outline-none transition-colors cursor-pointer rounded-lg px-3 py-2.5 mb-1 last:mb-0 ${isSelected ? 'bg-slate-100 dark:bg-slate-800 text-foreground font-medium' : 'text-muted-foreground data-[highlighted]:bg-slate-50 dark:data-[highlighted]:bg-slate-800/50 data-[highlighted]:text-foreground'}`}>
+                                                                    <div className="text-[14px] font-medium truncate">{g.fullName}</div>
+                                                                    <div className="text-[11px] text-muted-foreground shrink-0 ml-3 font-normal">{guideRoleLabel(g.staffRole)}</div>
+                                                                </DropdownMenu.Item>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+                                                {r.assignedGuideId && (
+                                                    <div className="mt-1 border-t border-border pt-1">
+                                                        <DropdownMenu.Item onSelect={() => assignMutation.mutate({ studentId: r.id, guideId: null })} className="w-full outline-none transition-colors cursor-pointer rounded-lg px-3 py-2.5 text-red-500 dark:text-red-400 data-[highlighted]:bg-red-50 dark:data-[highlighted]:bg-red-500/10 font-medium">
+                                                            Remove Assignment
+                                                        </DropdownMenu.Item>
+                                                    </div>
+                                                )}
+                                            </DropdownMenu.Content>
+                                        </DropdownMenu.Portal>
+                                    </DropdownMenu.Root>
+                                )
                             )}
                             {hasFullStudentAccess && (
                                 <Link href={`/orders/${r.id}/edit`}>
@@ -1320,6 +1383,93 @@ export default function StudentsPage() {
                 </div>
             )}
             
+            {/* Requirement Assignment Modal */}
+            {showReqModal && reqModalStudent && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4" onClick={() => setShowReqModal(false)}>
+                    <div className="glass rounded-2xl p-6 max-w-lg w-full border border-violet-500/20 space-y-5" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <h3 className="text-lg font-semibold">Assign Requirements</h3>
+                                <p className="text-sm text-muted-foreground mt-0.5">{reqModalStudent.name}</p>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setShowReqModal(false)}>
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+
+                        {/* Assign ALL shortcut */}
+                        <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Assign All to One Person</p>
+                            <div className="flex items-center gap-2">
+                                <select
+                                    className="flex-1 h-9 rounded-lg border border-border bg-background text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                    defaultValue=""
+                                    onChange={(e) => {
+                                        const g = guides.find((g: any) => String(g.id) === e.target.value)
+                                        if (!g) return
+                                        const next: Record<string, { id: number; name: string }> = {}
+                                        reqModalStudent.requirementList.forEach((req: string) => {
+                                            next[req] = { id: g.id, name: g.fullName }
+                                        })
+                                        setReqDraft(next)
+                                    }}
+                                >
+                                    <option value="">Select member…</option>
+                                    {guides.map((g: any) => (
+                                        <option key={g.id} value={g.id}>{g.fullName} ({guideRoleLabel(g.staffRole)})</option>
+                                    ))}
+                                </select>
+                                <span className="text-xs text-muted-foreground shrink-0">→ fills all below</span>
+                            </div>
+                        </div>
+
+                        {/* Per-requirement assignment */}
+                        <div className="space-y-3">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Or Assign Individually</p>
+                            {reqModalStudent.requirementList.map((req: string) => (
+                                <div key={req} className="flex items-center gap-3">
+                                    <span className="text-sm font-medium w-28 shrink-0 truncate" title={req}>{req}</span>
+                                    <select
+                                        className="flex-1 h-9 rounded-lg border border-border bg-background text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                        value={reqDraft[req]?.id ?? ''}
+                                        onChange={(e) => {
+                                            const g = guides.find((g: any) => String(g.id) === e.target.value)
+                                            setReqDraft(prev => ({
+                                                ...prev,
+                                                [req]: g ? { id: g.id, name: g.fullName } : null,
+                                            }))
+                                        }}
+                                    >
+                                        <option value="">Unassigned</option>
+                                        {guides.map((g: any) => (
+                                            <option key={g.id} value={g.id}>{g.fullName} ({guideRoleLabel(g.staffRole)})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+                            <Button variant="outline" onClick={() => setShowReqModal(false)} disabled={updateReqMutation.isPending}>Cancel</Button>
+                            <Button
+                                className="gap-2 gradient-primary text-white"
+                                disabled={updateReqMutation.isPending}
+                                onClick={() => {
+                                    const newCustomFields = {
+                                        ...reqModalStudent.customFields,
+                                        requirementAssignments: reqDraft,
+                                    }
+                                    updateReqMutation.mutate({ studentId: reqModalStudent.id, customFields: newCustomFields })
+                                }}
+                            >
+                                {updateReqMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                                Save Assignments
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">

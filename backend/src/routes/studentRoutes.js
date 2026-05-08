@@ -544,21 +544,16 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
+        const studentId = BigInt(id);
 
         const student = await prisma.student.findUnique({
-            where: { id: BigInt(id) },
+            where: { id: studentId },
             include: {
                 lead: {
                     select: {
                         id: true,
                         stage: true,
                         source: true,
-                    },
-                },
-                createdBy: {
-                    select: {
-                        id: true,
-                        fullName: true,
                     },
                 },
             },
@@ -571,6 +566,16 @@ router.get('/:id', async (req, res, next) => {
             });
         }
 
+        // Fetch creator + co-handler via raw SQL (Prisma client may not have these relations yet)
+        const [extra] = await prisma.$queryRaw`
+            SELECT c.id as creator_id, c.full_name as creator_name,
+                   h.id as cohandler_id, h.full_name as cohandler_name
+            FROM students s
+            LEFT JOIN users c ON c.id = s.created_by
+            LEFT JOIN users h ON h.id = s.co_handled_by_id
+            WHERE s.id = ${studentId}
+        `;
+
         const serializedStudent = {
             ...student,
             id: student.id.toString(),
@@ -579,6 +584,14 @@ router.get('/:id', async (req, res, next) => {
             lead: student.lead ? {
                 ...student.lead,
                 id: student.lead.id.toString(),
+            } : null,
+            createdBy: extra?.creator_id ? {
+                id: Number(extra.creator_id),
+                fullName: extra.creator_name,
+            } : null,
+            coHandledBy: extra?.cohandler_id ? {
+                id: Number(extra.cohandler_id),
+                fullName: extra.cohandler_name,
             } : null,
         };
 
