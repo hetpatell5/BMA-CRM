@@ -677,6 +677,25 @@ router.get('/:id/payment-details', async (req, res, next) => {
     }
 });
 
+// Reset password for a team member (Admin only)
+router.put('/:id/reset-password', async (req, res, next) => {
+    try {
+        if (req.user.role !== 'ADMIN') {
+            return res.status(403).json({ success: false, message: 'Only admins can reset passwords' });
+        }
+        const userId = parseInt(req.params.id);
+        const { newPassword } = req.body;
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+        }
+        const hashed = await bcrypt.hash(newPassword, 12);
+        await prisma.user.update({ where: { id: userId }, data: { password: hashed } });
+        res.json({ success: true, message: 'Password updated successfully' });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Update payment details (Admin only)
 router.put('/:id/payment-details', async (req, res, next) => {
     try {

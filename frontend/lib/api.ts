@@ -207,6 +207,8 @@ export const teamAPI = {
     },
     sendEmail: (id: number, data: { subject: string; body: string; invoiceUrl?: string | null }) =>
         api.post(`/team/${id}/send-email`, data),
+    resetPassword: (id: number, newPassword: string) =>
+        api.put(`/team/${id}/reset-password`, { newPassword }),
 }
 
 // Order Form Config API

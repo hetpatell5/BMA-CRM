@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     Users, Plus, Edit, Trash2, Loader2,
     Crown, UserCog, AlertTriangle, RefreshCw, Mail, Clock,
-    ChevronDown, BookOpen, Star, Layers, PhoneCall, PenTool, IndianRupee, Eye, X,
+    ChevronDown, BookOpen, Star, Layers, PhoneCall, PenTool, IndianRupee, Eye, EyeOff, X, KeyRound,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -98,6 +98,11 @@ export default function SettingsPage() {
 
     const [showViewModal, setShowViewModal]       = useState(false)
     const [viewTarget, setViewTarget]             = useState<any>(null)
+
+    const [showPasswordModal, setShowPasswordModal] = useState(false)
+    const [passwordTarget, setPasswordTarget]       = useState<any>(null)
+    const [newPassword, setNewPassword]             = useState('')
+    const [showPassword, setShowPassword]           = useState(false)
     const [viewPaymentData, setViewPaymentData]   = useState<any>(null)
     const [isLoadingPayment, setIsLoadingPayment] = useState(false)
 
@@ -155,6 +160,19 @@ export default function SettingsPage() {
             toast({ title: 'Deleted!', description: 'Team member permanently removed', variant: 'success' })
         },
         onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message || 'Failed to delete user', variant: 'destructive' }),
+    })
+
+    const resetPasswordMutation = useMutation({
+        mutationFn: ({ id, password }: { id: number; password: string }) =>
+            teamAPI.resetPassword(id, password),
+        onSuccess: () => {
+            setShowPasswordModal(false)
+            setPasswordTarget(null)
+            setNewPassword('')
+            setShowPassword(false)
+            toast({ title: 'Password updated!', description: 'The member can now log in with the new password', variant: 'success' })
+        },
+        onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message || 'Failed to update password', variant: 'destructive' }),
     })
 
     const closeAssignModal = () => {
@@ -549,6 +567,17 @@ export default function SettingsPage() {
                                                         title="Edit member"
                                                     >
                                                         <Edit className="w-4 h-4" />
+                                                    </button>
+                                                )}
+
+                                                {/* Change Password */}
+                                                {currentUser?.role === 'ADMIN' && (
+                                                    <button
+                                                        className="w-8 h-8 rounded-md border border-white/10 hover:bg-white/5 flex items-center justify-center text-muted-foreground hover:text-amber-400 transition-colors"
+                                                        onClick={() => { setPasswordTarget(member); setNewPassword(''); setShowPassword(false); setShowPasswordModal(true) }}
+                                                        title="Change password"
+                                                    >
+                                                        <KeyRound className="w-4 h-4" />
                                                     </button>
                                                 )}
 
@@ -958,6 +987,60 @@ export default function SettingsPage() {
                         <div className="flex items-center justify-end gap-3 mt-6 pt-6 border-t border-slate-200 dark:border-white/10">
                             <Button variant="outline" onClick={() => setShowViewModal(false)}>Close</Button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* ─── CHANGE PASSWORD MODAL ─── */}
+            {showPasswordModal && passwordTarget && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in !mt-0">
+                    <div className="glass rounded-2xl p-6 max-w-sm w-full border border-amber-500/20">
+                        <div className="flex items-start justify-between mb-5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-xl bg-amber-500/15 flex items-center justify-center">
+                                    <KeyRound className="w-5 h-5 text-amber-400" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-lg">Change Password</h3>
+                                    <p className="text-sm text-muted-foreground">{passwordTarget.fullName}</p>
+                                </div>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => { setShowPasswordModal(false); setPasswordTarget(null) }}>
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+                        <form onSubmit={e => { e.preventDefault(); resetPasswordMutation.mutate({ id: passwordTarget.id, password: newPassword }) }} className="space-y-4">
+                            <div>
+                                <Label htmlFor="new-password">New Password *</Label>
+                                <div className="relative mt-1">
+                                    <Input
+                                        id="new-password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={newPassword}
+                                        onChange={e => setNewPassword(e.target.value)}
+                                        placeholder="Min. 6 characters"
+                                        required
+                                        minLength={6}
+                                        className="pr-10"
+                                        autoFocus
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(p => !p)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-end gap-3 pt-2">
+                                <Button type="button" variant="outline" onClick={() => { setShowPasswordModal(false); setPasswordTarget(null) }} disabled={resetPasswordMutation.isPending}>Cancel</Button>
+                                <Button type="submit" className="gap-2 gradient-primary" disabled={resetPasswordMutation.isPending}>
+                                    {resetPasswordMutation.isPending
+                                        ? <><Loader2 className="w-4 h-4 animate-spin" />Updating...</>
+                                        : <><KeyRound className="w-4 h-4" />Update Password</>}
+                                </Button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
