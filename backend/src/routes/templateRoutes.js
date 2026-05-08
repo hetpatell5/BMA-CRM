@@ -4,6 +4,7 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 const requireTemplateManager = requireRole('ADMIN', 'MANAGER');
+const requireTemplateViewer  = requireRole('ADMIN', 'MANAGER', 'STAFF');
 
 // Helper to serialize BigInt
 BigInt.prototype.toJSON = function () { return this.toString() }
@@ -107,7 +108,7 @@ router.post('/public/:id/submit', async (req, res) => {
 
 // ─── PROTECTED ROUTES (auth required) ──────────────────
 // Get all templates
-router.get('/', authenticateToken, requireTemplateManager, async (req, res) => {
+router.get('/', authenticateToken, requireTemplateViewer, async (req, res) => {
     try {
         const templates = await prisma.taskTemplate.findMany({
             orderBy: { createdAt: 'desc' }
@@ -119,7 +120,7 @@ router.get('/', authenticateToken, requireTemplateManager, async (req, res) => {
 });
 
 // Get single template by ID
-router.get('/:id', authenticateToken, requireTemplateManager, async (req, res) => {
+router.get('/:id', authenticateToken, requireTemplateViewer, async (req, res) => {
     try {
         const template = await prisma.taskTemplate.findUnique({ where: { id: parseInt(req.params.id) } });
         if (!template) return res.status(404).json({ success: false, message: 'Template not found' });

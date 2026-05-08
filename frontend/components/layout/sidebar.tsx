@@ -43,7 +43,7 @@ const navigation = [
     { name: 'Import Data', href: '/import', icon: Upload, roles: ['ADMIN', 'MANAGER'] },
     { name: 'Payments', href: '/payment', icon: Users, roles: ['ADMIN', 'MANAGER'] },
     { name: 'Team Management', href: '/team', icon: UserPlus, roles: ['ADMIN', 'MANAGER'], exact: true },
-    { name: 'Form Templates', href: '/team/templates', icon: Settings, roles: ['ADMIN', 'MANAGER'] },
+    { name: 'Form Templates', href: '/team/templates', icon: Settings, roles: ['ADMIN', 'MANAGER'], staffRoles: ['TELECALLER'] },
     { name: 'Settings', href: '/settings', icon: Settings2, roles: ['ADMIN'], exact: true },
 ]
 
@@ -54,8 +54,10 @@ export function Sidebar() {
     const userRole = user?.role || 'STAFF'
 
     const filteredNav = navigation.filter(item => {
-        if (!item.roles) return true
-        return item.roles.includes(userRole)
+        if (!item.roles && !item.staffRoles) return true
+        if (item.roles?.includes(userRole)) return true
+        if (item.staffRoles && user?.staffRole && item.staffRoles.includes(user.staffRole)) return true
+        return false
     })
 
     return (

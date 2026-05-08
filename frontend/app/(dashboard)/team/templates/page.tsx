@@ -566,7 +566,9 @@ export default function FormTemplatesPage() {
     const { toast } = useToast()
     const queryClient = useQueryClient()
     const { user: currentUser } = useAuthStore()
+    const isTelecaller = currentUser?.role === 'STAFF' && currentUser?.staffRole === 'TELECALLER'
     const canManageTemplates = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+    const canViewTemplates = canManageTemplates || isTelecaller
 
     const [editing, setEditing] = useState<FormTemplate | null>(null)
     const [building, setBuilding] = useState(false)
@@ -588,7 +590,7 @@ export default function FormTemplatesPage() {
             const res = await templatesAPI.getAll()
             return (res.data?.data || []) as FormTemplate[]
         },
-        enabled: canManageTemplates,
+        enabled: canViewTemplates,
     })
 
     const templates = data || []
@@ -619,12 +621,12 @@ export default function FormTemplatesPage() {
         }
     })
 
-    if (!canManageTemplates) {
+    if (!canViewTemplates) {
         return (
             <div className="glass rounded-2xl border border-white/10 p-12 text-center">
                 <ClipboardList className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-30" />
                 <h2 className="text-lg font-semibold mb-2">Form Templates</h2>
-                <p className="text-sm text-muted-foreground">Only admins and leaders can access this page.</p>
+                <p className="text-sm text-muted-foreground">Only admins, leaders and telecallers can access this page.</p>
             </div>
         )
     }
@@ -653,13 +655,15 @@ export default function FormTemplatesPage() {
                         Build dynamic enquiry forms to send to customers — inspired by Google Forms
                     </p>
                 </div>
-                <Button
-                    onClick={() => { setEditing(null); setBuilding(true) }}
-                    className="gap-2 gradient-primary shadow-lg"
-                >
-                    <Plus className="w-4 h-4" />
-                    New Template
-                </Button>
+                {canManageTemplates && (
+                    <Button
+                        onClick={() => { setEditing(null); setBuilding(true) }}
+                        className="gap-2 gradient-primary shadow-lg"
+                    >
+                        <Plus className="w-4 h-4" />
+                        New Template
+                    </Button>
+                )}
             </div>
 
             {/* Stats */}
@@ -692,9 +696,11 @@ export default function FormTemplatesPage() {
                     <ClipboardList className="w-14 h-14 mx-auto mb-4 text-muted-foreground opacity-30" />
                     <h3 className="text-lg font-semibold mb-2">No templates yet</h3>
                     <p className="text-muted-foreground mb-6">Create your first Google Forms-style enquiry template</p>
-                    <Button onClick={() => { setEditing(null); setBuilding(true) }} className="gradient-primary gap-2">
-                        <Plus className="w-4 h-4" /> Create First Template
-                    </Button>
+                    {canManageTemplates && (
+                        <Button onClick={() => { setEditing(null); setBuilding(true) }} className="gradient-primary gap-2">
+                            <Plus className="w-4 h-4" /> Create First Template
+                        </Button>
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -735,24 +741,28 @@ export default function FormTemplatesPage() {
                                                 <Share2 className="w-3.5 h-3.5" />
                                             </button>
                                         )}
-                                        <button
-                                            onClick={() => duplicateMutation.mutate(t)}
-                                            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                                            title="Duplicate">
-                                            <Copy className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={() => { setEditing(t); setBuilding(true) }}
-                                            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-blue-500/20 flex items-center justify-center text-muted-foreground hover:text-blue-400 transition-colors"
-                                            title="Edit">
-                                            <Edit className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={() => deleteMutation.mutate(t.id)}
-                                            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-muted-foreground hover:text-red-400 transition-colors"
-                                            title="Delete">
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                        {canManageTemplates && (
+                                            <>
+                                                <button
+                                                    onClick={() => duplicateMutation.mutate(t)}
+                                                    className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                                                    title="Duplicate">
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => { setEditing(t); setBuilding(true) }}
+                                                    className="w-7 h-7 rounded-lg bg-white/5 hover:bg-blue-500/20 flex items-center justify-center text-muted-foreground hover:text-blue-400 transition-colors"
+                                                    title="Edit">
+                                                    <Edit className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteMutation.mutate(t.id)}
+                                                    className="w-7 h-7 rounded-lg bg-white/5 hover:bg-red-500/20 flex items-center justify-center text-muted-foreground hover:text-red-400 transition-colors"
+                                                    title="Delete">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
