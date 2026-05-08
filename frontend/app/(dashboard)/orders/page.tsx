@@ -98,6 +98,7 @@ function getStudentRow(s: any) {
         createdBy:       s.createdBy || null,
         createdById:     s.createdById || null,
         coHandledById:   s.coHandledById || null,
+        coHandledBy:     s.coHandledBy || null,
     }
 }
 
@@ -505,9 +506,16 @@ export default function StudentsPage() {
                 return (
                     <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
                         {r.createdBy ? (
-                            <span className="text-[13px] font-semibold text-cyan-600 dark:text-cyan-400">
-                                {r.createdBy.fullName} <span className="text-muted-foreground font-normal text-[11px]">#{r.createdById}</span>
-                            </span>
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[13px] font-semibold text-cyan-600 dark:text-cyan-400">
+                                    {r.createdBy.fullName} <span className="text-muted-foreground font-normal text-[11px]">#{r.createdById}</span>
+                                </span>
+                                {r.coHandledBy && (
+                                    <span className="text-[12px] font-medium text-violet-600 dark:text-violet-400">
+                                        + {r.coHandledBy.fullName} <span className="text-muted-foreground font-normal text-[11px]">#{r.coHandledById}</span>
+                                    </span>
+                                )}
+                            </div>
                         ) : (
                             <span className="text-muted-foreground text-xs">—</span>
                         )}
@@ -581,14 +589,25 @@ export default function StudentsPage() {
                                     </Button>
                                 </Link>
                             )}
-                            {/* Take Over — show for anyone who didn't create this order and it has no co-handler yet */}
-                            {hasFullStudentAccess && r.createdById !== currentUser?.id && !r.coHandledById && (
+                            {/* Take Over — always show for eligible users; toast if already taken */}
+                            {hasFullStudentAccess && r.createdById !== currentUser?.id && (
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-cyan-500 hover:text-cyan-400 hover:bg-cyan-500/10"
-                                    title="Take Over (co-handle 50/50)"
-                                    onClick={(e) => { e.stopPropagation(); coHandleMutation.mutate(r.id) }}
+                                    className={`h-8 w-8 hover:bg-cyan-500/10 ${r.coHandledById ? 'text-violet-400 hover:text-violet-300' : 'text-cyan-500 hover:text-cyan-400'}`}
+                                    title={r.coHandledById ? 'Already taken over — contact admin/manager to reassign' : 'Take Over (co-handle 50/50)'}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (r.coHandledById) {
+                                            toast({
+                                                title: 'Already taken over',
+                                                description: 'This order is already being co-handled. Contact admin or manager to reassign.',
+                                                variant: 'destructive',
+                                            })
+                                        } else {
+                                            coHandleMutation.mutate(r.id)
+                                        }
+                                    }}
                                     disabled={coHandleMutation.isPending}
                                 >
                                     <Users className="w-4 h-4" />

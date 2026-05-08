@@ -473,15 +473,17 @@ router.get('/', async (req, res, next) => {
         let guideMap = {};
         if (studentIds.length > 0) {
             const rows = await prisma.$queryRaw`
-                SELECT s.id, s.assigned_guide_id, s.assigned_by_id, s.created_by_id, s.co_handled_by_id,
+                SELECT s.id, s.assigned_guide_id, s.assigned_by_id, s.created_by, s.co_handled_by_id,
                        u.id as guide_id, u.full_name as guide_name,
                        u.staff_role as guide_staff_role, u.degree as guide_degree,
                        a.id as assigner_id, a.full_name as assigner_name, a.staff_role as assigner_staff_role,
-                       c.id as creator_id, c.full_name as creator_name, c.staff_role as creator_staff_role
+                       c.id as creator_id, c.full_name as creator_name, c.staff_role as creator_staff_role,
+                       h.id as cohandler_id, h.full_name as cohandler_name
                 FROM students s
                 LEFT JOIN users u ON u.id = s.assigned_guide_id
                 LEFT JOIN users a ON a.id = s.assigned_by_id
-                LEFT JOIN users c ON c.id = s.created_by_id
+                LEFT JOIN users c ON c.id = s.created_by
+                LEFT JOIN users h ON h.id = s.co_handled_by_id
                 WHERE s.id IN (${Prisma.join(studentIds)})
             `;
             rows.forEach(row => {
@@ -499,13 +501,17 @@ router.get('/', async (req, res, next) => {
                         fullName: row.assigner_name,
                         staffRole: row.assigner_staff_role,
                     } : null,
-                    createdById: row.created_by_id ? Number(row.created_by_id) : null,
+                    createdById: row.created_by ? Number(row.created_by) : null,
                     createdBy: row.creator_id ? {
                         id: Number(row.creator_id),
                         fullName: row.creator_name,
                         staffRole: row.creator_staff_role,
                     } : null,
                     coHandledById: row.co_handled_by_id ? Number(row.co_handled_by_id) : null,
+                    coHandledBy: row.cohandler_id ? {
+                        id: Number(row.cohandler_id),
+                        fullName: row.cohandler_name,
+                    } : null,
                 };
             });
         }
@@ -514,7 +520,7 @@ router.get('/', async (req, res, next) => {
         const serializedStudents = students.map(s => ({
             ...s,
             id: s.id.toString(),
-            ...(guideMap[s.id.toString()] || { assignedGuideId: null, assignedGuide: null, assignedById: null, assignedBy: null, createdById: null, createdBy: null, coHandledById: null }),
+            ...(guideMap[s.id.toString()] || { assignedGuideId: null, assignedGuide: null, assignedById: null, assignedBy: null, createdById: null, createdBy: null, coHandledById: null, coHandledBy: null }),
         }));
 
         res.json({
