@@ -168,8 +168,10 @@ export default function StudentsPage() {
     const queryClient = useQueryClient()
     const { toast } = useToast()
     const { user: currentUser } = useAuthStore()
+    const isAdminManager = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
     const isTelecaller = currentUser?.role === 'STAFF' && currentUser?.staffRole === 'TELECALLER'
-    const hasFullStudentAccess = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER' || isTelecaller
+    const hasFullStudentAccess = isAdminManager || isTelecaller
+    const canBulkManageOrders = isAdminManager
 
     // Fetch Shiprocket config for dynamic hard copy keyword detection
     const { data: srConfigData } = useQuery({
@@ -332,6 +334,18 @@ export default function StudentsPage() {
     })
     const guides: any[] = guidesData || []
 
+    const { data: takeoverUsersData } = useQuery({
+        queryKey: ['takeover-users'],
+        queryFn: async () => (await teamAPI.getTakeoverUsers()).data.data,
+        enabled: isAdminManager,
+    })
+    const takeoverUsers: any[] = takeoverUsersData || []
+    const takeoverUserGroups = [
+        { label: 'Admin', users: takeoverUsers.filter(u => u.role === 'ADMIN') },
+        { label: 'Manager', users: takeoverUsers.filter(u => u.role === 'MANAGER') },
+        { label: 'Rest Telecallers', users: takeoverUsers.filter(u => u.role === 'STAFF' && u.staffRole === 'TELECALLER') },
+    ]
+
     // Bulk update
     const bulkUpdateMutation = useMutation({
         mutationFn: ({ ids, status }: { ids: string[]; status: string }) =>
@@ -379,10 +393,15 @@ export default function StudentsPage() {
 
     // Co-handle (Take Over)
     const coHandleMutation = useMutation({
-        mutationFn: (studentId: string) => studentsAPI.coHandle(studentId),
-        onSuccess: () => {
+        mutationFn: ({ studentId, coHandlerId }: { studentId: string; coHandlerId?: number | null }) =>
+            studentsAPI.coHandle(studentId, coHandlerId),
+        onSuccess: (response) => {
             queryClient.invalidateQueries({ queryKey: ['students'] })
-            toast({ title: 'Co-handling!', description: 'You are now co-handling this order (50/50 commission)', variant: 'success' })
+            toast({
+                title: 'Co-handling!',
+                description: response?.data?.message || 'Takeover updated successfully',
+                variant: 'success',
+            })
         },
         onError: (error: any) => toast({
             title: 'Cannot take over',
@@ -781,29 +800,74 @@ export default function StudentsPage() {
                                     </Button>
                                 </Link>
                             )}
-                            {/* Take Over — always show for eligible users; toast if already taken */}
+                            {/* Take Over — admins/managers can reassign an existing co-handler */}
                             {hasFullStudentAccess && r.createdById !== currentUser?.id && (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className={`h-8 w-8 hover:bg-cyan-500/10 ${r.coHandledById ? 'text-violet-400 hover:text-violet-300' : 'text-cyan-500 hover:text-cyan-400'}`}
-                                    title={r.coHandledById ? 'Already taken over — contact admin/manager to reassign' : 'Take Over (co-handle 50/50)'}
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        if (r.coHandledById) {
-                                            toast({
-                                                title: 'Already taken over',
-                                                description: 'This order is already being co-handled. Contact admin or manager to reassign.',
-                                                variant: 'destructive',
-                                            })
-                                        } else {
-                                            coHandleMutation.mutate(r.id)
-                                        }
-                                    }}
-                                    disabled={coHandleMutation.isPending}
-                                >
-                                    <Users className="w-4 h-4" />
-                                </Button>
+                                r.coHandledById && isAdminManager ? (
+                                    <DropdownMenu.Root>
+                                        <DropdownMenu.Trigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                                                title="Reassign takeover"
+                                                disabled={coHandleMutation.isPending}
+                                            >
+                                                <Users className="w-4 h-4" />
+                                            </Button>
+                                        </DropdownMenu.Trigger>
+                                        <DropdownMenu.Portal>
+                                            <DropdownMenu.Content
+                                                align="end"
+                                                sideOffset={6}
+                                                collisionPadding={12}
+                                                className="z-[100] w-56 max-w-[calc(100vw-1rem)] overflow-hidden rounded-md bg-zinc-800 text-zinc-100 border border-zinc-700 p-1 shadow-2xl animate-fade-in"
+                                            >
+                                                {takeoverUserGroups.map(group => (
+                                                    <div key={group.label}>
+                                                        <DropdownMenu.Label className="px-2 py-1.5 text-[13px] font-semibold text-zinc-300">
+                                                            {group.label}
+                                                        </DropdownMenu.Label>
+                                                        {group.users.length === 0 ? (
+                                                            <div className="px-2 pb-1.5 text-xs text-zinc-500">No active users</div>
+                                                        ) : (
+                                                            group.users.map(user => (
+                                                                <DropdownMenu.Item
+                                                                    key={user.id}
+                                                                    onSelect={() => coHandleMutation.mutate({ studentId: r.id, coHandlerId: user.id })}
+                                                                    className="outline-none cursor-pointer rounded px-2 py-1.5 text-[13px] data-[highlighted]:bg-zinc-700"
+                                                                >
+                                                                    {user.fullName}
+                                                                </DropdownMenu.Item>
+                                                            ))
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </DropdownMenu.Content>
+                                        </DropdownMenu.Portal>
+                                    </DropdownMenu.Root>
+                                ) : (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className={`h-8 w-8 ${r.coHandledById ? 'text-red-500 hover:text-red-400 hover:bg-red-500/10' : 'text-cyan-500 hover:text-cyan-400 hover:bg-cyan-500/10'}`}
+                                        title={r.coHandledById ? 'Already taken over — contact admin/manager to reassign' : 'Take Over (co-handle 50/50)'}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (r.coHandledById) {
+                                                toast({
+                                                    title: 'Already taken over',
+                                                    description: 'This order is already being co-handled. Contact admin or manager to reassign.',
+                                                    variant: 'destructive',
+                                                })
+                                            } else {
+                                                coHandleMutation.mutate({ studentId: r.id })
+                                            }
+                                        }}
+                                        disabled={coHandleMutation.isPending}
+                                    >
+                                        <Users className="w-4 h-4" />
+                                    </Button>
+                                )
                             )}
                             {hasFullStudentAccess && isHardCopyOrder(r) && (
                                 <Link href={`/orders/${r.id}`} title="Ship via Shiprocket">
@@ -982,7 +1046,7 @@ export default function StudentsPage() {
             )}
 
             {/* Bulk Actions (admin/leader) */}
-            {hasFullStudentAccess && selectedIds.length > 0 && (
+            {canBulkManageOrders && selectedIds.length > 0 && (
                 <div className="border border-border rounded-xl p-4 flex items-center justify-between animate-fade-in">
                     <p className="text-sm"><span className="font-medium">{selectedIds.length}</span> students selected</p>
                     <div className="flex items-center gap-2">
@@ -1250,7 +1314,7 @@ export default function StudentsPage() {
                         <table className="w-full min-w-[1000px] border-collapse relative">
                             <thead className="sticky top-0 z-10 shadow-sm">
                                 <tr className="border-b border-border bg-slate-50 dark:bg-slate-800">
-                                    {hasFullStudentAccess && (
+                                    {canBulkManageOrders && (
                                         <th className="p-2 text-left w-10 border-r border-border bg-slate-100 dark:bg-slate-800">
                                             <input
                                                 type="checkbox"
@@ -1285,7 +1349,7 @@ export default function StudentsPage() {
                                     ))
                                 ) : students.length === 0 ? (
                                     <tr>
-                                        <td colSpan={activeColumns.length + (hasFullStudentAccess ? 1 : 0)} className="p-12 text-center">
+                                        <td colSpan={activeColumns.length + (canBulkManageOrders ? 1 : 0)} className="p-12 text-center">
                                             <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
                                             <p className="text-lg font-medium mb-2">No orders found</p>
                                             <p className="text-muted-foreground mb-4">
@@ -1311,7 +1375,7 @@ export default function StudentsPage() {
                                                 className="group/row border-b border-border hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors"
                                             >
                                                 {/* Checkbox (Admin/leader) */}
-                                                {hasFullStudentAccess && (
+                                                {canBulkManageOrders && (
                                                     <td className="p-2 border-r border-border">
                                                         <input
                                                             type="checkbox"

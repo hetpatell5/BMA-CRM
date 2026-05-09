@@ -112,6 +112,44 @@ router.get('/assignable', async (req, res, next) => {
     }
 });
 
+// Get users eligible to take over/co-handle orders (Admin/Manager only)
+router.get('/takeover/available', async (req, res, next) => {
+    try {
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'MANAGER') {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied',
+            });
+        }
+
+        const users = await prisma.user.findMany({
+            where: {
+                status: 'ACTIVE',
+                OR: [
+                    { role: 'ADMIN' },
+                    { role: 'MANAGER' },
+                    { role: 'STAFF', staffRole: 'TELECALLER' },
+                ],
+            },
+            select: {
+                id: true,
+                fullName: true,
+                email: true,
+                role: true,
+                staffRole: true,
+            },
+            orderBy: [
+                { role: 'asc' },
+                { fullName: 'asc' },
+            ],
+        });
+
+        res.json({ success: true, data: users });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Get my team members (Manager/Leader view)
 router.get('/leader/me/members', async (req, res, next) => {
     try {

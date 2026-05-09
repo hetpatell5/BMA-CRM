@@ -230,6 +230,13 @@ router.post('/bulk-update', async (req, res, next) => {
 // Bulk delete - MUST be before /:id route
 router.post('/bulk-delete', async (req, res, next) => {
     try {
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'MANAGER') {
+            return res.status(403).json({
+                success: false,
+                message: 'Only admins and managers can delete orders',
+            });
+        }
+
         const { ids } = req.body;
 
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -255,7 +262,8 @@ router.post('/bulk-delete', async (req, res, next) => {
     }
 });
 
-// Co-handle an order (second telecaller takes over when primary is absent)
+// Co-handle/take over an order. Telecallers can take an unclaimed co-handle slot;
+// admins/managers can reassign the co-handler repeatedly when escalation is needed.
 router.post('/co-handle/:id', async (req, res, next) => {
     try {
         const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
@@ -272,21 +280,61 @@ router.post('/co-handle/:id', async (req, res, next) => {
 
         if (!student) return res.status(404).json({ success: false, message: 'Order not found' });
 
+        const requestedCoHandlerId = req.body?.coHandlerId ? parseInt(req.body.coHandlerId) : null;
+        if (requestedCoHandlerId !== null && !Number.isInteger(requestedCoHandlerId)) {
+            return res.status(400).json({ success: false, message: 'Invalid takeover user' });
+        }
+
+        if (requestedCoHandlerId && !isAdmin) {
+            return res.status(403).json({ success: false, message: 'Only admins and managers can reassign takeover owner' });
+        }
+
+        const nextCoHandlerId = requestedCoHandlerId || req.user.id;
+
+        const coHandler = await prisma.user.findFirst({
+            where: {
+                id: nextCoHandlerId,
+                status: 'ACTIVE',
+                OR: [
+                    { role: 'ADMIN' },
+                    { role: 'MANAGER' },
+                    { role: 'STAFF', staffRole: 'TELECALLER' },
+                ],
+            },
+            select: { id: true, fullName: true },
+        });
+
+        if (!coHandler) {
+            return res.status(400).json({ success: false, message: 'Selected takeover user is not available' });
+        }
+
         // Can't co-handle your own order
-        if (student.assignedById === req.user.id || student.assignedById === BigInt(req.user.id)) {
+        if (student.assignedById === nextCoHandlerId || student.assignedById === BigInt(nextCoHandlerId)) {
             return res.status(400).json({ success: false, message: 'You are already the primary telecaller for this order' });
         }
 
-        // Already has a co-handler
-        if (student.coHandledById) {
+        // Already has a co-handler. Staff must ask admin/manager to reassign.
+        if (student.coHandledById && !isAdmin) {
             return res.status(400).json({ success: false, message: 'This order already has a co-handler. A 3rd handler requires admin approval.' });
         }
 
         await prisma.$executeRaw`
-            UPDATE students SET co_handled_by_id = ${req.user.id}, co_handled_at = NOW() WHERE id = ${studentId}
+            UPDATE students SET co_handled_by_id = ${nextCoHandlerId}, co_handled_at = NOW() WHERE id = ${studentId}
         `;
 
-        res.json({ success: true, message: 'You are now co-handling this order (50/50 commission split)' });
+        res.json({
+            success: true,
+            message: requestedCoHandlerId
+                ? `Takeover assigned to ${coHandler.fullName}`
+                : 'You are now co-handling this order (50/50 commission split)',
+            data: {
+                coHandledById: coHandler.id,
+                coHandledBy: {
+                    id: coHandler.id,
+                    fullName: coHandler.fullName,
+                },
+            },
+        });
     } catch (error) {
         next(error);
     }

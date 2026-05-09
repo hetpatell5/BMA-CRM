@@ -108,8 +108,8 @@ export const studentsAPI = {
     exportExcel: (params?: any) => api.get('/students/export/excel', { params, responseType: 'blob' }),
     assignToGuide: (studentId: string, guideId: number | null, commission?: string | null) =>
         api.post(`/students/assign/${studentId}`, { guideId, commission }),
-    coHandle: (studentId: string | number) =>
-        api.post(`/students/co-handle/${studentId}`),
+    coHandle: (studentId: string | number, coHandlerId?: number | null) =>
+        api.post(`/students/co-handle/${studentId}`, coHandlerId ? { coHandlerId } : {}),
 }
 
 // Leads API
@@ -184,6 +184,7 @@ export const teamAPI = {
     delete: (id: number) => api.delete(`/team/${id}`),
     getManagers: () => api.get('/team/managers/available'),
     getGuides: () => api.get('/team/guides/available'),
+    getTakeoverUsers: () => api.get('/team/takeover/available'),
     getPaymentDetails: (id: number) => api.get(`/team/${id}/payment-details`),
     updatePaymentDetails: (id: number, data: any) => api.put(`/team/${id}/payment-details`, data),
     getPaymentSummary: () => api.get('/team/payment-summary'),
