@@ -5,6 +5,36 @@ import { notify, getAdminIds } from '../services/notificationService.js';
 
 const router = express.Router();
 
+const normalizeComparable = (value) => String(value || '').trim().toLowerCase();
+
+const customFieldText = (customFields, ...keywords) => {
+    if (!customFields || typeof customFields !== 'object' || Array.isArray(customFields)) return '';
+
+    const normalizedKeywords = keywords.map(keyword => normalizeComparable(keyword));
+
+    for (const [key, value] of Object.entries(customFields)) {
+        if (value === null || value === undefined || typeof value === 'object') continue;
+
+        const normalizedKey = normalizeComparable(key);
+        if (normalizedKeywords.some(keyword => normalizedKey === keyword || normalizedKey.includes(keyword))) {
+            return String(value).trim();
+        }
+    }
+
+    return '';
+};
+
+const getStudentProgramme = (student) => (
+    student.programme ||
+    student.course ||
+    customFieldText(student.customFields, 'program name', 'programme', 'program', 'course')
+);
+
+const getStudentRegionalCenter = (student) => (
+    student.regionalCenter ||
+    customFieldText(student.customFields, 'regional center', 'regional centre', 'regionalcenter', 'rc')
+);
+
 // Get filter options (for dropdowns) - MUST be before /:id route
 router.get('/meta/filters', async (req, res, next) => {
     try {
@@ -372,8 +402,8 @@ router.post('/assign/:id', async (req, res, next) => {
         }
 
         if (parsedGuideId) {
-            const programme = student.programme || student.course || null;
-            const regionalCenter = student.regionalCenter || null;
+            const programme = getStudentProgramme(student);
+            const regionalCenter = getStudentRegionalCenter(student);
 
             if (programme && regionalCenter && !forceDuplicate) {
                 const guide = await prisma.user.findUnique({
@@ -381,18 +411,27 @@ router.post('/assign/:id', async (req, res, next) => {
                     select: { fullName: true },
                 });
 
-                const duplicateCount = await prisma.student.count({
+                const assignedCandidates = await prisma.student.findMany({
                     where: {
                         id: { not: studentId },
                         assignedGuideId: parsedGuideId,
-                        regionalCenter,
-                        OR: [
-                            { programme },
-                            { course: programme },
-                        ],
                         status: { not: 'ALL_DONE' },
                     },
+                    select: {
+                        id: true,
+                        programme: true,
+                        course: true,
+                        regionalCenter: true,
+                        customFields: true,
+                    },
                 });
+
+                const normalizedProgramme = normalizeComparable(programme);
+                const normalizedRegionalCenter = normalizeComparable(regionalCenter);
+                const duplicateCount = assignedCandidates.filter(candidate => (
+                    normalizeComparable(getStudentProgramme(candidate)) === normalizedProgramme &&
+                    normalizeComparable(getStudentRegionalCenter(candidate)) === normalizedRegionalCenter
+                )).length;
 
                 if (duplicateCount >= 3) {
                     return res.status(409).json({
