@@ -106,8 +106,8 @@ export const studentsAPI = {
     bulkUpdate: (ids: string[], status: string) => api.post('/students/bulk-update', { ids, status }),
     bulkDelete: (ids: string[]) => api.post('/students/bulk-delete', { ids }),
     exportExcel: (params?: any) => api.get('/students/export/excel', { params, responseType: 'blob' }),
-    assignToGuide: (studentId: string, guideId: number | null, commission?: string | null) =>
-        api.post(`/students/assign/${studentId}`, { guideId, commission }),
+    assignToGuide: (studentId: string, guideId: number | null, commission?: string | null, forceDuplicate?: boolean) =>
+        api.post(`/students/assign/${studentId}`, { guideId, commission, forceDuplicate }),
     coHandle: (studentId: string | number, coHandlerId?: number | null) =>
         api.post(`/students/co-handle/${studentId}`, coHandlerId ? { coHandlerId } : {}),
 }

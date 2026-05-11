@@ -111,6 +111,7 @@ function getStudentRow(s: any) {
         email:                  s.email || cfGet(cf, 'email'),
         phone:                  s.phone || cfGet(cf, 'contact number', 'contact', 'mobile', 'phone'),
         programme:              s.programme || s.course || cfGet(cf, 'program name', 'programme', 'program', 'course'),
+        regionalCenter:         s.regionalCenter || cfGet(cf, 'regional center', 'regional centre', 'rc'),
         semester:               cfGet(cf, 'present semester', 'semester', 'year'),
         requirement:            requirementStr,
         requirementList,
@@ -371,8 +372,8 @@ export default function StudentsPage() {
 
     // Assign to staff member
     const assignMutation = useMutation({
-        mutationFn: ({ studentId, guideId }: { studentId: string; guideId: number | null }) =>
-            studentsAPI.assignToGuide(studentId, guideId),
+        mutationFn: ({ studentId, guideId, forceDuplicate }: { studentId: string; guideId: number | null; forceDuplicate?: boolean }) =>
+            studentsAPI.assignToGuide(studentId, guideId, undefined, forceDuplicate),
         onSuccess: (_, { guideId }) => {
             queryClient.invalidateQueries({ queryKey: ['students'] })
             if (guideId) {
@@ -384,11 +385,26 @@ export default function StudentsPage() {
                 variant: 'success',
             })
         },
-        onError: (error: any) => toast({
-            title: 'Error',
-            description: error?.response?.data?.message || 'Failed to assign order',
-            variant: 'destructive',
-        }),
+        onError: (error: any, variables) => {
+            const warning = error?.response?.data
+            if (
+                error?.response?.status === 409 &&
+                warning?.code === 'DUPLICATE_ASSIGNMENT_WARNING' &&
+                !variables.forceDuplicate
+            ) {
+                const shouldContinue = window.confirm(warning.message || 'This member already has 3 matching orders. Now go ahead?')
+                if (shouldContinue) {
+                    assignMutation.mutate({ ...variables, forceDuplicate: true })
+                }
+                return
+            }
+
+            toast({
+                title: 'Error',
+                description: warning?.message || 'Failed to assign order',
+                variant: 'destructive',
+            })
+        },
     })
 
     // Co-handle (Take Over)
@@ -524,7 +540,30 @@ export default function StudentsPage() {
         return selectedRequirementByOrder[studentRow.id] || 'all'
     }
 
+    function getLoadedDuplicateAssignmentWarning(studentRow: ReturnType<typeof getStudentRow>, guide: any) {
+        if (!studentRow.programme || !studentRow.regionalCenter) return null
+
+        const duplicateCount = students
+            .map((student: any) => getStudentRow(student))
+            .filter((row: ReturnType<typeof getStudentRow>) => {
+                if (row.id === studentRow.id) return false
+                if (row.programme !== studentRow.programme) return false
+                if (row.regionalCenter !== studentRow.regionalCenter) return false
+                if (row.assignedGuideId === guide.id) return true
+                return Object.values(row.requirementAssignments).some(assignment => assignment?.id === guide.id)
+            }).length
+
+        if (duplicateCount < 3) return null
+
+        return `This order has the same RC (${studentRow.regionalCenter}) and same Program (${studentRow.programme}) already assigned to ${guide.fullName} ${duplicateCount} times. Now go ahead?`
+    }
+
     function handleRequirementTargetAssign(studentRow: ReturnType<typeof getStudentRow>, guide: any) {
+        const warning = getLoadedDuplicateAssignmentWarning(studentRow, guide)
+        if (warning && !window.confirm(warning)) {
+            return
+        }
+
         const selectedRequirement = selectedRequirementFor(studentRow)
         const assignment = assignmentForGuide(guide)
 

@@ -349,15 +349,65 @@ router.post('/assign/:id', async (req, res, next) => {
         }
 
         const studentId = BigInt(req.params.id);
-        const { guideId } = req.body;
+        const { guideId, forceDuplicate = false } = req.body;
+        const parsedGuideId = guideId ? parseInt(guideId) : null;
 
         const student = await prisma.student.findUnique({
             where: { id: studentId },
-            select: { customFields: true },
+            select: {
+                customFields: true,
+                fullName: true,
+                programme: true,
+                course: true,
+                regionalCenter: true,
+            },
         });
 
         if (!student) {
             return res.status(404).json({ success: false, message: 'Student not found' });
+        }
+
+        if (parsedGuideId && !Number.isInteger(parsedGuideId)) {
+            return res.status(400).json({ success: false, message: 'Invalid guide selected' });
+        }
+
+        if (parsedGuideId) {
+            const programme = student.programme || student.course || null;
+            const regionalCenter = student.regionalCenter || null;
+
+            if (programme && regionalCenter && !forceDuplicate) {
+                const guide = await prisma.user.findUnique({
+                    where: { id: parsedGuideId },
+                    select: { fullName: true },
+                });
+
+                const duplicateCount = await prisma.student.count({
+                    where: {
+                        id: { not: studentId },
+                        assignedGuideId: parsedGuideId,
+                        regionalCenter,
+                        OR: [
+                            { programme },
+                            { course: programme },
+                        ],
+                        status: { not: 'ALL_DONE' },
+                    },
+                });
+
+                if (duplicateCount >= 3) {
+                    return res.status(409).json({
+                        success: false,
+                        code: 'DUPLICATE_ASSIGNMENT_WARNING',
+                        message: `This order has the same RC (${regionalCenter}) and same Program (${programme}) already assigned to ${guide?.fullName || 'this member'} ${duplicateCount} times. Now go ahead?`,
+                        data: {
+                            count: duplicateCount,
+                            memberName: guide?.fullName || 'this member',
+                            programme,
+                            regionalCenter,
+                        },
+                    });
+                }
+            }
         }
 
         const nextCustomFields = student.customFields && typeof student.customFields === 'object'
@@ -366,7 +416,7 @@ router.post('/assign/:id', async (req, res, next) => {
 
 
         await prisma.$transaction([
-            prisma.$executeRaw`UPDATE students SET assigned_guide_id = ${guideId ? parseInt(guideId) : null}, assigned_by_id = ${guideId ? parseInt(req.user.id) : null} WHERE id = ${studentId}`,
+            prisma.$executeRaw`UPDATE students SET assigned_guide_id = ${parsedGuideId}, assigned_by_id = ${parsedGuideId ? parseInt(req.user.id) : null} WHERE id = ${studentId}`,
             prisma.student.update({
                 where: { id: studentId },
                 data: { customFields: Object.keys(nextCustomFields).length > 0 ? nextCustomFields : null },
@@ -406,9 +456,9 @@ router.post('/assign/:id', async (req, res, next) => {
         const io = req.app.get('io');
 
         // Notify the assigned guide
-        if (guideId) {
+        if (parsedGuideId) {
             await notify(io, {
-                userIds: [parseInt(guideId)],
+                userIds: [parsedGuideId],
                 type: 'STUDENT_ASSIGNED',
                 title: 'Student Assigned to You',
                 message: `${student.fullName || 'A student'} has been assigned to you.`,
@@ -418,7 +468,7 @@ router.post('/assign/:id', async (req, res, next) => {
 
         res.json({
             success: true,
-            message: guideId ? 'Student assigned successfully' : 'Assignment removed',
+            message: parsedGuideId ? 'Student assigned successfully' : 'Assignment removed',
             data,
         });
     } catch (error) {
