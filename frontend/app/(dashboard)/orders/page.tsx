@@ -603,19 +603,19 @@ export default function StudentsPage() {
         switch (col.id) {
             case 'name':
                 return (
-                    <td key={col.id} className="p-2 border-r border-border" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
+                    <td key={col.id} className="p-2 border-r border-border cursor-pointer group/name" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
                         <div className="flex items-center gap-2 whitespace-nowrap min-w-max">
-                            <span className="text-[14px] font-bold text-foreground group-hover/row:text-primary transition-colors">{r.name}</span>
+                            <span className="text-[14px] font-bold text-foreground group-hover/name:text-primary transition-colors">{r.name}</span>
                             {r.email && <span className="text-[11px] text-muted-foreground font-medium opacity-70">({r.email})</span>}
                         </div>
                     </td>
                 )
             case 'phone':
-                return <td key={col.id} className="p-2 text-[14px] font-mono border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>{r.phone || <span className="text-muted-foreground">—</span>}</td>
+                return <td key={col.id} className="p-2 text-[14px] font-mono border-r border-border whitespace-nowrap">{r.phone || <span className="text-muted-foreground">—</span>}</td>
             case 'programme':
-                return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>{r.programme || <span className="text-muted-foreground">—</span>}</td>
+                return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap">{r.programme || <span className="text-muted-foreground">—</span>}</td>
             case 'semester':
-                return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap text-center" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>{r.semester ? <span className="font-medium">{r.semester}</span> : <span className="text-muted-foreground">—</span>}</td>
+                return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap text-center">{r.semester ? <span className="font-medium">{r.semester}</span> : <span className="text-muted-foreground">—</span>}</td>
             case 'requirement': {
                 if (hasFullStudentAccess && r.requirementList.length > 1) {
                     const selectedRequirement = selectedRequirementFor(r)
@@ -652,10 +652,10 @@ export default function StudentsPage() {
                     )
                 }
 
-                return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>{r.requirement ? <span className="font-medium">{r.requirement}</span> : <span className="text-muted-foreground">—</span>}</td>
+                return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap">{r.requirement ? <span className="font-medium">{r.requirement}</span> : <span className="text-muted-foreground">—</span>}</td>
             }
             case 'source':
-                return <td key={col.id} className="p-2 border-r border-border whitespace-nowrap text-center" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}><span className="text-[12px] uppercase tracking-wider text-muted-foreground font-bold">{src.label}</span></td>
+                return <td key={col.id} className="p-2 border-r border-border whitespace-nowrap text-center"><span className="text-[12px] uppercase tracking-wider text-muted-foreground font-bold">{src.label}</span></td>
             case 'status':
                 return (
                     <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={e => e.stopPropagation()}>
@@ -696,7 +696,7 @@ export default function StudentsPage() {
                 )
             case 'assignedTo': {
                 return (
-                    <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
+                    <td key={col.id} className="p-2 border-r border-border whitespace-nowrap">
                         {r.requirementList.length > 1 ? (
                             <div className="flex flex-col gap-1">
                                 {r.requirementList.map((req: string) => {
@@ -727,7 +727,7 @@ export default function StudentsPage() {
             }
             case 'orderBy':
                 return (
-                    <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
+                    <td key={col.id} className="p-2 border-r border-border whitespace-nowrap">
                         {r.createdBy ? (
                             <div className="flex flex-col gap-0.5">
                                 <span className="text-[13px] font-semibold text-cyan-600 dark:text-cyan-400">
@@ -752,7 +752,7 @@ export default function StudentsPage() {
                     ? Boolean(reqAssignedBy)
                     : Boolean(r.assignedGuideId && r.assignedBy)
                 return (
-                    <td key={col.id} className="p-2 border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
+                    <td key={col.id} className="p-2 border-r border-border whitespace-nowrap">
                         {shouldShowAssignedBy ? (
                             <span className="text-muted-foreground text-[12px] font-bold uppercase tracking-tight">
                                 {reqAssignedBy || r.assignedBy.fullName}
@@ -764,7 +764,7 @@ export default function StudentsPage() {
                 )
             case 'decidedPrice':
                 return (
-                    <td key={col.id} className="p-2 text-[15px] border-r border-border whitespace-nowrap text-right pr-4 font-bold" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>
+                    <td key={col.id} className="p-2 text-[15px] border-r border-border whitespace-nowrap text-right pr-4 font-bold">
                         {r.decidedPrice ? <span className="text-foreground">{formatPrice(r.decidedPrice)}</span> : <span className="text-muted-foreground">—</span>}
                     </td>
                 )
@@ -937,7 +937,7 @@ export default function StudentsPage() {
             default:
                 // Custom column cell reading from customFields using cfGet matcher
                 const val = cfGet(student.customFields, col.customFieldKey || col.label)
-                return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${r.id}`); }}>{val || <span className="text-muted-foreground">—</span>}</td>
+                return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap">{val || <span className="text-muted-foreground">—</span>}</td>
         }
     }
 
