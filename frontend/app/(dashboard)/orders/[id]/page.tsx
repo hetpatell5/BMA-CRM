@@ -281,7 +281,7 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
                 </section>
             ` : ''
 
-            const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=768')
+            const printWindow = window.open('', '_blank', 'width=1024,height=768')
             if (!printWindow) {
                 toast({
                     title: 'Popup blocked',
