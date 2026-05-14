@@ -38,6 +38,12 @@ type RequirementAssignment = {
     assignedByName?: string
 } | null
 
+type OrderOwner = {
+    id: number | null
+    name: string
+    sharePercent: number | null
+}
+
 const DEFAULT_COLUMNS: ColumnDef[] = [
     { id: 'name',        label: 'Full Name',      locked: true,  coreField: 'name' },
     { id: 'phone',       label: 'Contact',        coreField: 'phone' },
@@ -54,7 +60,8 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 ]
 
 
-const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments'])
+const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments', 'telecallerowners'])
+const TELECALLER_OWNERS_FIELD = '_telecallerOwners'
 
 function normalizeFieldKey(key: string) {
     return key.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -100,6 +107,70 @@ function formatPrice(value: string | null | undefined) {
     return normalized
 }
 
+function normalizeOwnerEntry(entry: any): OrderOwner | null {
+    if (!entry || typeof entry !== 'object') return null
+
+    const name = String(entry.name || entry.fullName || '').trim()
+    if (!name) return null
+
+    const parsedId = entry.id === null || entry.id === undefined || entry.id === ''
+        ? null
+        : Number(entry.id)
+    const parsedShare = entry.sharePercent === null || entry.sharePercent === undefined || entry.sharePercent === ''
+        ? null
+        : Number(entry.sharePercent)
+
+    return {
+        id: Number.isFinite(parsedId) ? parsedId : null,
+        name,
+        sharePercent: Number.isFinite(parsedShare) ? parsedShare : null,
+    }
+}
+
+function buildOrderOwners(s: any): OrderOwner[] {
+    const cf = s.customFields
+    const storedOwners = Array.isArray(cf?.[TELECALLER_OWNERS_FIELD]) ? cf[TELECALLER_OWNERS_FIELD] : []
+    const seen = new Set<string>()
+    const owners: OrderOwner[] = []
+
+    const pushUnique = (entry: any) => {
+        const owner = normalizeOwnerEntry(entry)
+        if (!owner) return
+
+        const key = owner.id !== null ? `id:${owner.id}` : `name:${owner.name.toLowerCase()}`
+        if (seen.has(key)) return
+
+        seen.add(key)
+        owners.push(owner)
+    }
+
+    if (s.createdBy) {
+        pushUnique({ id: s.createdBy.id, name: s.createdBy.fullName })
+    }
+
+    storedOwners.forEach(pushUnique)
+
+    if (s.coHandledBy) {
+        pushUnique({ id: s.coHandledBy.id, name: s.coHandledBy.fullName })
+    }
+
+    if (!owners.length) return []
+
+    const ownersWithShare = owners.some(owner => owner.sharePercent !== null)
+        ? owners
+        : owners.map((owner, index) => {
+            const baseShare = Number((100 / owners.length).toFixed(2))
+            const allocated = Number((baseShare * index).toFixed(2))
+            const sharePercent = index === owners.length - 1
+                ? Number((100 - allocated).toFixed(2))
+                : baseShare
+
+            return { ...owner, sharePercent }
+        })
+
+    return ownersWithShare
+}
+
 function getStudentRow(s: any) {
     const cf = s.customFields
     const requirementStr = cfGet(cf, 'requirement of', 'requirement in', 'product type', 'requirement')
@@ -129,6 +200,7 @@ function getStudentRow(s: any) {
         createdById:            s.createdById || null,
         coHandledById:          s.coHandledById || null,
         coHandledBy:            s.coHandledBy || null,
+        orderOwners:            buildOrderOwners(s),
         customFields:           cf || {},
         requirementAssignments: (cf?.requirementAssignments && typeof cf.requirementAssignments === 'object')
             ? cf.requirementAssignments as Record<string, RequirementAssignment>
@@ -392,7 +464,7 @@ export default function StudentsPage() {
                 warning?.code === 'DUPLICATE_ASSIGNMENT_WARNING' &&
                 !variables.forceDuplicate
             ) {
-                const shouldContinue = window.confirm(warning.message || 'This member already has 3 matching orders. Now go ahead?')
+                const shouldContinue = window.confirm(warning.message || 'This member already has 5 matching orders. Now go ahead?')
                 if (shouldContinue) {
                     assignMutation.mutate({ ...variables, forceDuplicate: true })
                 }
@@ -728,16 +800,21 @@ export default function StudentsPage() {
             case 'orderBy':
                 return (
                     <td key={col.id} className="p-2 border-r border-border whitespace-nowrap">
-                        {r.createdBy ? (
+                        {r.orderOwners.length > 0 ? (
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-[13px] font-semibold text-cyan-600 dark:text-cyan-400">
-                                    {r.createdBy.fullName} <span className="text-muted-foreground font-normal text-[11px]">#{r.createdById}</span>
-                                </span>
-                                {r.coHandledBy && (
-                                    <span className="text-[12px] font-medium text-violet-600 dark:text-violet-400">
-                                        + {r.coHandledBy.fullName} <span className="text-muted-foreground font-normal text-[11px]">#{r.coHandledById}</span>
+                                {r.orderOwners.map((owner: OrderOwner, index: number) => (
+                                    <span key={`${owner.id ?? owner.name}-${index}`} className="text-[12px] font-medium text-violet-600 dark:text-violet-400">
+                                        <span className={index === 0 ? 'text-cyan-600 dark:text-cyan-400 font-semibold text-[13px]' : ''}>
+                                            {index > 0 ? '+ ' : ''}{owner.name}
+                                        </span>
+                                        {owner.id ? <span className="text-muted-foreground font-normal text-[11px]"> #{owner.id}</span> : null}
+                                        {r.orderOwners.length > 1 && owner.sharePercent !== null ? (
+                                            <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                {owner.sharePercent.toFixed(owner.sharePercent % 1 === 0 ? 0 : 2)}%
+                                            </span>
+                                        ) : null}
                                     </span>
-                                )}
+                                ))}
                             </div>
                         ) : (
                             <span className="text-muted-foreground text-xs">—</span>

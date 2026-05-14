@@ -6,6 +6,75 @@ import { notify, getAdminIds } from '../services/notificationService.js';
 const router = express.Router();
 
 const normalizeComparable = (value) => String(value || '').trim().toLowerCase();
+const TELECALLER_OWNERS_FIELD = '_telecallerOwners';
+
+const readCustomFieldObject = (customFields) => (
+    customFields && typeof customFields === 'object' && !Array.isArray(customFields)
+        ? { ...customFields }
+        : {}
+);
+
+const normalizeTelecallerOwner = (entry) => {
+    if (!entry || typeof entry !== 'object') return null;
+
+    const parsedId = entry.id === null || entry.id === undefined || entry.id === ''
+        ? null
+        : Number(entry.id);
+    const name = String(entry.name || entry.fullName || '').trim();
+
+    if (!name) return null;
+
+    return {
+        id: Number.isFinite(parsedId) ? parsedId : null,
+        name,
+        role: entry.role ? String(entry.role) : null,
+        staffRole: entry.staffRole ? String(entry.staffRole) : null,
+        addedAt: entry.addedAt ? String(entry.addedAt) : null,
+        sharePercent: entry.sharePercent === null || entry.sharePercent === undefined || entry.sharePercent === ''
+            ? null
+            : Number(entry.sharePercent),
+    };
+};
+
+const uniqueTelecallerOwners = (owners) => {
+    const seen = new Set();
+    const normalized = [];
+
+    owners.forEach((entry) => {
+        const owner = normalizeTelecallerOwner(entry);
+        if (!owner) return;
+
+        const key = owner.id !== null
+            ? `id:${owner.id}`
+            : `name:${normalizeComparable(owner.name)}`;
+
+        if (seen.has(key)) return;
+        seen.add(key);
+        normalized.push(owner);
+    });
+
+    return normalized;
+};
+
+const withEqualCommissionSplit = (owners) => {
+    if (!owners.length) return [];
+
+    const baseShare = Number((100 / owners.length).toFixed(2));
+    let allocated = 0;
+
+    return owners.map((owner, index) => {
+        const sharePercent = index === owners.length - 1
+            ? Number((100 - allocated).toFixed(2))
+            : baseShare;
+
+        allocated = Number((allocated + sharePercent).toFixed(2));
+
+        return {
+            ...owner,
+            sharePercent,
+        };
+    });
+};
 
 const customFieldText = (customFields, ...keywords) => {
     if (!customFields || typeof customFields !== 'object' || Array.isArray(customFields)) return '';
@@ -84,7 +153,7 @@ router.get('/meta/filters', async (req, res, next) => {
         studentsForCF.forEach(s => {
             if (s.customFields && typeof s.customFields === 'object') {
                 Object.keys(s.customFields).forEach(k => {
-                    if (k && k.trim()) customFieldKeysSet.add(k.trim());
+                    if (k && k.trim() && !k.startsWith('_')) customFieldKeysSet.add(k.trim());
                 });
             }
         });
@@ -304,8 +373,14 @@ router.post('/co-handle/:id', async (req, res, next) => {
 
         const studentId = BigInt(req.params.id);
         const [student] = await prisma.$queryRaw`
-            SELECT id, full_name as fullName, assigned_by_id as assignedById, co_handled_by_id as coHandledById
-            FROM students WHERE id = ${studentId}
+            SELECT s.id, s.full_name as fullName, s.assigned_by_id as assignedById, s.co_handled_by_id as coHandledById,
+                   s.custom_fields as customFields, s.created_by as createdById,
+                   c.full_name as createdByName, c.role as createdByRole, c.staff_role as createdByStaffRole,
+                   h.full_name as currentCoHandlerName, h.role as currentCoHandlerRole, h.staff_role as currentCoHandlerStaffRole
+            FROM students s
+            LEFT JOIN users c ON c.id = s.created_by
+            LEFT JOIN users h ON h.id = s.co_handled_by_id
+            WHERE s.id = ${studentId}
         `;
 
         if (!student) return res.status(404).json({ success: false, message: 'Order not found' });
@@ -331,7 +406,7 @@ router.post('/co-handle/:id', async (req, res, next) => {
                     { role: 'STAFF', staffRole: 'TELECALLER' },
                 ],
             },
-            select: { id: true, fullName: true },
+            select: { id: true, fullName: true, role: true, staffRole: true },
         });
 
         if (!coHandler) {
@@ -348,15 +423,59 @@ router.post('/co-handle/:id', async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'This order already has a co-handler. A 3rd handler requires admin approval.' });
         }
 
-        await prisma.$executeRaw`
-            UPDATE students SET co_handled_by_id = ${nextCoHandlerId}, co_handled_at = NOW() WHERE id = ${studentId}
-        `;
+        const nextCustomFields = readCustomFieldObject(student.customFields);
+        const existingOwners = Array.isArray(nextCustomFields[TELECALLER_OWNERS_FIELD])
+            ? nextCustomFields[TELECALLER_OWNERS_FIELD]
+            : [];
+        const ownershipChain = uniqueTelecallerOwners([
+            student.createdById ? {
+                id: Number(student.createdById),
+                name: student.createdByName,
+                role: student.createdByRole,
+                staffRole: student.createdByStaffRole,
+                addedAt: new Date().toISOString(),
+            } : null,
+            ...existingOwners,
+            student.coHandledById ? {
+                id: Number(student.coHandledById),
+                name: student.currentCoHandlerName,
+                role: student.currentCoHandlerRole,
+                staffRole: student.currentCoHandlerStaffRole,
+                addedAt: new Date().toISOString(),
+            } : null,
+            {
+                id: coHandler.id,
+                name: coHandler.fullName,
+                role: coHandler.role,
+                staffRole: coHandler.staffRole,
+                addedAt: new Date().toISOString(),
+            },
+        ]);
+
+        nextCustomFields[TELECALLER_OWNERS_FIELD] = withEqualCommissionSplit(ownershipChain);
+
+        await prisma.$transaction([
+            prisma.$executeRaw`
+                UPDATE students
+                SET co_handled_by_id = ${nextCoHandlerId}, co_handled_at = NOW()
+                WHERE id = ${studentId}
+            `,
+            prisma.student.update({
+                where: { id: studentId },
+                data: { customFields: nextCustomFields },
+            }),
+        ]);
+
+        const ownerCount = nextCustomFields[TELECALLER_OWNERS_FIELD].length;
+        const splitLabel = ownerCount > 1
+            ? `${Number((100 / ownerCount).toFixed(2))}% each`
+            : '100%';
 
         res.json({
             success: true,
             message: requestedCoHandlerId
-                ? `Takeover assigned to ${coHandler.fullName}`
-                : 'You are now co-handling this order (50/50 commission split)',
+                ? `Takeover assigned to ${coHandler.fullName}. Commission split updated to ${splitLabel}.`
+                : `You are now co-handling this order. Commission split updated to ${splitLabel}.`,
             data: {
                 coHandledById: coHandler.id,
                 coHandledBy: {
