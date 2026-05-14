@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     ArrowLeft, BookOpen,
     GraduationCap, Edit, User, Info, FileText,
-    Truck, ExternalLink,
+    Truck, ExternalLink, Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -21,7 +21,7 @@ import dynamic from 'next/dynamic'
 
 const ShiprocketModal = dynamic(() => import('@/components/shiprocket-modal'), { ssr: false })
 
-const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments'])
+const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments', 'telecallerowners'])
 
 function normalizeFieldKey(key: string) {
     return key.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -87,6 +87,20 @@ function formatPrice(value: string | null | undefined) {
     return normalized
 }
 
+function escapeHtml(value: any) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+}
+
+function printableText(value: any) {
+    const text = valueToText(value)
+    return text || '—'
+}
+
 // ─── Core fields we map directly (skip from customFields display) ─────────────
 const CORE_KEYWORDS = ['name', 'email', 'phone', 'contact number', 'mobile', 'programme', 'program name', 'course']
 function isCoreField(label: string) {
@@ -107,6 +121,7 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
     const [showEditPrice, setShowEditPrice] = useState(false)
     const [editPriceValue, setEditPriceValue] = useState('')
     const [showShiprocketModal, setShowShiprocketModal] = useState(false)
+    const [isPreparingPdf, setIsPreparingPdf] = useState(false)
 
     const { data: response, isLoading } = useQuery({
         queryKey: ['student', id],
@@ -189,6 +204,272 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
         : student.source === 'excel' ? { txt: 'Excel Import', cls: 'bg-blue-500/20 text-blue-300 border-blue-500/30' }
         : { txt: 'Manual', cls: 'bg-white/10 text-muted-foreground border-white/20' };
 
+    const handleSavePdf = () => {
+        setIsPreparingPdf(true)
+
+        try {
+            const contactRows: Array<[string, any]> = [
+                ['Full Name', student.fullName],
+                ['Email Id', student.email],
+                ['Contact Number', student.phone],
+                ['Alternative Contact', customFields['Alternative Contact Number'] || customFields['Alt Contact'] || student.alternateEmail],
+                ['Postal Address', customFields['Postal Address With Pincode'] || customFields['Postal Address'] || customFields['Address'] || [student.city, student.state].filter(Boolean).join(', ')],
+            ]
+
+            const academicRows: Array<[string, any]> = [
+                ['Program Name', student.programme || student.course || customFields['Program Name with Year'] || customFields['Programme']],
+                ['Present Semester / Year', customFields['Present Semester / Year'] || customFields['Present Semester'] || customFields['Semester'] || customFields['Year']],
+                ['Enrollment No', student.enrollmentNo],
+                ['Regional Center', student.regionalCenter],
+                ['Subjects', Array.isArray(student.subjects) ? student.subjects.join(', ') : student.subjects],
+            ]
+
+            const assignmentRows: Array<[string, any]> = [
+                ['Requirement', requirementText],
+                ['Subject Codes', customFields['Require Assignments Subject Codes (Ex: ECO-01, BCS-011, etc.)'] || customFields['Subject Codes']],
+                ['Total Assignments', customFields['Total How Many Assignments (Ex: 4, 6, 8, 10, 14 etc.)']],
+                ['Language', customFields['Assignment Language'] || customFields['Language']],
+                ['Description', customFields['Describe Requirement'] || customFields['Description']],
+                ['Order / Payment Date', customFields['Order Date / Payment Date'] || customFields['Payment Date']],
+            ]
+
+            if (commission) {
+                assignmentRows.splice(5, 0, ['Commission', formatPrice(commission)])
+            }
+            if (canSeeDecidedPrice) {
+                assignmentRows.splice(commission ? 6 : 5, 0, ['Decided Price', decidedPrice ? formatPrice(decidedPrice) : 'Not set'])
+            }
+
+            const recordRows: Array<[string, any]> = [
+                ['Status', student.status?.replace(/_/g, ' ')],
+                ['Source', sourceLabel.txt],
+                ['Added By', student.createdBy?.fullName || 'System'],
+                ['Added On', formatDate(student.createdAt)],
+                ['Updated', formatDate(student.updatedAt)],
+            ]
+
+            const renderSection = (title: string, rows: Array<[string, any]>) => {
+                const filteredRows = rows.filter(([, value]) => printableText(value) !== '—')
+                if (filteredRows.length === 0) return ''
+
+                return `
+                    <section class="section">
+                        <h2>${escapeHtml(title)}</h2>
+                        <div class="grid">
+                            ${filteredRows.map(([label, value]) => `
+                                <div class="row">
+                                    <div class="label">${escapeHtml(label)}</div>
+                                    <div class="value">${escapeHtml(printableText(value))}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </section>
+                `
+            }
+
+            const extraSection = extraFields.length > 0 ? `
+                <section class="section">
+                    <h2>Form Response Details</h2>
+                    <div class="grid">
+                        ${extraFields.map(([label, value]) => `
+                            <div class="row">
+                                <div class="label">${escapeHtml(label)}</div>
+                                <div class="value">${escapeHtml(printableText(value))}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </section>
+            ` : ''
+
+            const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=768')
+            if (!printWindow) {
+                toast({
+                    title: 'Popup blocked',
+                    description: 'Please allow popups to save this order as PDF.',
+                    variant: 'destructive',
+                })
+                return
+            }
+
+            const html = `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="utf-8" />
+                    <title>${escapeHtml(`Order ${student.fullName || id}`)}</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body {
+                            margin: 0;
+                            padding: 32px;
+                            font-family: Arial, sans-serif;
+                            color: #0f172a;
+                            background: #f8fafc;
+                        }
+                        .page {
+                            max-width: 920px;
+                            margin: 0 auto;
+                            background: #ffffff;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 16px;
+                            padding: 32px;
+                        }
+                        .topbar {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                            gap: 24px;
+                            padding-bottom: 24px;
+                            border-bottom: 2px solid #e2e8f0;
+                        }
+                        .brand {
+                            font-size: 12px;
+                            font-weight: 700;
+                            letter-spacing: 0.16em;
+                            text-transform: uppercase;
+                            color: #2563eb;
+                            margin-bottom: 8px;
+                        }
+                        .title {
+                            font-size: 28px;
+                            line-height: 1.2;
+                            font-weight: 700;
+                            margin: 0 0 8px;
+                        }
+                        .sub {
+                            color: #475569;
+                            font-size: 14px;
+                            line-height: 1.6;
+                        }
+                        .meta {
+                            min-width: 220px;
+                            background: #f8fafc;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 12px;
+                            padding: 16px 18px;
+                        }
+                        .meta-row {
+                            display: flex;
+                            justify-content: space-between;
+                            gap: 16px;
+                            font-size: 13px;
+                            padding: 8px 0;
+                            border-bottom: 1px solid #e2e8f0;
+                        }
+                        .meta-row:last-child { border-bottom: 0; }
+                        .meta-label { color: #64748b; }
+                        .meta-value { font-weight: 600; text-align: right; }
+                        .section {
+                            margin-top: 28px;
+                        }
+                        .section h2 {
+                            margin: 0 0 14px;
+                            font-size: 16px;
+                            font-weight: 700;
+                            color: #0f172a;
+                        }
+                        .grid {
+                            border: 1px solid #e2e8f0;
+                            border-radius: 12px;
+                            overflow: hidden;
+                        }
+                        .row {
+                            display: grid;
+                            grid-template-columns: 220px 1fr;
+                            gap: 18px;
+                            padding: 12px 16px;
+                            border-bottom: 1px solid #e2e8f0;
+                            font-size: 14px;
+                            align-items: start;
+                        }
+                        .row:last-child { border-bottom: 0; }
+                        .label {
+                            color: #64748b;
+                            font-weight: 600;
+                        }
+                        .value {
+                            color: #0f172a;
+                            white-space: pre-wrap;
+                            word-break: break-word;
+                        }
+                        @media print {
+                            body {
+                                background: #ffffff;
+                                padding: 0;
+                            }
+                            .page {
+                                max-width: none;
+                                margin: 0;
+                                border: 0;
+                                border-radius: 0;
+                                padding: 18px;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="page">
+                        <div class="topbar">
+                            <div>
+                                <div class="brand">BookMyAssignment</div>
+                                <h1 class="title">${escapeHtml(student.fullName || 'Order Details')}</h1>
+                                <div class="sub">
+                                    Order ID: ${escapeHtml(id)}<br />
+                                    ${escapeHtml(student.email || 'No email')}<br />
+                                    ${escapeHtml(student.phone || 'No contact number')}
+                                </div>
+                            </div>
+                            <div class="meta">
+                                <div class="meta-row">
+                                    <span class="meta-label">Status</span>
+                                    <span class="meta-value">${escapeHtml(student.status?.replace(/_/g, ' ') || '—')}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Source</span>
+                                    <span class="meta-value">${escapeHtml(sourceLabel.txt)}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Created</span>
+                                    <span class="meta-value">${escapeHtml(formatDate(student.createdAt))}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Updated</span>
+                                    <span class="meta-value">${escapeHtml(formatDate(student.updatedAt))}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${renderSection('Contact Information', contactRows)}
+                        ${renderSection('Academic Details', academicRows)}
+                        ${renderSection('Assignment Details', assignmentRows)}
+                        ${renderSection('Record Information', recordRows)}
+                        ${extraSection}
+                    </div>
+                    <script>
+                        window.onload = function () {
+                            setTimeout(function () {
+                                window.print();
+                            }, 250);
+                        };
+                    </script>
+                </body>
+                </html>
+            `
+
+            printWindow.document.open()
+            printWindow.document.write(html)
+            printWindow.document.close()
+
+            toast({
+                title: 'PDF ready',
+                description: 'Print window opened. Choose Save as PDF to download and share.',
+                variant: 'success',
+            })
+        } finally {
+            setIsPreparingPdf(false)
+        }
+    }
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -260,6 +541,15 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
                             <Edit className="w-4 h-4" />Edit Order
                         </Button>
                     </Link>
+                    <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={handleSavePdf}
+                        disabled={isPreparingPdf}
+                    >
+                        <Download className="w-4 h-4" />
+                        {isPreparingPdf ? 'Preparing PDF...' : 'Save PDF'}
+                    </Button>
                 </div>
             </div>
 
