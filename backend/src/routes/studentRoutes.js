@@ -90,7 +90,7 @@ router.get('/meta/filters', async (req, res, next) => {
         });
 
         // Sort all arrays alphabetically
-        const sortedProgrammes = programmes.map(p => p.programme).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        const sortedProgrammes   = programmes.map(p => p.programme).filter(Boolean).sort((a, b) => a.localeCompare(b));
         const sortedRegionalCenters = regionalCenters.map(r => r.regionalCenter).filter(Boolean).sort((a, b) => a.localeCompare(b));
         const sortedSubjects = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
         const customFieldKeys = Array.from(customFieldKeysSet).sort((a, b) => a.localeCompare(b));
@@ -433,11 +433,11 @@ router.post('/assign/:id', async (req, res, next) => {
                     normalizeComparable(getStudentRegionalCenter(candidate)) === normalizedRegionalCenter
                 )).length;
 
-                if (duplicateCount >= 3) {
+                if (duplicateCount >= 5) {
                     return res.status(409).json({
                         success: false,
                         code: 'DUPLICATE_ASSIGNMENT_WARNING',
-                        message: `This order has the same RC (${regionalCenter}) and same Program (${programme}) already assigned to ${guide?.fullName || 'this member'} ${duplicateCount} times. Now go ahead?`,
+                        message: `This order has the same RC (${regionalCenter}) and same Program (${programme}) already assigned to ${guide?.fullName || 'this member'} ${duplicateCount} times.Still want to continue ?`,
                         data: {
                             count: duplicateCount,
                             memberName: guide?.fullName || 'this member',

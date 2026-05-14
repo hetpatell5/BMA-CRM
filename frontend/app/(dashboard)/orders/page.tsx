@@ -553,7 +553,7 @@ export default function StudentsPage() {
                 return Object.values(row.requirementAssignments).some(assignment => assignment?.id === guide.id)
             }).length
 
-        if (duplicateCount < 3) return null
+        if (duplicateCount < 5) return null
 
         return `This order has the same RC (${studentRow.regionalCenter}) and same Program (${studentRow.programme}) already assigned to ${guide.fullName} ${duplicateCount} times. Now go ahead?`
     }

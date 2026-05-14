@@ -385,13 +385,30 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/activities', async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { activityType, description, outcome } = req.body;
+        const {
+            activityType,
+            type,
+            description,
+            notes,
+            outcome,
+            nextFollowUp,
+        } = req.body;
+
+        const normalizedActivityType = activityType || (type === 'FOLLOWUP' ? 'FOLLOW_UP' : type);
+        const normalizedDescription = description ?? notes;
+
+        if (!normalizedActivityType || !normalizedDescription?.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Activity type and notes are required',
+            });
+        }
 
         const activity = await prisma.leadActivity.create({
             data: {
                 leadId: BigInt(id),
-                activityType,
-                description,
+                activityType: normalizedActivityType,
+                description: normalizedDescription.trim(),
                 outcome,
                 createdById: req.user.id,
             },
@@ -405,7 +422,10 @@ router.post('/:id/activities', async (req, res, next) => {
         // Update last contact date
         await prisma.lead.update({
             where: { id: BigInt(id) },
-            data: { lastContactDate: new Date() },
+            data: {
+                lastContactDate: new Date(),
+                ...(nextFollowUp ? { nextFollowUp: new Date(nextFollowUp) } : {}),
+            },
         });
 
         res.status(201).json({
@@ -415,6 +435,8 @@ router.post('/:id/activities', async (req, res, next) => {
                 ...activity,
                 id: activity.id.toString(),
                 leadId: activity.leadId.toString(),
+                type: activity.activityType,
+                notes: activity.description,
             },
         });
     } catch (error) {

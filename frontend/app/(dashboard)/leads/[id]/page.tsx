@@ -33,11 +33,11 @@ const ACTIVITY_TYPES = [
     { key: 'EMAIL',   label: 'Email',   icon: Mail },
     { key: 'MEETING', label: 'Meeting', icon: Calendar },
     { key: 'NOTE',    label: 'Note',    icon: MessageSquare },
-    { key: 'FOLLOWUP',label: 'Follow-up',icon: Clock },
+    { key: 'FOLLOW_UP',label: 'Follow-up',icon: Clock },
 ]
 
 const ACTIVITY_ICONS: Record<string, any> = {
-    CALL: Phone, EMAIL: Mail, MEETING: Calendar, NOTE: MessageSquare, FOLLOWUP: Clock,
+    CALL: Phone, EMAIL: Mail, MEETING: Calendar, NOTE: MessageSquare, FOLLOW_UP: Clock,
 }
 
 export default function LeadDetailPage() {
@@ -84,14 +84,23 @@ export default function LeadDetailPage() {
     })
 
     const addActivityMutation = useMutation({
-        mutationFn: (data: any) => leadsAPI.addActivity(leadId, data),
+        mutationFn: (data: any) => leadsAPI.addActivity(leadId, {
+            activityType: data.type,
+            description: data.notes,
+            outcome: data.outcome,
+            nextFollowUp: data.nextFollowUp || null,
+        }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['lead', leadId] })
             setShowActivityForm(false)
             setActivityData({ type: 'NOTE', notes: '', outcome: '', nextFollowUp: '' })
             toast({ title: 'Activity logged', variant: 'success' })
         },
-        onError: () => toast({ title: 'Failed to log activity', variant: 'destructive' }),
+        onError: (error: any) => toast({
+            title: 'Failed to log activity',
+            description: error?.response?.data?.message || 'Please check the activity details and try again.',
+            variant: 'destructive',
+        }),
     })
 
     const deleteMutation = useMutation({
@@ -380,7 +389,8 @@ export default function LeadDetailPage() {
                         ) : (
                             <div className="space-y-4">
                                 {activities.map((act: any, idx: number) => {
-                                    const Icon = ACTIVITY_ICONS[act.type] || MessageSquare
+                                    const activityType = act.activityType || act.type
+                                    const Icon = ACTIVITY_ICONS[activityType] || MessageSquare
                                     return (
                                         <div key={act.id} className="flex gap-3">
                                             <div className="flex flex-col items-center">
@@ -393,13 +403,13 @@ export default function LeadDetailPage() {
                                             </div>
                                             <div className="flex-1 pb-2">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-xs font-semibold uppercase tracking-wide text-primary">{act.type}</span>
+                                                    <span className="text-xs font-semibold uppercase tracking-wide text-primary">{activityType?.replace(/_/g, ' ')}</span>
                                                     <span className="text-xs text-muted-foreground">• {formatDate(act.createdAt)}</span>
-                                                    {act.performedBy && (
-                                                        <span className="text-xs text-muted-foreground">by {act.performedBy.fullName}</span>
+                                                    {act.createdBy && (
+                                                        <span className="text-xs text-muted-foreground">by {act.createdBy.fullName}</span>
                                                     )}
                                                 </div>
-                                                <p className="text-sm">{act.notes}</p>
+                                                <p className="text-sm">{act.description || act.notes}</p>
                                                 {act.outcome && (
                                                     <p className="text-xs text-muted-foreground mt-1">Outcome: <span className="text-foreground">{act.outcome}</span></p>
                                                 )}
