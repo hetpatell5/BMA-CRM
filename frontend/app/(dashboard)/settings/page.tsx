@@ -45,6 +45,7 @@ export default function SettingsPage() {
         emailFromName: '',
         emailBodyTemplate: '',
         invoiceTemplate: '',
+        orderPdfTemplate: '',
     })
     const [showPassword, setShowPassword] = useState(false)
     const [testStatus, setTestStatus] = useState<null | 'loading' | 'success' | 'error'>(null)
@@ -69,6 +70,7 @@ export default function SettingsPage() {
                 emailFromName: settingsData?.emailConfig?.fromName || 'CRM Admin',
                 emailBodyTemplate: settingsData?.emailConfig?.bodyTemplate || '',
                 invoiceTemplate: settingsData?.emailConfig?.invoiceTemplate || '',
+                orderPdfTemplate: settingsData?.orderPdfConfig?.template || '',
             })
         }
     }, [settingsData])
@@ -97,6 +99,9 @@ export default function SettingsPage() {
                 fromName: form.emailFromName,
                 bodyTemplate: form.emailBodyTemplate,
                 invoiceTemplate: form.invoiceTemplate,
+            },
+            orderPdfConfig: {
+                template: form.orderPdfTemplate,
             },
         }),
         onSuccess: () => {
@@ -487,6 +492,28 @@ export default function SettingsPage() {
                                             />
                                             <p className="text-[12px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
                                                 Available variables: <code>{`{invoiceId}`}</code>, <code>{`{date}`}</code>, <code>{`{memberName}`}</code>, <code>{`{memberRole}`}</code>, <code>{`{memberEmail}`}</code>, <code>{`{memberAccount}`}</code>, <code>{`{breakdownTableRows}`}</code>, <code>{`{totalAmount}`}</code>, <code>{`{noteSection}`}</code>.
+                                            </p>
+                                        </div>
+
+                                        <div className="pt-4 border-t border-slate-100 dark:border-white/5">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h4 className="font-semibold text-slate-900 dark:text-white text-sm">Order PDF Template</h4>
+                                                <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20">HTML + CSS</span>
+                                            </div>
+                                            <Label htmlFor="order-pdf-body" className="text-[13px] font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Order PDF HTML Template</Label>
+                                            <textarea
+                                                id="order-pdf-body"
+                                                value={form.orderPdfTemplate}
+                                                onChange={e => set('orderPdfTemplate', e.target.value)}
+                                                placeholder="<!DOCTYPE html><html><head><style>body { color: blue; }</style></head><body>...</body></html>"
+                                                rows={16}
+                                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] focus:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:focus:bg-slate-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-purple-500 resize-y font-mono leading-relaxed"
+                                            />
+                                            <p className="text-[12px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
+                                                Available variables: <code>{`{documentTitle}`}</code>, <code>{`{brandName}`}</code>, <code>{`{orderId}`}</code>, <code>{`{fullName}`}</code>, <code>{`{email}`}</code>, <code>{`{phone}`}</code>, <code>{`{programName}`}</code>, <code>{`{status}`}</code>, <code>{`{source}`}</code>, <code>{`{createdAt}`}</code>, <code>{`{updatedAt}`}</code>, <code>{`{contactSection}`}</code>, <code>{`{academicSection}`}</code>, <code>{`{assignmentSection}`}</code>, <code>{`{recordSection}`}</code>, <code>{`{extraSection}`}</code>.
+                                            </p>
+                                            <p className="text-[12px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
+                                                The section variables already contain formatted HTML blocks, so you can move them anywhere in your template and style them however you want.
                                             </p>
                                         </div>
                                     </div>

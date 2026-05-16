@@ -241,4 +241,5 @@ export const shiprocketAPI = {
 export const appSettingsAPI = {
     get: () => api.get('/app-settings'),
     update: (settings: Record<string, any>) => api.put('/app-settings', settings),
+    getOrderPdfConfig: () => api.get('/app-settings/order-pdf-config'),
 }

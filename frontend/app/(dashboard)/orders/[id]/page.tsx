@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { studentsAPI, shiprocketAPI } from '@/lib/api'
+import { appSettingsAPI, studentsAPI, shiprocketAPI } from '@/lib/api'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     ArrowLeft, BookOpen,
@@ -22,6 +22,168 @@ import dynamic from 'next/dynamic'
 const ShiprocketModal = dynamic(() => import('@/components/shiprocket-modal'), { ssr: false })
 
 const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments', 'telecallerowners'])
+const DEFAULT_ORDER_PDF_TEMPLATE = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{documentTitle}</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 28px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #0f172a;
+            background: #f8fafc;
+        }
+        .page {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #dbe3ef;
+            border-radius: 18px;
+            overflow: hidden;
+        }
+        .hero {
+            padding: 28px 32px;
+            background: linear-gradient(135deg, #0f172a, #1e3a8a);
+            color: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+        }
+        .brand {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+        .title {
+            margin: 0;
+            font-size: 30px;
+            line-height: 1.15;
+            font-weight: 700;
+        }
+        .subtitle {
+            margin-top: 10px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: rgba(255,255,255,0.82);
+        }
+        .hero-card {
+            min-width: 260px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 14px;
+            padding: 16px 18px;
+            backdrop-filter: blur(8px);
+        }
+        .hero-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            font-size: 13px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .hero-row:last-child { border-bottom: 0; }
+        .hero-label { color: rgba(255,255,255,0.72); }
+        .hero-value { text-align: right; font-weight: 600; }
+        .content {
+            padding: 28px 32px 32px;
+        }
+        .section {
+            margin-bottom: 22px;
+        }
+        .section:last-child {
+            margin-bottom: 0;
+        }
+        .section-title {
+            margin: 0 0 12px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .section-box {
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #ffffff;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr);
+            gap: 18px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .row:last-child { border-bottom: 0; }
+        .label {
+            color: #64748b;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .value {
+            color: #0f172a;
+            font-size: 13px;
+            line-height: 1.6;
+            word-break: break-word;
+            white-space: pre-wrap;
+            text-align: left;
+        }
+        .empty {
+            color: #94a3b8;
+            font-style: italic;
+        }
+        @media print {
+            body {
+                background: #ffffff;
+                padding: 0;
+            }
+            .page {
+                max-width: none;
+                border: 0;
+                border-radius: 0;
+            }
+            .hero {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="hero">
+            <div>
+                <div class="brand">{brandName}</div>
+                <h1 class="title">{fullName}</h1>
+                <div class="subtitle">
+                    Order ID: {orderId}<br />
+                    {programName}<br />
+                    {email}<br />
+                    {phone}
+                </div>
+            </div>
+            <div class="hero-card">
+                <div class="hero-row"><span class="hero-label">Status</span><span class="hero-value">{status}</span></div>
+                <div class="hero-row"><span class="hero-label">Source</span><span class="hero-value">{source}</span></div>
+                <div class="hero-row"><span class="hero-label">Created</span><span class="hero-value">{createdAt}</span></div>
+                <div class="hero-row"><span class="hero-label">Updated</span><span class="hero-value">{updatedAt}</span></div>
+            </div>
+        </div>
+        <div class="content">
+            {contactSection}
+            {academicSection}
+            {assignmentSection}
+            {recordSection}
+            {extraSection}
+        </div>
+    </div>
+</body>
+</html>`
 
 function normalizeFieldKey(key: string) {
     return key.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -101,6 +263,25 @@ function printableText(value: any) {
     return text || '—'
 }
 
+function renderPdfSection(title: string, rows: Array<[string, any]>) {
+    const filteredRows = rows.filter(([, value]) => printableText(value) !== '—')
+    if (filteredRows.length === 0) return ''
+
+    return `
+        <section class="section">
+            <h2 class="section-title">${escapeHtml(title)}</h2>
+            <div class="section-box">
+                ${filteredRows.map(([label, value]) => `
+                    <div class="row">
+                        <div class="label">${escapeHtml(label)}</div>
+                        <div class="value">${escapeHtml(printableText(value))}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </section>
+    `
+}
+
 // ─── Core fields we map directly (skip from customFields display) ─────────────
 const CORE_KEYWORDS = ['name', 'email', 'phone', 'contact number', 'mobile', 'programme', 'program name', 'course']
 function isCoreField(label: string) {
@@ -133,6 +314,11 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
     const { data: srConfigData } = useQuery({
         queryKey: ['shiprocket-config'],
         queryFn: async () => (await shiprocketAPI.getConfig()).data.data,
+        staleTime: 5 * 60 * 1000,
+    })
+    const { data: orderPdfConfigData } = useQuery({
+        queryKey: ['order-pdf-config'],
+        queryFn: async () => (await appSettingsAPI.getOrderPdfConfig()).data.data,
         staleTime: 5 * 60 * 1000,
     })
     const hardCopyKeywords: string[] = srConfigData?.hardCopyKeywords || ['hard copy']
@@ -248,38 +434,13 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
                 ['Updated', formatDate(student.updatedAt)],
             ]
 
-            const renderSection = (title: string, rows: Array<[string, any]>) => {
-                const filteredRows = rows.filter(([, value]) => printableText(value) !== '—')
-                if (filteredRows.length === 0) return ''
-
-                return `
-                    <section class="section">
-                        <h2>${escapeHtml(title)}</h2>
-                        <div class="grid">
-                            ${filteredRows.map(([label, value]) => `
-                                <div class="row">
-                                    <div class="label">${escapeHtml(label)}</div>
-                                    <div class="value">${escapeHtml(printableText(value))}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </section>
-                `
-            }
-
-            const extraSection = extraFields.length > 0 ? `
-                <section class="section">
-                    <h2>Form Response Details</h2>
-                    <div class="grid">
-                        ${extraFields.map(([label, value]) => `
-                            <div class="row">
-                                <div class="label">${escapeHtml(label)}</div>
-                                <div class="value">${escapeHtml(printableText(value))}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </section>
-            ` : ''
+            const contactSection = renderPdfSection('Contact Information', contactRows)
+            const academicSection = renderPdfSection('Academic Details', academicRows)
+            const assignmentSection = renderPdfSection('Assignment Details', assignmentRows)
+            const recordSection = renderPdfSection('Record Information', recordRows)
+            const extraSection = extraFields.length > 0
+                ? renderPdfSection('Form Response Details', extraFields as Array<[string, any]>)
+                : ''
 
             const printWindow = window.open('', '_blank', 'width=1024,height=768')
             if (!printWindow) {
@@ -291,170 +452,37 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
                 return
             }
 
-            const html = `
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="utf-8" />
-                    <title>${escapeHtml(`Order ${student.fullName || id}`)}</title>
-                    <style>
-                        * { box-sizing: border-box; }
-                        body {
-                            margin: 0;
-                            padding: 32px;
-                            font-family: Arial, sans-serif;
-                            color: #0f172a;
-                            background: #f8fafc;
-                        }
-                        .page {
-                            max-width: 920px;
-                            margin: 0 auto;
-                            background: #ffffff;
-                            border: 1px solid #e2e8f0;
-                            border-radius: 16px;
-                            padding: 32px;
-                        }
-                        .topbar {
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: flex-start;
-                            gap: 24px;
-                            padding-bottom: 24px;
-                            border-bottom: 2px solid #e2e8f0;
-                        }
-                        .brand {
-                            font-size: 12px;
-                            font-weight: 700;
-                            letter-spacing: 0.16em;
-                            text-transform: uppercase;
-                            color: #2563eb;
-                            margin-bottom: 8px;
-                        }
-                        .title {
-                            font-size: 28px;
-                            line-height: 1.2;
-                            font-weight: 700;
-                            margin: 0 0 8px;
-                        }
-                        .sub {
-                            color: #475569;
-                            font-size: 14px;
-                            line-height: 1.6;
-                        }
-                        .meta {
-                            min-width: 220px;
-                            background: #f8fafc;
-                            border: 1px solid #e2e8f0;
-                            border-radius: 12px;
-                            padding: 16px 18px;
-                        }
-                        .meta-row {
-                            display: flex;
-                            justify-content: space-between;
-                            gap: 16px;
-                            font-size: 13px;
-                            padding: 8px 0;
-                            border-bottom: 1px solid #e2e8f0;
-                        }
-                        .meta-row:last-child { border-bottom: 0; }
-                        .meta-label { color: #64748b; }
-                        .meta-value { font-weight: 600; text-align: right; }
-                        .section {
-                            margin-top: 28px;
-                        }
-                        .section h2 {
-                            margin: 0 0 14px;
-                            font-size: 16px;
-                            font-weight: 700;
-                            color: #0f172a;
-                        }
-                        .grid {
-                            border: 1px solid #e2e8f0;
-                            border-radius: 12px;
-                            overflow: hidden;
-                        }
-                        .row {
-                            display: grid;
-                            grid-template-columns: 220px 1fr;
-                            gap: 18px;
-                            padding: 12px 16px;
-                            border-bottom: 1px solid #e2e8f0;
-                            font-size: 14px;
-                            align-items: start;
-                        }
-                        .row:last-child { border-bottom: 0; }
-                        .label {
-                            color: #64748b;
-                            font-weight: 600;
-                        }
-                        .value {
-                            color: #0f172a;
-                            white-space: pre-wrap;
-                            word-break: break-word;
-                        }
-                        @media print {
-                            body {
-                                background: #ffffff;
-                                padding: 0;
-                            }
-                            .page {
-                                max-width: none;
-                                margin: 0;
-                                border: 0;
-                                border-radius: 0;
-                                padding: 18px;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="page">
-                        <div class="topbar">
-                            <div>
-                                <div class="brand">BookMyAssignment</div>
-                                <h1 class="title">${escapeHtml(student.fullName || 'Order Details')}</h1>
-                                <div class="sub">
-                                    Order ID: ${escapeHtml(id)}<br />
-                                    ${escapeHtml(student.email || 'No email')}<br />
-                                    ${escapeHtml(student.phone || 'No contact number')}
-                                </div>
-                            </div>
-                            <div class="meta">
-                                <div class="meta-row">
-                                    <span class="meta-label">Status</span>
-                                    <span class="meta-value">${escapeHtml(student.status?.replace(/_/g, ' ') || '—')}</span>
-                                </div>
-                                <div class="meta-row">
-                                    <span class="meta-label">Source</span>
-                                    <span class="meta-value">${escapeHtml(sourceLabel.txt)}</span>
-                                </div>
-                                <div class="meta-row">
-                                    <span class="meta-label">Created</span>
-                                    <span class="meta-value">${escapeHtml(formatDate(student.createdAt))}</span>
-                                </div>
-                                <div class="meta-row">
-                                    <span class="meta-label">Updated</span>
-                                    <span class="meta-value">${escapeHtml(formatDate(student.updatedAt))}</span>
-                                </div>
-                            </div>
-                        </div>
+            const template = orderPdfConfigData?.template || DEFAULT_ORDER_PDF_TEMPLATE
+            const replacements: Record<string, string> = {
+                documentTitle: escapeHtml(`Order ${student.fullName || id}`),
+                brandName: escapeHtml('BookMyAssignment'),
+                orderId: escapeHtml(id),
+                fullName: escapeHtml(student.fullName || 'Order Details'),
+                email: escapeHtml(student.email || 'No email'),
+                phone: escapeHtml(student.phone || 'No contact number'),
+                programName: escapeHtml(student.programme || student.course || customFields['Program Name with Year'] || customFields['Programme'] || 'No program'),
+                status: escapeHtml(student.status?.replace(/_/g, ' ') || '—'),
+                source: escapeHtml(sourceLabel.txt),
+                createdAt: escapeHtml(formatDate(student.createdAt)),
+                updatedAt: escapeHtml(formatDate(student.updatedAt)),
+                contactSection,
+                academicSection,
+                assignmentSection,
+                recordSection,
+                extraSection,
+            }
 
-                        ${renderSection('Contact Information', contactRows)}
-                        ${renderSection('Academic Details', academicRows)}
-                        ${renderSection('Assignment Details', assignmentRows)}
-                        ${renderSection('Record Information', recordRows)}
-                        ${extraSection}
-                    </div>
-                    <script>
-                        window.onload = function () {
-                            setTimeout(function () {
-                                window.print();
-                            }, 250);
-                        };
-                    </script>
-                </body>
-                </html>
-            `
+            const renderedTemplate = template.replace(/\{([a-zA-Z0-9]+)\}/g, (_match: string, key: string) => replacements[key] ?? '')
+            const printScript = `<script>
+                window.onload = function () {
+                    setTimeout(function () {
+                        window.print();
+                    }, 250);
+                };
+            </script>`
+            const html = renderedTemplate.includes('</body>')
+                ? renderedTemplate.replace('</body>', `${printScript}</body>`)
+                : `${renderedTemplate}${printScript}`
 
             printWindow.document.open()
             printWindow.document.write(html)

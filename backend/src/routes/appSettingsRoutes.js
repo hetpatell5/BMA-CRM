@@ -113,13 +113,184 @@ const DEFAULT_SETTINGS = {
 </body>
 </html>`,
     },
+    orderPdfConfig: {
+        template: `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{documentTitle}</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 28px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #0f172a;
+            background: #f8fafc;
+        }
+        .page {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #dbe3ef;
+            border-radius: 18px;
+            overflow: hidden;
+        }
+        .hero {
+            padding: 28px 32px;
+            background: linear-gradient(135deg, #0f172a, #1e3a8a);
+            color: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+        }
+        .brand {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+        .title {
+            margin: 0;
+            font-size: 30px;
+            line-height: 1.15;
+            font-weight: 700;
+        }
+        .subtitle {
+            margin-top: 10px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: rgba(255,255,255,0.82);
+        }
+        .hero-card {
+            min-width: 260px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 14px;
+            padding: 16px 18px;
+            backdrop-filter: blur(8px);
+        }
+        .hero-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            font-size: 13px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .hero-row:last-child { border-bottom: 0; }
+        .hero-label { color: rgba(255,255,255,0.72); }
+        .hero-value { text-align: right; font-weight: 600; }
+        .content {
+            padding: 28px 32px 32px;
+        }
+        .section {
+            margin-bottom: 22px;
+        }
+        .section:last-child {
+            margin-bottom: 0;
+        }
+        .section-title {
+            margin: 0 0 12px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .section-box {
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #ffffff;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr);
+            gap: 18px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .row:last-child { border-bottom: 0; }
+        .label {
+            color: #64748b;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .value {
+            color: #0f172a;
+            font-size: 13px;
+            line-height: 1.6;
+            word-break: break-word;
+            white-space: pre-wrap;
+            text-align: left;
+        }
+        .empty {
+            color: #94a3b8;
+            font-style: italic;
+        }
+        @media print {
+            body {
+                background: #ffffff;
+                padding: 0;
+            }
+            .page {
+                max-width: none;
+                border: 0;
+                border-radius: 0;
+            }
+            .hero {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="hero">
+            <div>
+                <div class="brand">{brandName}</div>
+                <h1 class="title">{fullName}</h1>
+                <div class="subtitle">
+                    Order ID: {orderId}<br />
+                    {programName}<br />
+                    {email}<br />
+                    {phone}
+                </div>
+            </div>
+            <div class="hero-card">
+                <div class="hero-row"><span class="hero-label">Status</span><span class="hero-value">{status}</span></div>
+                <div class="hero-row"><span class="hero-label">Source</span><span class="hero-value">{source}</span></div>
+                <div class="hero-row"><span class="hero-label">Created</span><span class="hero-value">{createdAt}</span></div>
+                <div class="hero-row"><span class="hero-label">Updated</span><span class="hero-value">{updatedAt}</span></div>
+            </div>
+        </div>
+        <div class="content">
+            {contactSection}
+            {academicSection}
+            {assignmentSection}
+            {recordSection}
+            {extraSection}
+        </div>
+    </div>
+</body>
+</html>`,
+    },
 };
 
 function readSettings() {
     try {
         if (existsSync(SETTINGS_FILE)) {
             const raw = readFileSync(SETTINGS_FILE, 'utf8');
-            return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+            const parsed = JSON.parse(raw);
+            return {
+                ...DEFAULT_SETTINGS,
+                ...parsed,
+                shiprocket: { ...DEFAULT_SETTINGS.shiprocket, ...(parsed.shiprocket || {}) },
+                emailConfig: { ...DEFAULT_SETTINGS.emailConfig, ...(parsed.emailConfig || {}) },
+                orderPdfConfig: { ...DEFAULT_SETTINGS.orderPdfConfig, ...(parsed.orderPdfConfig || {}) },
+            };
         }
     } catch {}
     return DEFAULT_SETTINGS;
@@ -193,6 +364,15 @@ router.put('/', requireAdmin, (req, res) => {
             current.emailConfig = updatedEmail;
         }
 
+        if (req.body.orderPdfConfig) {
+            const { orderPdfConfig } = req.body;
+            const updatedOrderPdf = { ...current.orderPdfConfig };
+
+            if (orderPdfConfig.template !== undefined) updatedOrderPdf.template = orderPdfConfig.template;
+
+            current.orderPdfConfig = updatedOrderPdf;
+        }
+
         writeSettings(current);
 
         // Update env vars in memory immediately
@@ -206,6 +386,21 @@ router.put('/', requireAdmin, (req, res) => {
         res.json({ success: true, message: 'Settings saved successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to save settings' });
+    }
+});
+
+// GET /api/app-settings/order-pdf-config — safe PDF template config for frontend use
+router.get('/order-pdf-config', (req, res) => {
+    try {
+        const settings = readSettings();
+        res.json({
+            success: true,
+            data: {
+                template: settings.orderPdfConfig?.template || DEFAULT_SETTINGS.orderPdfConfig.template,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to load order PDF config' });
     }
 });
 
