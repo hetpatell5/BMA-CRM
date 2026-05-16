@@ -510,10 +510,10 @@ export default function SettingsPage() {
                                                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] focus:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:focus:bg-slate-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-purple-500 resize-y font-mono leading-relaxed"
                                             />
                                             <p className="text-[12px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
-                                                Available variables: <code>{`{documentTitle}`}</code>, <code>{`{brandName}`}</code>, <code>{`{orderId}`}</code>, <code>{`{fullName}`}</code>, <code>{`{email}`}</code>, <code>{`{phone}`}</code>, <code>{`{programName}`}</code>, <code>{`{status}`}</code>, <code>{`{source}`}</code>, <code>{`{createdAt}`}</code>, <code>{`{updatedAt}`}</code>, <code>{`{contactSection}`}</code>, <code>{`{academicSection}`}</code>, <code>{`{assignmentSection}`}</code>, <code>{`{recordSection}`}</code>, <code>{`{extraSection}`}</code>.
+                                                Available variables: <code>{`{documentTitle}`}</code>, <code>{`{brandName}`}</code>, <code>{`{orderId}`}</code>, <code>{`{fullName}`}</code>, <code>{`{email}`}</code>, <code>{`{phone}`}</code>, <code>{`{programName}`}</code>, <code>{`{status}`}</code>, <code>{`{source}`}</code>, <code>{`{createdAt}`}</code>, <code>{`{updatedAt}`}</code>, <code>{`{allDetailsTable}`}</code>, <code>{`{contactSection}`}</code>, <code>{`{academicSection}`}</code>, <code>{`{assignmentSection}`}</code>, <code>{`{recordSection}`}</code>, <code>{`{extraSection}`}</code>.
                                             </p>
                                             <p className="text-[12px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
-                                                The section variables already contain formatted HTML blocks, so you can move them anywhere in your template and style them however you want.
+                                                For compact single-page PDFs, use <code>{`{allDetailsTable}`}</code>. The section variables are still available if you want a multi-block layout.
                                             </p>
                                         </div>
                                     </div>
