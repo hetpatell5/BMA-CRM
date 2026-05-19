@@ -402,7 +402,7 @@ router.put('/order-columns', (req, res) => {
                 id: String(col.id).slice(0, 80),
                 label: String(col.label).trim().slice(0, 80),
                 customFieldKey: String(col.customFieldKey || col.label).trim().slice(0, 80),
-                visibility: ['all', 'ops', 'staffOnly'].includes(col.visibility) ? col.visibility : 'all',
+                visibility: ['all', 'ops'].includes(col.visibility) ? col.visibility : 'all',
             }))
             .filter(col => col.label && col.customFieldKey);
 

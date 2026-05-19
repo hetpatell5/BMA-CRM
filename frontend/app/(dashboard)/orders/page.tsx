@@ -29,7 +29,7 @@ type ColumnDef = {
     coreField?: string;       // maps to getStudentRow() fields
     customFieldKey?: string;  // reads from customFields JSON using cfGet()
     adminOnly?: boolean;      // only visible to admin/manager
-    visibility?: 'all' | 'ops' | 'staffOnly'
+    visibility?: 'all' | 'ops'
 }
 
 type RequirementAssignment = {
@@ -257,7 +257,7 @@ export default function StudentsPage() {
     const isTelecaller = currentUser?.role === 'STAFF' && currentUser?.staffRole === 'TELECALLER'
     const hasFullStudentAccess = isAdminManager || isTelecaller
     const canBulkManageOrders = isAdminManager
-    const currentColumnVisibilityRole = isAdminManager || isTelecaller ? 'ops' : 'staffOnly'
+    const currentColumnVisibilityRole = isAdminManager || isTelecaller ? 'ops' : 'staff'
 
     // Fetch Shiprocket config for dynamic hard copy keyword detection
     const { data: srConfigData } = useQuery({
@@ -295,7 +295,7 @@ export default function StudentsPage() {
     const [activeColumns, setActiveColumns] = useState<ColumnDef[]>([])
     const [showColumnPanel, setShowColumnPanel] = useState(false)
     const [newColumnLabel, setNewColumnLabel] = useState('')
-    const [newColumnVisibility, setNewColumnVisibility] = useState<'all' | 'ops' | 'staffOnly'>('all')
+    const [newColumnVisibility, setNewColumnVisibility] = useState<'all' | 'ops'>('all')
 
     const { data: sharedColumnData } = useQuery({
         queryKey: ['order-columns'],
@@ -391,11 +391,14 @@ export default function StudentsPage() {
         saveColumnPrefs(activeColumns.filter(c => c.id !== id))
     }
 
-    const updateSharedColumnVisibility = (id: string, visibility: 'all' | 'ops' | 'staffOnly') => {
-        const nextSharedColumns = sharedCustomColumns.map(col =>
-            col.id === id ? { ...col, visibility } : col
-        )
-        saveSharedColumnsMutation.mutate(nextSharedColumns)
+    const updateColumnVisibility = (id: string, visibility: 'all' | 'ops') => {
+        const isSharedColumn = sharedCustomColumns.some(col => col.id === id)
+        if (isSharedColumn) {
+            const nextSharedColumns = sharedCustomColumns.map(col =>
+                col.id === id ? { ...col, visibility } : col
+            )
+            saveSharedColumnsMutation.mutate(nextSharedColumns)
+        }
         saveColumnPrefs(activeColumns.map(col =>
             col.id === id ? { ...col, visibility } : col
         ).filter(canViewColumn))
@@ -1703,18 +1706,15 @@ export default function StudentsPage() {
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <span className="text-xs font-medium truncate leading-tight block">{col.label}</span>
-                                                {col.customFieldKey && (
-                                                    <select
-                                                        value={col.visibility || 'all'}
-                                                        onChange={e => updateSharedColumnVisibility(col.id, e.target.value as 'all' | 'ops' | 'staffOnly')}
-                                                        className="mt-1 h-6 w-full rounded border border-border bg-background px-1.5 text-[10px] text-muted-foreground outline-none focus:ring-1 focus:ring-primary/30"
-                                                        disabled={saveSharedColumnsMutation.isPending}
-                                                    >
-                                                        <option value="all">Everyone</option>
-                                                        <option value="ops">Admin / manager / telecaller</option>
-                                                        <option value="staffOnly">Staff except telecaller</option>
-                                                    </select>
-                                                )}
+                                                <select
+                                                    value={col.visibility || 'all'}
+                                                    onChange={e => updateColumnVisibility(col.id, e.target.value as 'all' | 'ops')}
+                                                    className="mt-1 h-6 w-full rounded border border-border bg-background px-1.5 text-[10px] text-muted-foreground outline-none focus:ring-1 focus:ring-primary/30"
+                                                    disabled={saveSharedColumnsMutation.isPending}
+                                                >
+                                                    <option value="all">Everyone</option>
+                                                    <option value="ops">Admin / manager / telecaller</option>
+                                                </select>
                                             </div>
                                             {col.locked ? (
                                                 <div className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground bg-muted/50 shrink-0" title="Core field, cannot hide">
@@ -1765,12 +1765,11 @@ export default function StudentsPage() {
                                         <Label className="text-[11px] text-muted-foreground mb-1 block">Visible To</Label>
                                         <select
                                             value={newColumnVisibility}
-                                            onChange={e => setNewColumnVisibility(e.target.value as 'all' | 'ops' | 'staffOnly')}
+                                            onChange={e => setNewColumnVisibility(e.target.value as 'all' | 'ops')}
                                             className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
                                         >
                                             <option value="all">Everyone</option>
                                             <option value="ops">Admin, manager, telecaller</option>
-                                            <option value="staffOnly">Staff except telecaller</option>
                                         </select>
                                     </div>
                                     <Button type="submit" variant="secondary" size="sm" className="w-full gap-2 h-8 text-xs" disabled={saveSharedColumnsMutation.isPending}>
