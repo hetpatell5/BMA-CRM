@@ -245,6 +245,7 @@ const DEFAULT_SETTINGS = {
 </body>
 </html>`,
     },
+    orderColumns: [],
 };
 
 function readSettings() {
@@ -258,6 +259,7 @@ function readSettings() {
                 shiprocket: { ...DEFAULT_SETTINGS.shiprocket, ...(parsed.shiprocket || {}) },
                 emailConfig: { ...DEFAULT_SETTINGS.emailConfig, ...(parsed.emailConfig || {}) },
                 orderPdfConfig: { ...DEFAULT_SETTINGS.orderPdfConfig, ...(parsed.orderPdfConfig || {}) },
+                orderColumns: Array.isArray(parsed.orderColumns) ? parsed.orderColumns : [],
             };
         }
     } catch {}
@@ -369,6 +371,48 @@ router.get('/order-pdf-config', (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to load order PDF config' });
+    }
+});
+
+// GET /api/app-settings/order-columns — shared custom order table columns
+router.get('/order-columns', (req, res) => {
+    try {
+        const settings = readSettings();
+        res.json({
+            success: true,
+            data: Array.isArray(settings.orderColumns) ? settings.orderColumns : [],
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to load order columns' });
+    }
+});
+
+// PUT /api/app-settings/order-columns — admins, managers, and telecallers can manage shared custom columns
+router.put('/order-columns', (req, res) => {
+    try {
+        const isTelecaller = req.user.role === 'STAFF' && req.user.staffRole === 'TELECALLER';
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'MANAGER' && !isTelecaller) {
+            return res.status(403).json({ success: false, message: 'Insufficient permissions' });
+        }
+
+        const columns = Array.isArray(req.body?.columns) ? req.body.columns : [];
+        const sanitizedColumns = columns
+            .filter(col => col && typeof col === 'object' && col.id && col.label)
+            .map(col => ({
+                id: String(col.id).slice(0, 80),
+                label: String(col.label).trim().slice(0, 80),
+                customFieldKey: String(col.customFieldKey || col.label).trim().slice(0, 80),
+                visibility: ['all', 'ops', 'staffOnly'].includes(col.visibility) ? col.visibility : 'all',
+            }))
+            .filter(col => col.label && col.customFieldKey);
+
+        const settings = readSettings();
+        settings.orderColumns = sanitizedColumns;
+        writeSettings(settings);
+
+        res.json({ success: true, message: 'Order columns saved', data: sanitizedColumns });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to save order columns' });
     }
 });
 

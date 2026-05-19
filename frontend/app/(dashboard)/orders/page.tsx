@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { studentsAPI, teamAPI, shiprocketAPI } from '@/lib/api'
+import { appSettingsAPI, studentsAPI, teamAPI, shiprocketAPI } from '@/lib/api'
 import { formatNumber, formatDate, getStatusColor, debounce } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
@@ -29,6 +29,7 @@ type ColumnDef = {
     coreField?: string;       // maps to getStudentRow() fields
     customFieldKey?: string;  // reads from customFields JSON using cfGet()
     adminOnly?: boolean;      // only visible to admin/manager
+    visibility?: 'all' | 'ops' | 'staffOnly'
 }
 
 type RequirementAssignment = {
@@ -90,6 +91,17 @@ function cfGet(customFields: Record<string, any> | null | undefined, ...keywords
     }
 
     return ''
+}
+
+function cfFindKey(customFields: Record<string, any> | null | undefined, fallbackKey: string): string {
+    if (!customFields || typeof customFields !== 'object') return fallbackKey
+
+    const normalizedFallback = normalizeFieldKey(fallbackKey)
+    const exact = Object.keys(customFields).find(key => normalizeFieldKey(key) === normalizedFallback)
+    if (exact) return exact
+
+    const partial = Object.keys(customFields).find(key => key.toLowerCase().includes(fallbackKey.toLowerCase()))
+    return partial || fallbackKey
 }
 
 // ─── Column definitions ────────────────────────────────────────────────────────
@@ -245,6 +257,7 @@ export default function StudentsPage() {
     const isTelecaller = currentUser?.role === 'STAFF' && currentUser?.staffRole === 'TELECALLER'
     const hasFullStudentAccess = isAdminManager || isTelecaller
     const canBulkManageOrders = isAdminManager
+    const currentColumnVisibilityRole = isAdminManager || isTelecaller ? 'ops' : 'staffOnly'
 
     // Fetch Shiprocket config for dynamic hard copy keyword detection
     const { data: srConfigData } = useQuery({
@@ -282,6 +295,28 @@ export default function StudentsPage() {
     const [activeColumns, setActiveColumns] = useState<ColumnDef[]>([])
     const [showColumnPanel, setShowColumnPanel] = useState(false)
     const [newColumnLabel, setNewColumnLabel] = useState('')
+    const [newColumnVisibility, setNewColumnVisibility] = useState<'all' | 'ops' | 'staffOnly'>('all')
+
+    const { data: sharedColumnData } = useQuery({
+        queryKey: ['order-columns'],
+        queryFn: async () => (await appSettingsAPI.getOrderColumns()).data.data,
+        enabled: !!currentUser?.id,
+    })
+    const sharedCustomColumns: ColumnDef[] = Array.isArray(sharedColumnData) ? sharedColumnData : []
+
+    const saveSharedColumnsMutation = useMutation({
+        mutationFn: (columns: ColumnDef[]) => appSettingsAPI.updateOrderColumns(columns),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['order-columns'] })
+            queryClient.invalidateQueries({ queryKey: ['student-filters'] })
+            toast({ title: 'Saved', description: 'Column setup updated', variant: 'success' })
+        },
+        onError: (err: any) => toast({
+            title: 'Error',
+            description: err?.response?.data?.message || 'Failed to save column setup',
+            variant: 'destructive',
+        }),
+    })
 
     const [filters, setFilters] = useState({
         status:         searchParams.get('status') || '',
@@ -292,25 +327,36 @@ export default function StudentsPage() {
         subject:        searchParams.get('subject') || '',
     })
 
-    // Load columns — merge saved prefs with DEFAULT_COLUMNS so new columns always appear
+    const canViewColumn = (col: ColumnDef) => {
+        if (col.adminOnly) return hasFullStudentAccess
+        if (!col.visibility || col.visibility === 'all') return true
+        return col.visibility === currentColumnVisibilityRole
+    }
+
+    const visibleBaseColumns = [...DEFAULT_COLUMNS, ...sharedCustomColumns].filter(canViewColumn)
+
+    // Load columns — merge saved prefs with defaults and shared custom columns so new columns always appear
     useEffect(() => {
         if (!currentUser?.id) return;
-        const defaults = DEFAULT_COLUMNS.filter(c => c.adminOnly ? hasFullStudentAccess : true)
+        const defaults = visibleBaseColumns
         const saved = localStorage.getItem(`crm_column_prefs_v1_${currentUser.id}`)
         if (saved) {
             try {
                 const parsed: ColumnDef[] = JSON.parse(saved)
+                const visibleParsed = parsed
+                    .map(col => defaults.find(d => d.id === col.id) || col)
+                    .filter(canViewColumn)
                 // Add any default columns missing from saved prefs (new columns added after save)
-                const missing = defaults.filter(d => !parsed.find(p => p.id === d.id))
+                const missing = defaults.filter(d => !visibleParsed.find(p => p.id === d.id))
                 if (missing.length > 0) {
                     // Insert missing columns before 'actions'
-                    const actionsIdx = parsed.findIndex(c => c.id === 'actions')
+                    const actionsIdx = visibleParsed.findIndex(c => c.id === 'actions')
                     const merged = actionsIdx !== -1
-                        ? [...parsed.slice(0, actionsIdx), ...missing, ...parsed.slice(actionsIdx)]
-                        : [...parsed, ...missing]
+                        ? [...visibleParsed.slice(0, actionsIdx), ...missing, ...visibleParsed.slice(actionsIdx)]
+                        : [...visibleParsed, ...missing]
                     setActiveColumns(merged)
                 } else {
-                    setActiveColumns(parsed)
+                    setActiveColumns(visibleParsed)
                 }
                 return
             } catch (e) {
@@ -318,7 +364,7 @@ export default function StudentsPage() {
             }
         }
         setActiveColumns(defaults)
-    }, [currentUser?.id, hasFullStudentAccess])
+    }, [currentUser?.id, hasFullStudentAccess, currentColumnVisibilityRole, sharedCustomColumns.length])
 
     const saveColumnPrefs = (cols: ColumnDef[]) => {
         if (!currentUser?.id) return;
@@ -326,8 +372,8 @@ export default function StudentsPage() {
         setActiveColumns(cols)
     }
 
-    const unassignedColumnDefaults = DEFAULT_COLUMNS.filter(col => 
-        (col.adminOnly ? hasFullStudentAccess : true) && !activeColumns.find(ac => ac.id === col.id)
+    const unassignedColumnDefaults = visibleBaseColumns.filter(col => 
+        !activeColumns.find(ac => ac.id === col.id)
     )
 
     // Manage columns logic
@@ -343,6 +389,21 @@ export default function StudentsPage() {
 
     const removeColumn = (id: string) => {
         saveColumnPrefs(activeColumns.filter(c => c.id !== id))
+    }
+
+    const updateSharedColumnVisibility = (id: string, visibility: 'all' | 'ops' | 'staffOnly') => {
+        const nextSharedColumns = sharedCustomColumns.map(col =>
+            col.id === id ? { ...col, visibility } : col
+        )
+        saveSharedColumnsMutation.mutate(nextSharedColumns)
+        saveColumnPrefs(activeColumns.map(col =>
+            col.id === id ? { ...col, visibility } : col
+        ).filter(canViewColumn))
+    }
+
+    const deleteSharedColumn = (id: string) => {
+        saveSharedColumnsMutation.mutate(sharedCustomColumns.filter(col => col.id !== id))
+        saveColumnPrefs(activeColumns.filter(col => col.id !== id))
     }
 
     const addColumn = (col: ColumnDef) => {
@@ -365,17 +426,23 @@ export default function StudentsPage() {
         }
         
         const newId = `custom_${lbl.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
-        if (activeColumns.some(c => c.id === newId)) {
+        const allKnownColumns = [...DEFAULT_COLUMNS, ...sharedCustomColumns, ...activeColumns]
+        if (allKnownColumns.some(c => c.id === newId)) {
             toast({ title: 'Error', description: 'Column already exists', variant: 'destructive' })
             return
         }
 
-        addColumn({
+        const newColumn: ColumnDef = {
             id: newId,
             label: lbl,
-            customFieldKey: lbl
-        })
+            customFieldKey: lbl,
+            visibility: newColumnVisibility,
+        }
+
+        addColumn(newColumn)
+        saveSharedColumnsMutation.mutate([...sharedCustomColumns, newColumn])
         setNewColumnLabel('')
+        setNewColumnVisibility('all')
     }
 
 
@@ -513,6 +580,41 @@ export default function StudentsPage() {
             variant: 'destructive',
         }),
     })
+
+    const updateCustomCellMutation = useMutation({
+        mutationFn: ({ studentId, customFields }: { studentId: string; customFields: any }) =>
+            studentsAPI.update(studentId, { customFields }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] })
+            queryClient.invalidateQueries({ queryKey: ['student-filters'] })
+        },
+        onError: (err: any) => toast({
+            title: 'Error',
+            description: err?.response?.data?.message || 'Failed to save cell',
+            variant: 'destructive',
+        }),
+    })
+
+    function saveCustomCell(student: any, col: ColumnDef, rawValue: string) {
+        const fieldLabel = col.customFieldKey || col.label
+        const existingFields = student.customFields && typeof student.customFields === 'object'
+            ? student.customFields
+            : {}
+        const fieldKey = cfFindKey(existingFields, fieldLabel)
+        const nextValue = rawValue.trim()
+        const nextCustomFields = { ...existingFields }
+
+        if (nextValue) {
+            nextCustomFields[fieldKey] = nextValue
+        } else {
+            delete nextCustomFields[fieldKey]
+        }
+
+        updateCustomCellMutation.mutate({
+            studentId: String(student.id),
+            customFields: nextCustomFields,
+        })
+    }
 
     // Export
     const [isExporting, setIsExporting] = useState(false)
@@ -1012,9 +1114,31 @@ export default function StudentsPage() {
                     </td>
                 )
             default:
-                // Custom column cell reading from customFields using cfGet matcher
+                // Custom column cells behave like simple spreadsheet cells.
                 const val = cfGet(student.customFields, col.customFieldKey || col.label)
-                return <td key={col.id} className="p-2 text-[14px] border-r border-border whitespace-nowrap">{val || <span className="text-muted-foreground">—</span>}</td>
+                return (
+                    <td key={col.id} className="p-1.5 text-[14px] border-r border-border min-w-[160px]" onClick={e => e.stopPropagation()}>
+                        <input
+                            defaultValue={val}
+                            placeholder="Type here"
+                            className="h-8 min-w-[140px] w-full rounded border border-transparent bg-transparent px-2 text-[13px] text-foreground outline-none transition-colors hover:border-border hover:bg-background focus:border-primary/50 focus:bg-background focus:ring-2 focus:ring-primary/10 placeholder:text-muted-foreground/50"
+                            onBlur={(e) => {
+                                if (e.currentTarget.value.trim() !== val) {
+                                    saveCustomCell(student, col, e.currentTarget.value)
+                                }
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.currentTarget.blur()
+                                }
+                                if (e.key === 'Escape') {
+                                    e.currentTarget.value = val
+                                    e.currentTarget.blur()
+                                }
+                            }}
+                        />
+                    </td>
+                )
         }
     }
 
@@ -1577,11 +1701,29 @@ export default function StudentsPage() {
                                                 <button onClick={() => moveColumn(idx, 'up')} disabled={idx === 0} className="text-slate-400 hover:text-foreground disabled:opacity-30"><GripVertical className="w-2.5 h-2.5 mx-auto rotate-90"/></button>
                                                 <button onClick={() => moveColumn(idx, 'down')} disabled={idx === activeColumns.length - 1} className="text-slate-400 hover:text-foreground disabled:opacity-30"><GripVertical className="w-2.5 h-2.5 mx-auto rotate-90"/></button>
                                             </div>
-                                            <span className="text-xs font-medium truncate flex-1 leading-tight">{col.label}</span>
+                                            <div className="min-w-0 flex-1">
+                                                <span className="text-xs font-medium truncate leading-tight block">{col.label}</span>
+                                                {col.customFieldKey && (
+                                                    <select
+                                                        value={col.visibility || 'all'}
+                                                        onChange={e => updateSharedColumnVisibility(col.id, e.target.value as 'all' | 'ops' | 'staffOnly')}
+                                                        className="mt-1 h-6 w-full rounded border border-border bg-background px-1.5 text-[10px] text-muted-foreground outline-none focus:ring-1 focus:ring-primary/30"
+                                                        disabled={saveSharedColumnsMutation.isPending}
+                                                    >
+                                                        <option value="all">Everyone</option>
+                                                        <option value="ops">Admin / manager / telecaller</option>
+                                                        <option value="staffOnly">Staff except telecaller</option>
+                                                    </select>
+                                                )}
+                                            </div>
                                             {col.locked ? (
                                                 <div className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground bg-muted/50 shrink-0" title="Core field, cannot hide">
                                                     <Lock className="w-3 h-3" />
                                                 </div>
+                                            ) : col.customFieldKey ? (
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 shrink-0" onClick={() => deleteSharedColumn(col.id)} title="Delete Column">
+                                                    <Trash2 className="w-3 h-3" />
+                                                </Button>
                                             ) : (
                                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 shrink-0" onClick={() => removeColumn(col.id)} title="Hide Column">
                                                     <EyeOff className="w-3 h-3" />
@@ -1619,11 +1761,24 @@ export default function StudentsPage() {
                                             className="h-8 text-xs font-mono"
                                         />
                                     </div>
-                                    <Button type="submit" variant="secondary" size="sm" className="w-full gap-2 h-8 text-xs">
-                                        <Plus className="w-3 h-3" /> Add from Details
+                                    <div>
+                                        <Label className="text-[11px] text-muted-foreground mb-1 block">Visible To</Label>
+                                        <select
+                                            value={newColumnVisibility}
+                                            onChange={e => setNewColumnVisibility(e.target.value as 'all' | 'ops' | 'staffOnly')}
+                                            className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
+                                        >
+                                            <option value="all">Everyone</option>
+                                            <option value="ops">Admin, manager, telecaller</option>
+                                            <option value="staffOnly">Staff except telecaller</option>
+                                        </select>
+                                    </div>
+                                    <Button type="submit" variant="secondary" size="sm" className="w-full gap-2 h-8 text-xs" disabled={saveSharedColumnsMutation.isPending}>
+                                        {saveSharedColumnsMutation.isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                                        Add Column
                                     </Button>
                                     <p className="text-[10px] text-muted-foreground leading-tight px-1">
-                                        Reads the label literally from the Order's nested fields schema.
+                                        Empty cells become editable instantly. The visibility choice applies to everyone.
                                     </p>
                                 </form>
                             </div>
