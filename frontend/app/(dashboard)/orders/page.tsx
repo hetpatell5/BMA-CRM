@@ -302,10 +302,27 @@ export default function StudentsPage() {
         queryFn: async () => (await appSettingsAPI.getOrderColumns()).data.data,
         enabled: !!currentUser?.id,
     })
-    const sharedCustomColumns: ColumnDef[] = Array.isArray(sharedColumnData) ? sharedColumnData : []
+    const sharedColumnSettings = Array.isArray(sharedColumnData)
+        ? { columns: sharedColumnData as ColumnDef[], visibility: {} as Record<string, 'all' | 'ops'> }
+        : {
+            columns: Array.isArray(sharedColumnData?.columns) ? sharedColumnData.columns as ColumnDef[] : [],
+            visibility: (sharedColumnData?.visibility && typeof sharedColumnData.visibility === 'object')
+                ? sharedColumnData.visibility as Record<string, 'all' | 'ops'>
+                : {} as Record<string, 'all' | 'ops'>,
+        }
+    const sharedColumnVisibility = sharedColumnSettings.visibility
+    const sharedCustomColumns: ColumnDef[] = sharedColumnSettings.columns.map(col => ({
+        ...col,
+        visibility: sharedColumnVisibility[col.id] || col.visibility || 'all',
+    }))
+    const sharedColumnSettingsKey = JSON.stringify({
+        columns: sharedCustomColumns.map(col => ({ id: col.id, visibility: col.visibility })),
+        visibility: sharedColumnVisibility,
+    })
 
     const saveSharedColumnsMutation = useMutation({
-        mutationFn: (columns: ColumnDef[]) => appSettingsAPI.updateOrderColumns(columns),
+        mutationFn: ({ columns, visibility }: { columns: ColumnDef[]; visibility: Record<string, 'all' | 'ops'> }) =>
+            appSettingsAPI.updateOrderColumns(columns, visibility),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['order-columns'] })
             queryClient.invalidateQueries({ queryKey: ['student-filters'] })
@@ -328,12 +345,16 @@ export default function StudentsPage() {
     })
 
     const canViewColumn = (col: ColumnDef) => {
-        if (col.adminOnly) return hasFullStudentAccess
-        if (!col.visibility || col.visibility === 'all') return true
-        return col.visibility === currentColumnVisibilityRole
+        const visibility = sharedColumnVisibility[col.id] || col.visibility || (col.adminOnly ? 'ops' : 'all')
+        if (visibility === 'all') return true
+        return visibility === currentColumnVisibilityRole
     }
 
-    const visibleBaseColumns = [...DEFAULT_COLUMNS, ...sharedCustomColumns].filter(canViewColumn)
+    const defaultColumnsWithVisibility = DEFAULT_COLUMNS.map(col => ({
+        ...col,
+        visibility: sharedColumnVisibility[col.id] || col.visibility || (col.adminOnly ? 'ops' : 'all'),
+    }))
+    const visibleBaseColumns = [...defaultColumnsWithVisibility, ...sharedCustomColumns].filter(canViewColumn)
 
     // Load columns — merge saved prefs with defaults and shared custom columns so new columns always appear
     useEffect(() => {
@@ -364,7 +385,7 @@ export default function StudentsPage() {
             }
         }
         setActiveColumns(defaults)
-    }, [currentUser?.id, hasFullStudentAccess, currentColumnVisibilityRole, sharedCustomColumns.length])
+    }, [currentUser?.id, hasFullStudentAccess, currentColumnVisibilityRole, sharedColumnSettingsKey])
 
     const saveColumnPrefs = (cols: ColumnDef[]) => {
         if (!currentUser?.id) return;
@@ -392,20 +413,32 @@ export default function StudentsPage() {
     }
 
     const updateColumnVisibility = (id: string, visibility: 'all' | 'ops') => {
-        const isSharedColumn = sharedCustomColumns.some(col => col.id === id)
-        if (isSharedColumn) {
-            const nextSharedColumns = sharedCustomColumns.map(col =>
-                col.id === id ? { ...col, visibility } : col
-            )
-            saveSharedColumnsMutation.mutate(nextSharedColumns)
+        const nextSharedColumns = sharedCustomColumns.map(col =>
+            col.id === id ? { ...col, visibility } : col
+        )
+        const nextVisibility = {
+            ...sharedColumnVisibility,
+            [id]: visibility,
         }
+
+        saveSharedColumnsMutation.mutate({ columns: nextSharedColumns, visibility: nextVisibility })
         saveColumnPrefs(activeColumns.map(col =>
             col.id === id ? { ...col, visibility } : col
-        ).filter(canViewColumn))
+        ).filter(col => {
+            const nextColVisibility = col.id === id
+                ? visibility
+                : (nextVisibility[col.id] || col.visibility || (col.adminOnly ? 'ops' : 'all'))
+            return nextColVisibility === 'all' || nextColVisibility === currentColumnVisibilityRole
+        }))
     }
 
     const deleteSharedColumn = (id: string) => {
-        saveSharedColumnsMutation.mutate(sharedCustomColumns.filter(col => col.id !== id))
+        const nextVisibility = { ...sharedColumnVisibility }
+        delete nextVisibility[id]
+        saveSharedColumnsMutation.mutate({
+            columns: sharedCustomColumns.filter(col => col.id !== id),
+            visibility: nextVisibility,
+        })
         saveColumnPrefs(activeColumns.filter(col => col.id !== id))
     }
 
@@ -443,7 +476,13 @@ export default function StudentsPage() {
         }
 
         addColumn(newColumn)
-        saveSharedColumnsMutation.mutate([...sharedCustomColumns, newColumn])
+        saveSharedColumnsMutation.mutate({
+            columns: [...sharedCustomColumns, newColumn],
+            visibility: {
+                ...sharedColumnVisibility,
+                [newColumn.id]: newColumnVisibility,
+            },
+        })
         setNewColumnLabel('')
         setNewColumnVisibility('all')
     }

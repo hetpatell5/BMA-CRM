@@ -246,6 +246,7 @@ const DEFAULT_SETTINGS = {
 </html>`,
     },
     orderColumns: [],
+    orderColumnVisibility: {},
 };
 
 function readSettings() {
@@ -260,6 +261,9 @@ function readSettings() {
                 emailConfig: { ...DEFAULT_SETTINGS.emailConfig, ...(parsed.emailConfig || {}) },
                 orderPdfConfig: { ...DEFAULT_SETTINGS.orderPdfConfig, ...(parsed.orderPdfConfig || {}) },
                 orderColumns: Array.isArray(parsed.orderColumns) ? parsed.orderColumns : [],
+                orderColumnVisibility: parsed.orderColumnVisibility && typeof parsed.orderColumnVisibility === 'object'
+                    ? parsed.orderColumnVisibility
+                    : {},
             };
         }
     } catch {}
@@ -380,7 +384,12 @@ router.get('/order-columns', (req, res) => {
         const settings = readSettings();
         res.json({
             success: true,
-            data: Array.isArray(settings.orderColumns) ? settings.orderColumns : [],
+            data: {
+                columns: Array.isArray(settings.orderColumns) ? settings.orderColumns : [],
+                visibility: settings.orderColumnVisibility && typeof settings.orderColumnVisibility === 'object'
+                    ? settings.orderColumnVisibility
+                    : {},
+            },
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to load order columns' });
@@ -396,21 +405,42 @@ router.put('/order-columns', (req, res) => {
         }
 
         const columns = Array.isArray(req.body?.columns) ? req.body.columns : [];
+        const visibility = req.body?.visibility && typeof req.body.visibility === 'object'
+            ? req.body.visibility
+            : {};
         const sanitizedColumns = columns
             .filter(col => col && typeof col === 'object' && col.id && col.label)
             .map(col => ({
                 id: String(col.id).slice(0, 80),
                 label: String(col.label).trim().slice(0, 80),
                 customFieldKey: String(col.customFieldKey || col.label).trim().slice(0, 80),
-                visibility: ['all', 'ops'].includes(col.visibility) ? col.visibility : 'all',
+                visibility: ['all', 'ops'].includes(visibility[col.id] || col.visibility) ? (visibility[col.id] || col.visibility) : 'all',
             }))
             .filter(col => col.label && col.customFieldKey);
 
+        const sanitizedVisibility = {};
+        Object.entries(visibility).forEach(([columnId, value]) => {
+            if (['all', 'ops'].includes(value)) {
+                sanitizedVisibility[String(columnId).slice(0, 80)] = value;
+            }
+        });
+        sanitizedColumns.forEach(col => {
+            sanitizedVisibility[col.id] = col.visibility;
+        });
+
         const settings = readSettings();
         settings.orderColumns = sanitizedColumns;
+        settings.orderColumnVisibility = sanitizedVisibility;
         writeSettings(settings);
 
-        res.json({ success: true, message: 'Order columns saved', data: sanitizedColumns });
+        res.json({
+            success: true,
+            message: 'Order columns saved',
+            data: {
+                columns: sanitizedColumns,
+                visibility: sanitizedVisibility,
+            },
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to save order columns' });
     }

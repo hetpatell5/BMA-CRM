@@ -243,5 +243,6 @@ export const appSettingsAPI = {
     update: (settings: Record<string, any>) => api.put('/app-settings', settings),
     getOrderPdfConfig: () => api.get('/app-settings/order-pdf-config'),
     getOrderColumns: () => api.get('/app-settings/order-columns'),
-    updateOrderColumns: (columns: any[]) => api.put('/app-settings/order-columns', { columns }),
+    updateOrderColumns: (columns: any[], visibility?: Record<string, 'all' | 'ops'>) =>
+        api.put('/app-settings/order-columns', { columns, visibility }),
 }
