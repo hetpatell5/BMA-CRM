@@ -413,9 +413,21 @@ export default function StudentsPage() {
     }
 
     const updateColumnVisibility = (id: string, visibility: 'all' | 'ops') => {
-        const nextSharedColumns = sharedCustomColumns.map(col =>
-            col.id === id ? { ...col, visibility } : col
-        )
+        const selectedColumn = activeColumns.find(col => col.id === id)
+        const isSharedColumn = sharedCustomColumns.some(col => col.id === id)
+        const nextSharedColumns = isSharedColumn
+            ? sharedCustomColumns.map(col => col.id === id ? { ...col, visibility } : col)
+            : selectedColumn?.customFieldKey
+                ? [
+                    ...sharedCustomColumns,
+                    {
+                        id: selectedColumn.id,
+                        label: selectedColumn.label,
+                        customFieldKey: selectedColumn.customFieldKey,
+                        visibility,
+                    },
+                ]
+                : sharedCustomColumns
         const nextVisibility = {
             ...sharedColumnVisibility,
             [id]: visibility,
