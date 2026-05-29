@@ -247,6 +247,7 @@ const DEFAULT_SETTINGS = {
     },
     orderColumns: [],
     orderColumnVisibility: {},
+    orderColumnOrder: [],
 };
 
 function readSettings() {
@@ -264,6 +265,7 @@ function readSettings() {
                 orderColumnVisibility: parsed.orderColumnVisibility && typeof parsed.orderColumnVisibility === 'object'
                     ? parsed.orderColumnVisibility
                     : {},
+                orderColumnOrder: Array.isArray(parsed.orderColumnOrder) ? parsed.orderColumnOrder : [],
             };
         }
     } catch {}
@@ -389,6 +391,7 @@ router.get('/order-columns', (req, res) => {
                 visibility: settings.orderColumnVisibility && typeof settings.orderColumnVisibility === 'object'
                     ? settings.orderColumnVisibility
                     : {},
+                order: Array.isArray(settings.orderColumnOrder) ? settings.orderColumnOrder : [],
             },
         });
     } catch (error) {
@@ -408,6 +411,7 @@ router.put('/order-columns', (req, res) => {
         const visibility = req.body?.visibility && typeof req.body.visibility === 'object'
             ? req.body.visibility
             : {};
+        const order = Array.isArray(req.body?.order) ? req.body.order : [];
         const sanitizedColumns = columns
             .filter(col => col && typeof col === 'object' && col.id && col.label)
             .map(col => ({
@@ -427,10 +431,15 @@ router.put('/order-columns', (req, res) => {
         sanitizedColumns.forEach(col => {
             sanitizedVisibility[col.id] = col.visibility;
         });
+        const sanitizedOrder = order
+            .filter(columnId => columnId !== null && columnId !== undefined)
+            .map(columnId => String(columnId).slice(0, 80))
+            .filter((columnId, index, allIds) => columnId && allIds.indexOf(columnId) === index);
 
         const settings = readSettings();
         settings.orderColumns = sanitizedColumns;
         settings.orderColumnVisibility = sanitizedVisibility;
+        settings.orderColumnOrder = sanitizedOrder;
         writeSettings(settings);
 
         res.json({
@@ -439,6 +448,7 @@ router.put('/order-columns', (req, res) => {
             data: {
                 columns: sanitizedColumns,
                 visibility: sanitizedVisibility,
+                order: sanitizedOrder,
             },
         });
     } catch (error) {

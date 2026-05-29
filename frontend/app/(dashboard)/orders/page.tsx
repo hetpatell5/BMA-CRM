@@ -303,14 +303,16 @@ export default function StudentsPage() {
         enabled: !!currentUser?.id,
     })
     const sharedColumnSettings = Array.isArray(sharedColumnData)
-        ? { columns: sharedColumnData as ColumnDef[], visibility: {} as Record<string, 'all' | 'ops'> }
+        ? { columns: sharedColumnData as ColumnDef[], visibility: {} as Record<string, 'all' | 'ops'>, order: [] as string[] }
         : {
             columns: Array.isArray(sharedColumnData?.columns) ? sharedColumnData.columns as ColumnDef[] : [],
             visibility: (sharedColumnData?.visibility && typeof sharedColumnData.visibility === 'object')
                 ? sharedColumnData.visibility as Record<string, 'all' | 'ops'>
                 : {} as Record<string, 'all' | 'ops'>,
+            order: Array.isArray(sharedColumnData?.order) ? sharedColumnData.order as string[] : [],
         }
     const sharedColumnVisibility = sharedColumnSettings.visibility
+    const sharedColumnOrder = sharedColumnSettings.order
     const sharedCustomColumns: ColumnDef[] = sharedColumnSettings.columns.map(col => ({
         ...col,
         visibility: sharedColumnVisibility[col.id] || col.visibility || 'all',
@@ -318,11 +320,12 @@ export default function StudentsPage() {
     const sharedColumnSettingsKey = JSON.stringify({
         columns: sharedCustomColumns.map(col => ({ id: col.id, visibility: col.visibility })),
         visibility: sharedColumnVisibility,
+        order: sharedColumnOrder,
     })
 
     const saveSharedColumnsMutation = useMutation({
-        mutationFn: ({ columns, visibility }: { columns: ColumnDef[]; visibility: Record<string, 'all' | 'ops'> }) =>
-            appSettingsAPI.updateOrderColumns(columns, visibility),
+        mutationFn: ({ columns, visibility, order }: { columns: ColumnDef[]; visibility: Record<string, 'all' | 'ops'>; order: string[] }) =>
+            appSettingsAPI.updateOrderColumns(columns, visibility, order),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['order-columns'] })
             queryClient.invalidateQueries({ queryKey: ['student-filters'] })
@@ -354,7 +357,16 @@ export default function StudentsPage() {
         ...col,
         visibility: sharedColumnVisibility[col.id] || col.visibility || (col.adminOnly ? 'ops' : 'all'),
     }))
-    const visibleBaseColumns = [...defaultColumnsWithVisibility, ...sharedCustomColumns].filter(canViewColumn)
+    const sortColumnsBySharedOrder = (cols: ColumnDef[]) => {
+        const orderMap = new Map(sharedColumnOrder.map((id, index) => [id, index]))
+        return [...cols].sort((a, b) => {
+            const aOrder = orderMap.has(a.id) ? orderMap.get(a.id)! : Number.MAX_SAFE_INTEGER
+            const bOrder = orderMap.has(b.id) ? orderMap.get(b.id)! : Number.MAX_SAFE_INTEGER
+            if (aOrder !== bOrder) return aOrder - bOrder
+            return cols.findIndex(col => col.id === a.id) - cols.findIndex(col => col.id === b.id)
+        })
+    }
+    const visibleBaseColumns = sortColumnsBySharedOrder([...defaultColumnsWithVisibility, ...sharedCustomColumns].filter(canViewColumn))
 
     // Load columns — merge saved prefs with defaults and shared custom columns so new columns always appear
     useEffect(() => {
@@ -369,16 +381,12 @@ export default function StudentsPage() {
                     .filter(canViewColumn)
                 // Add any default columns missing from saved prefs (new columns added after save)
                 const missing = defaults.filter(d => !visibleParsed.find(p => p.id === d.id))
-                if (missing.length > 0) {
-                    // Insert missing columns before 'actions'
-                    const actionsIdx = visibleParsed.findIndex(c => c.id === 'actions')
-                    const merged = actionsIdx !== -1
-                        ? [...visibleParsed.slice(0, actionsIdx), ...missing, ...visibleParsed.slice(actionsIdx)]
-                        : [...visibleParsed, ...missing]
-                    setActiveColumns(merged)
-                } else {
-                    setActiveColumns(visibleParsed)
-                }
+                const merged = [...visibleParsed, ...missing]
+                const mergedById = new Map(merged.map(col => [col.id, col]))
+                const orderedMerged = defaults
+                    .map(defaultCol => mergedById.get(defaultCol.id) || defaultCol)
+                    .filter(col => mergedById.has(col.id))
+                setActiveColumns(orderedMerged)
                 return
             } catch (e) {
                 console.error("Failed to parse saved columns", e)
@@ -405,6 +413,11 @@ export default function StudentsPage() {
         } else if (direction === 'down' && index < cols.length - 1) {
             [cols[index], cols[index + 1]] = [cols[index + 1], cols[index]]
         }
+        saveSharedColumnsMutation.mutate({
+            columns: sharedCustomColumns,
+            visibility: sharedColumnVisibility,
+            order: cols.map(col => col.id),
+        })
         saveColumnPrefs(cols)
     }
 
@@ -433,7 +446,11 @@ export default function StudentsPage() {
             [id]: visibility,
         }
 
-        saveSharedColumnsMutation.mutate({ columns: nextSharedColumns, visibility: nextVisibility })
+        saveSharedColumnsMutation.mutate({
+            columns: nextSharedColumns,
+            visibility: nextVisibility,
+            order: activeColumns.map(col => col.id),
+        })
         saveColumnPrefs(activeColumns.map(col =>
             col.id === id ? { ...col, visibility } : col
         ).filter(col => {
@@ -450,6 +467,7 @@ export default function StudentsPage() {
         saveSharedColumnsMutation.mutate({
             columns: sharedCustomColumns.filter(col => col.id !== id),
             visibility: nextVisibility,
+            order: sharedColumnOrder.filter(columnId => columnId !== id),
         })
         saveColumnPrefs(activeColumns.filter(col => col.id !== id))
     }
@@ -494,6 +512,7 @@ export default function StudentsPage() {
                 ...sharedColumnVisibility,
                 [newColumn.id]: newColumnVisibility,
             },
+            order: [...activeColumns.map(col => col.id).filter(columnId => columnId !== newColumn.id), newColumn.id],
         })
         setNewColumnLabel('')
         setNewColumnVisibility('all')
