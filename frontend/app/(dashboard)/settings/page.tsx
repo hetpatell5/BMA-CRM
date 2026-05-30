@@ -20,6 +20,11 @@ type OrderIdRule = {
     prefix: string
 }
 
+function normalizeOrderIdPrefix(prefix: string) {
+    const normalized = prefix.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+    return (normalized.replace(/\d+$/g, '') || normalized).slice(0, 8)
+}
+
 export default function SettingsPage() {
     const { user } = useAuthStore()
     const queryClient = useQueryClient()
@@ -59,7 +64,7 @@ export default function SettingsPage() {
     const [testMsg, setTestMsg] = useState('')
 
     useEffect(() => {
-        if (sr.email !== undefined) {
+        if (settingsData) {
             setForm({
                 email: sr.email || '',
                 password: sr.passwordSet ? '••••••••' : '',
@@ -134,7 +139,7 @@ export default function SettingsPage() {
             orderIdRules: form.orderIdRules
                 .map(rule => ({
                     requirement: rule.requirement.trim(),
-                    prefix: rule.prefix.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''),
+                    prefix: normalizeOrderIdPrefix(rule.prefix),
                 }))
                 .filter(rule => rule.requirement && rule.prefix),
         }),
@@ -318,7 +323,7 @@ export default function SettingsPage() {
                                             <Label className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">Prefix</Label>
                                             <Input
                                                 value={rule.prefix}
-                                                onChange={e => updateOrderIdRule(index, { prefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })}
+                                                onChange={e => updateOrderIdRule(index, { prefix: normalizeOrderIdPrefix(e.target.value) })}
                                                 placeholder="SP"
                                                 maxLength={8}
                                                 className="h-9 rounded-lg text-sm font-mono uppercase"

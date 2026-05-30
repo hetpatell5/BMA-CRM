@@ -47,7 +47,7 @@ type OrderOwner = {
 
 const DEFAULT_COLUMNS: ColumnDef[] = [
     { id: 'name',        label: 'Full Name',      locked: true,  coreField: 'name' },
-    { id: 'orderId',     label: 'Order ID',       locked: true,  coreField: 'orderId' },
+    { id: 'orderId',     label: 'Order ID',       coreField: 'orderId' },
     { id: 'phone',       label: 'Contact',        coreField: 'phone' },
     { id: 'programme',   label: 'Program',        coreField: 'programme' },
     { id: 'semester',    label: 'Sem / Year',     coreField: 'semester' },
@@ -62,7 +62,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 ]
 
 
-const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments', 'telecallerowners'])
+const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments', 'telecallerowners', 'orderidprefix', 'orderidrequirement', 'orderidgenerated'])
 const TELECALLER_OWNERS_FIELD = '_telecallerOwners'
 
 function normalizeFieldKey(key: string) {
@@ -192,7 +192,7 @@ function getStudentRow(s: any) {
         : []
     return {
         name:                   s.fullName || cfGet(cf, 'name', 'full name'),
-        orderId:                cf?.['Order ID'] || s.controlNumber || cfGet(cf, 'order id', 'orderid'),
+        orderId:                cf?._orderIdGenerated === true ? (cf?.['Order ID'] || s.controlNumber) : s.controlNumber,
         email:                  s.email || cfGet(cf, 'email'),
         phone:                  s.phone || cfGet(cf, 'contact number', 'contact', 'mobile', 'phone'),
         programme:              s.programme || s.course || cfGet(cf, 'program name', 'programme', 'program', 'course'),

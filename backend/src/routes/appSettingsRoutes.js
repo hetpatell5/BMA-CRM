@@ -12,6 +12,21 @@ const SETTINGS_FILE = path.join(__dirname, '../../app-settings.json');
 const router = Router();
 const requireAdmin = requireRole('ADMIN');
 
+function normalizeOrderIdPrefix(prefix) {
+    const normalized = String(prefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return (normalized.replace(/\d+$/g, '') || normalized).slice(0, 8);
+}
+
+function normalizeOrderIdRules(rules) {
+    return (Array.isArray(rules) ? rules : [])
+        .filter(rule => rule && typeof rule === 'object')
+        .map(rule => ({
+            requirement: String(rule.requirement || '').trim().slice(0, 120),
+            prefix: normalizeOrderIdPrefix(rule.prefix),
+        }))
+        .filter(rule => rule.requirement && rule.prefix);
+}
+
 const DEFAULT_SETTINGS = {
     shiprocket: {
         email: process.env.SHIPROCKET_EMAIL || '',
@@ -251,6 +266,7 @@ const DEFAULT_SETTINGS = {
     orderIdRules: [
         { requirement: 'Synopsis', prefix: 'SP' },
         { requirement: 'Guess Paper', prefix: 'GP' },
+        { requirement: 'Guide', prefix: 'GU' },
     ],
     orderIdCounters: {},
 };
@@ -271,7 +287,9 @@ function readSettings() {
                     ? parsed.orderColumnVisibility
                     : {},
                 orderColumnOrder: Array.isArray(parsed.orderColumnOrder) ? parsed.orderColumnOrder : [],
-                orderIdRules: Array.isArray(parsed.orderIdRules) ? parsed.orderIdRules : DEFAULT_SETTINGS.orderIdRules,
+                orderIdRules: normalizeOrderIdRules(
+                    Array.isArray(parsed.orderIdRules) ? parsed.orderIdRules : DEFAULT_SETTINGS.orderIdRules
+                ),
                 orderIdCounters: parsed.orderIdCounters && typeof parsed.orderIdCounters === 'object'
                     ? parsed.orderIdCounters
                     : {},
@@ -359,14 +377,7 @@ router.put('/', requireAdmin, (req, res) => {
         }
 
         if (req.body.orderIdRules !== undefined) {
-            const orderIdRules = Array.isArray(req.body.orderIdRules) ? req.body.orderIdRules : [];
-            current.orderIdRules = orderIdRules
-                .filter(rule => rule && typeof rule === 'object')
-                .map(rule => ({
-                    requirement: String(rule.requirement || '').trim().slice(0, 120),
-                    prefix: String(rule.prefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8),
-                }))
-                .filter(rule => rule.requirement && rule.prefix);
+            current.orderIdRules = normalizeOrderIdRules(req.body.orderIdRules);
         }
 
         writeSettings(current);

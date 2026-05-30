@@ -100,7 +100,9 @@ router.post('/create-shipment/:studentId', requireAdminOrManager, async (req, re
         }
 
         // Create the shipment on Shiprocket
-        const crmOrderId = cf['Order ID'] || student.controlNumber || student.id.toString();
+        const crmOrderId = cf._orderIdGenerated === true
+            ? (cf['Order ID'] || student.controlNumber || student.id.toString())
+            : (student.controlNumber || student.id.toString());
         const result = await createShipment({
             orderId: crmOrderId,
             orderDate: new Date().toISOString().split('T')[0],

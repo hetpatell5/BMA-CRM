@@ -1,6 +1,9 @@
 import { readSettings, writeSettings } from '../routes/appSettingsRoutes.js';
 
 export const ORDER_ID_FIELD = 'Order ID';
+const ORDER_ID_PREFIX_FIELD = '_orderIdPrefix';
+const ORDER_ID_REQUIREMENT_FIELD = '_orderIdRequirement';
+const ORDER_ID_GENERATED_FIELD = '_orderIdGenerated';
 
 const REQUIREMENT_KEYS = [
     'requirement of',
@@ -58,6 +61,11 @@ function fallbackPrefixForRequirement(requirement) {
     return words.slice(0, 2).map(word => word[0]).join('');
 }
 
+export function normalizeOrderIdPrefix(prefix) {
+    const normalized = String(prefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return (normalized.replace(/\d+$/g, '') || normalized).slice(0, 8);
+}
+
 export function getRequirementFromCustomFields(customFields) {
     return firstRequirementToken(customFieldText(customFields, ...REQUIREMENT_KEYS));
 }
@@ -77,7 +85,7 @@ export function getOrderIdPrefixForRequirement(requirement, settings = readSetti
     });
 
     const prefix = partial?.prefix || fallbackPrefixForRequirement(requirementText);
-    return String(prefix || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    return normalizeOrderIdPrefix(prefix);
 }
 
 function parseSequence(orderId, prefix) {
@@ -90,22 +98,17 @@ async function findMaxExistingSequence(prisma, prefix) {
 
     const candidates = await prisma.student.findMany({
         where: {
-            OR: [
-                { controlNumber: { startsWith: prefix } },
-                { customFields: { string_contains: prefix } },
-            ],
+            controlNumber: { startsWith: prefix },
         },
-        select: { controlNumber: true, customFields: true },
+        select: { controlNumber: true },
         take: 10000,
         orderBy: { createdAt: 'desc' },
     });
 
     return candidates.reduce((max, student) => {
-        const cf = student.customFields && typeof student.customFields === 'object' ? student.customFields : {};
         return Math.max(
             max,
             parseSequence(student.controlNumber, prefix),
-            parseSequence(cf[ORDER_ID_FIELD], prefix),
         );
     }, 0);
 }
@@ -134,19 +137,33 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
         ? existingCustomFields
         : {};
 
+    delete nextFields[ORDER_ID_FIELD];
+    delete nextFields[ORDER_ID_PREFIX_FIELD];
+    delete nextFields[ORDER_ID_REQUIREMENT_FIELD];
+    delete nextFields[ORDER_ID_GENERATED_FIELD];
+
     const requirement = getRequirementFromCustomFields(nextFields) || getRequirementFromCustomFields(previousFields);
     const settings = readSettings();
     const prefix = getOrderIdPrefixForRequirement(requirement, settings);
 
-    if (!prefix) return { customFields: nextFields, orderId: nextFields[ORDER_ID_FIELD] || existingControlNumber || null };
+    if (!prefix) return { customFields: nextFields, orderId: existingControlNumber || null };
 
-    const existingOrderId = nextFields[ORDER_ID_FIELD] || previousFields[ORDER_ID_FIELD] || existingControlNumber;
-    if (parseSequence(existingOrderId, prefix) > 0) {
+    const existingOrderId = previousFields[ORDER_ID_FIELD] || existingControlNumber;
+    const isSystemGenerated = previousFields[ORDER_ID_GENERATED_FIELD] === true &&
+        previousFields[ORDER_ID_PREFIX_FIELD] === prefix &&
+        previousFields[ORDER_ID_REQUIREMENT_FIELD] === requirement;
+    if (isSystemGenerated && parseSequence(existingOrderId, prefix) > 0) {
         nextFields[ORDER_ID_FIELD] = existingOrderId;
+        nextFields[ORDER_ID_PREFIX_FIELD] = prefix;
+        nextFields[ORDER_ID_REQUIREMENT_FIELD] = requirement;
+        nextFields[ORDER_ID_GENERATED_FIELD] = true;
         return { customFields: nextFields, orderId: existingOrderId };
     }
 
     const orderId = await nextOrderId(prisma, prefix, settings);
     nextFields[ORDER_ID_FIELD] = orderId;
+    nextFields[ORDER_ID_PREFIX_FIELD] = prefix;
+    nextFields[ORDER_ID_REQUIREMENT_FIELD] = requirement;
+    nextFields[ORDER_ID_GENERATED_FIELD] = true;
     return { customFields: nextFields, orderId };
 }
