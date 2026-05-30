@@ -6,6 +6,7 @@ import XLSX from 'xlsx';
 import prisma from '../config/database.js';
 import { mapHeaders, learnMappings, resultsToSuggestedMappings } from '../services/smartMapper.js';
 import { notify, getAdminIds } from '../services/notificationService.js';
+import { ensureOrderIdForCustomFields } from '../services/orderIdService.js';
 
 const router = express.Router();
 
@@ -419,6 +420,14 @@ router.post('/process/:importId', async (req, res, next) => {
                         // Merge custom fields (from customField.* mapped columns)
                         if (mappedData.customFields && Object.keys(mappedData.customFields).length > 0) {
                             studentData.customFields = mappedData.customFields;
+                        }
+
+                        const orderIdResult = await ensureOrderIdForCustomFields(prisma, studentData.customFields || {});
+                        if (orderIdResult.orderId) {
+                            studentData.controlNumber = studentData.controlNumber || orderIdResult.orderId;
+                        }
+                        if (Object.keys(orderIdResult.customFields).length > 0) {
+                            studentData.customFields = orderIdResult.customFields;
                         }
 
                         studentsToCreate.push(studentData);

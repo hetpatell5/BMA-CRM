@@ -12,7 +12,13 @@ import {
     Truck, KeyRound, MapPin, Package, Settings2,
     Save, RefreshCw, CheckCircle2, AlertCircle, Eye,
     EyeOff, Loader2, Tag, Zap, TestTube2, ExternalLink, Mail,
+    Plus, Trash2, Hash,
 } from 'lucide-react'
+
+type OrderIdRule = {
+    requirement: string
+    prefix: string
+}
 
 export default function SettingsPage() {
     const { user } = useAuthStore()
@@ -46,6 +52,7 @@ export default function SettingsPage() {
         emailBodyTemplate: '',
         invoiceTemplate: '',
         orderPdfTemplate: '',
+        orderIdRules: [] as OrderIdRule[],
     })
     const [showPassword, setShowPassword] = useState(false)
     const [testStatus, setTestStatus] = useState<null | 'loading' | 'success' | 'error'>(null)
@@ -71,11 +78,32 @@ export default function SettingsPage() {
                 emailBodyTemplate: settingsData?.emailConfig?.bodyTemplate || '',
                 invoiceTemplate: settingsData?.emailConfig?.invoiceTemplate || '',
                 orderPdfTemplate: settingsData?.orderPdfConfig?.template || '',
+                orderIdRules: Array.isArray(settingsData?.orderIdRules)
+                    ? settingsData.orderIdRules
+                    : [],
             })
         }
     }, [settingsData])
 
     const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }))
+    const updateOrderIdRule = (index: number, updates: Partial<OrderIdRule>) => {
+        setForm(f => ({
+            ...f,
+            orderIdRules: f.orderIdRules.map((rule, idx) => idx === index ? { ...rule, ...updates } : rule),
+        }))
+    }
+    const addOrderIdRule = () => {
+        setForm(f => ({
+            ...f,
+            orderIdRules: [...f.orderIdRules, { requirement: '', prefix: '' }],
+        }))
+    }
+    const removeOrderIdRule = (index: number) => {
+        setForm(f => ({
+            ...f,
+            orderIdRules: f.orderIdRules.filter((_, idx) => idx !== index),
+        }))
+    }
 
     const saveMutation = useMutation({
         mutationFn: () => appSettingsAPI.update({
@@ -103,6 +131,12 @@ export default function SettingsPage() {
             orderPdfConfig: {
                 template: form.orderPdfTemplate,
             },
+            orderIdRules: form.orderIdRules
+                .map(rule => ({
+                    requirement: rule.requirement.trim(),
+                    prefix: rule.prefix.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''),
+                }))
+                .filter(rule => rule.requirement && rule.prefix),
         }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['app-settings'] })
@@ -245,6 +279,66 @@ export default function SettingsPage() {
                                         Comma-separated list. If an order's requirement matches any, the logistics flow triggers.
                                     </p>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] dark:border-white/10 dark:bg-slate-900/70">
+                            <div className="mb-6 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10">
+                                        <Hash className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-900 dark:text-white">Order ID Rules</h3>
+                                        <p className="text-[13px] text-slate-500 dark:text-slate-400">Requirement based numbering</p>
+                                    </div>
+                                </div>
+                                <Button type="button" variant="outline" size="sm" onClick={addOrderIdRule} className="h-8 gap-1.5 rounded-lg text-xs">
+                                    <Plus className="h-3.5 w-3.5" /> Add
+                                </Button>
+                            </div>
+
+                            <div className="space-y-3">
+                                {form.orderIdRules.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-[13px] text-slate-500 dark:border-white/10 dark:text-slate-400">
+                                        Add a requirement and prefix, for example Synopsis with SP.
+                                    </div>
+                                ) : form.orderIdRules.map((rule, index) => (
+                                    <div key={index} className="grid grid-cols-[1fr_92px_32px] items-end gap-2">
+                                        <div>
+                                            <Label className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">Requirement</Label>
+                                            <Input
+                                                value={rule.requirement}
+                                                onChange={e => updateOrderIdRule(index, { requirement: e.target.value })}
+                                                placeholder="Synopsis"
+                                                className="h-9 rounded-lg text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">Prefix</Label>
+                                            <Input
+                                                value={rule.prefix}
+                                                onChange={e => updateOrderIdRule(index, { prefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })}
+                                                placeholder="SP"
+                                                maxLength={8}
+                                                className="h-9 rounded-lg text-sm font-mono uppercase"
+                                            />
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-9 w-8 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                                            onClick={() => removeOrderIdRule(index)}
+                                            title="Remove rule"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                ))}
+                                <p className="text-[12px] leading-relaxed text-slate-400 dark:text-slate-500">
+                                    New orders receive the next number automatically: prefix plus three digits, such as SP001. If the requirement changes to a different prefix, the order gets a new ID for that requirement.
+                                </p>
                             </div>
                         </div>
                     </div>

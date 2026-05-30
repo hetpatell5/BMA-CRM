@@ -248,6 +248,11 @@ const DEFAULT_SETTINGS = {
     orderColumns: [],
     orderColumnVisibility: {},
     orderColumnOrder: [],
+    orderIdRules: [
+        { requirement: 'Synopsis', prefix: 'SP' },
+        { requirement: 'Guess Paper', prefix: 'GP' },
+    ],
+    orderIdCounters: {},
 };
 
 function readSettings() {
@@ -266,6 +271,10 @@ function readSettings() {
                     ? parsed.orderColumnVisibility
                     : {},
                 orderColumnOrder: Array.isArray(parsed.orderColumnOrder) ? parsed.orderColumnOrder : [],
+                orderIdRules: Array.isArray(parsed.orderIdRules) ? parsed.orderIdRules : DEFAULT_SETTINGS.orderIdRules,
+                orderIdCounters: parsed.orderIdCounters && typeof parsed.orderIdCounters === 'object'
+                    ? parsed.orderIdCounters
+                    : {},
             };
         }
     } catch {}
@@ -347,6 +356,17 @@ router.put('/', requireAdmin, (req, res) => {
             if (orderPdfConfig.template !== undefined) updatedOrderPdf.template = orderPdfConfig.template;
 
             current.orderPdfConfig = updatedOrderPdf;
+        }
+
+        if (req.body.orderIdRules !== undefined) {
+            const orderIdRules = Array.isArray(req.body.orderIdRules) ? req.body.orderIdRules : [];
+            current.orderIdRules = orderIdRules
+                .filter(rule => rule && typeof rule === 'object')
+                .map(rule => ({
+                    requirement: String(rule.requirement || '').trim().slice(0, 120),
+                    prefix: String(rule.prefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8),
+                }))
+                .filter(rule => rule.requirement && rule.prefix);
         }
 
         writeSettings(current);
@@ -480,5 +500,5 @@ router.get('/shiprocket-config', (req, res) => {
     }
 });
 
-export { readSettings };
+export { readSettings, writeSettings };
 export default router;

@@ -362,6 +362,7 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
     const decidedPrice = customFields['Decided Price'] || customFields.decidedPrice
     const commission   = customFields['Commission'] || customFields.commission
     const requirementText = customFieldText(customFields, 'requirement of', 'requirement in', 'product type', 'requirement')
+    const displayOrderId = customFields['Order ID'] || student.controlNumber || id
 
     const extraFields = Object.entries(customFields).filter(([k, v]) =>
         !INTERNAL_CUSTOM_FIELD_KEYS.has(normalizeFieldKey(k)) &&
@@ -450,7 +451,7 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
             const replacements: Record<string, string> = {
                 documentTitle: escapeHtml(`Order ${student.fullName || id}`),
                 brandName: escapeHtml('BookMyAssignment'),
-                orderId: escapeHtml(id),
+                orderId: escapeHtml(displayOrderId),
                 fullName: escapeHtml(student.fullName || 'Order Details'),
                 email: escapeHtml(student.email || 'No email'),
                 phone: escapeHtml(student.phone || 'No contact number'),
@@ -753,7 +754,7 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
             {/* Shiprocket Modal */}
             {showShiprocketModal && student && (
                 <ShiprocketModal
-                    orderId={id}
+                    orderId={displayOrderId}
                     prefill={{
                         customerName: student.fullName || '',
                         customerPhone: student.phone || '',

@@ -47,6 +47,7 @@ type OrderOwner = {
 
 const DEFAULT_COLUMNS: ColumnDef[] = [
     { id: 'name',        label: 'Full Name',      locked: true,  coreField: 'name' },
+    { id: 'orderId',     label: 'Order ID',       locked: true,  coreField: 'orderId' },
     { id: 'phone',       label: 'Contact',        coreField: 'phone' },
     { id: 'programme',   label: 'Program',        coreField: 'programme' },
     { id: 'semester',    label: 'Sem / Year',     coreField: 'semester' },
@@ -191,6 +192,7 @@ function getStudentRow(s: any) {
         : []
     return {
         name:                   s.fullName || cfGet(cf, 'name', 'full name'),
+        orderId:                cf?.['Order ID'] || s.controlNumber || cfGet(cf, 'order id', 'orderid'),
         email:                  s.email || cfGet(cf, 'email'),
         phone:                  s.phone || cfGet(cf, 'contact number', 'contact', 'mobile', 'phone'),
         programme:              s.programme || s.course || cfGet(cf, 'program name', 'programme', 'program', 'course'),
@@ -313,10 +315,15 @@ export default function StudentsPage() {
         }
     const sharedColumnVisibility = sharedColumnSettings.visibility
     const sharedColumnOrder = sharedColumnSettings.order
-    const sharedCustomColumns: ColumnDef[] = sharedColumnSettings.columns.map(col => ({
-        ...col,
-        visibility: sharedColumnVisibility[col.id] || col.visibility || 'all',
-    }))
+    const isLegacyOrderIdColumn = (col: ColumnDef) => (
+        Boolean(col.customFieldKey) && normalizeFieldKey(col.customFieldKey || col.label) === 'orderid'
+    )
+    const sharedCustomColumns: ColumnDef[] = sharedColumnSettings.columns
+        .filter(col => !isLegacyOrderIdColumn(col))
+        .map(col => ({
+            ...col,
+            visibility: sharedColumnVisibility[col.id] || col.visibility || 'all',
+        }))
     const sharedColumnSettingsKey = JSON.stringify({
         columns: sharedCustomColumns.map(col => ({ id: col.id, visibility: col.visibility })),
         visibility: sharedColumnVisibility,
@@ -378,7 +385,7 @@ export default function StudentsPage() {
                 const parsed: ColumnDef[] = JSON.parse(saved)
                 const visibleParsed = parsed
                     .map(col => defaults.find(d => d.id === col.id) || col)
-                    .filter(canViewColumn)
+                    .filter(col => canViewColumn(col) && !isLegacyOrderIdColumn(col))
                 // Add any default columns missing from saved prefs (new columns added after save)
                 const missing = defaults.filter(d => !visibleParsed.find(p => p.id === d.id))
                 const merged = [...visibleParsed, ...missing]
@@ -857,6 +864,8 @@ export default function StudentsPage() {
                         </div>
                     </td>
                 )
+            case 'orderId':
+                return <td key={col.id} className="p-2 text-[14px] font-mono font-semibold border-r border-border whitespace-nowrap">{r.orderId || <span className="text-muted-foreground">—</span>}</td>
             case 'phone':
                 return <td key={col.id} className="p-2 text-[14px] font-mono border-r border-border whitespace-nowrap">{r.phone || <span className="text-muted-foreground">—</span>}</td>
             case 'programme':

@@ -2,6 +2,7 @@ import express from 'express';
 import prisma from '../config/database.js';
 import { Prisma } from '@prisma/client';
 import { notify, getAdminIds } from '../services/notificationService.js';
+import { ensureOrderIdForCustomFields } from '../services/orderIdService.js';
 
 const router = express.Router();
 
@@ -14,11 +15,11 @@ const readCustomFieldObject = (customFields) => (
         : {}
 );
 
-const normalizeTelecallerOwner = (entry) => {
+const normalizeTelecallerOwner = (entry) => {   
     if (!entry || typeof entry !== 'object') return null;
 
     const parsedId = entry.id === null || entry.id === undefined || entry.id === ''
-        ? null
+        ? null 
         : Number(entry.id);
     const name = String(entry.name || entry.fullName || '').trim();
 
@@ -704,6 +705,7 @@ router.get('/', async (req, res, next) => {
             orderBy: { [sortBy]: sortOrder },
             select: {
                 id: true,
+                controlNumber: true,
                 enrollmentNo: true,
                 fullName: true,
                 email: true,
@@ -892,9 +894,12 @@ router.post('/', async (req, res, next) => {
             });
         }
 
+        const orderIdResult = await ensureOrderIdForCustomFields(prisma, customFields || {});
+
         const student = await prisma.student.create({
             data: {
                 enrollmentNo: enrollmentNo || null,
+                controlNumber: orderIdResult.orderId || null,
                 fullName,
                 email: email || null,
                 phone: phone || null,
@@ -914,7 +919,7 @@ router.post('/', async (req, res, next) => {
                 status: status || 'NEW_LEAD',
                 source: 'manual',
                 createdById: req.user.id,
-                customFields: customFields || null,
+                customFields: Object.keys(orderIdResult.customFields).length > 0 ? orderIdResult.customFields : null,
             },
         });
 
@@ -936,6 +941,17 @@ router.put('/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
         const updateData = { ...req.body };
+        const existingStudent = await prisma.student.findUnique({
+            where: { id: BigInt(id) },
+            select: { customFields: true, controlNumber: true },
+        });
+
+        if (!existingStudent) {
+            return res.status(404).json({
+                success: false,
+                message: 'Student not found',
+            });
+        }
 
         if (updateData.dateOfBirth) {
             updateData.dateOfBirth = new Date(updateData.dateOfBirth);
@@ -961,6 +977,17 @@ router.put('/:id', async (req, res, next) => {
                 updateData[field] = null;
             }
         });
+
+        if (updateData.customFields !== undefined) {
+            const orderIdResult = await ensureOrderIdForCustomFields(
+                prisma,
+                updateData.customFields,
+                existingStudent.customFields,
+                existingStudent.controlNumber,
+            );
+            updateData.customFields = Object.keys(orderIdResult.customFields).length > 0 ? orderIdResult.customFields : null;
+            updateData.controlNumber = orderIdResult.orderId || updateData.controlNumber || existingStudent.controlNumber || null;
+        }
 
         const student = await prisma.student.update({
             where: { id: BigInt(id) },
