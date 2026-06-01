@@ -25,6 +25,10 @@ function normalizeOrderIdPrefix(prefix: string) {
     return (normalized.replace(/\d+$/g, '') || normalized).slice(0, 8)
 }
 
+function cleanPrefixInput(prefix: string) {
+    return prefix.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)
+}
+
 export default function SettingsPage() {
     const { user } = useAuthStore()
     const queryClient = useQueryClient()
@@ -323,8 +327,9 @@ export default function SettingsPage() {
                                             <Label className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">Prefix</Label>
                                             <Input
                                                 value={rule.prefix}
-                                                onChange={e => updateOrderIdRule(index, { prefix: normalizeOrderIdPrefix(e.target.value) })}
-                                                placeholder="SP"
+                                                onChange={e => updateOrderIdRule(index, { prefix: cleanPrefixInput(e.target.value) })}
+                                                onBlur={e => updateOrderIdRule(index, { prefix: normalizeOrderIdPrefix(e.target.value) })}
+                                                placeholder="SP or SP001"
                                                 maxLength={8}
                                                 className="h-9 rounded-lg text-sm font-mono uppercase"
                                             />
