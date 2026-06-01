@@ -14,7 +14,7 @@ const requireAdmin = requireRole('ADMIN');
 
 function normalizeOrderIdPrefix(prefix) {
     const normalized = String(prefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    return (normalized.replace(/\d+$/g, '') || normalized).slice(0, 8);
+    return normalized.slice(0, 12);
 }
 
 function normalizeOrderIdRules(rules) {
@@ -25,6 +25,21 @@ function normalizeOrderIdRules(rules) {
             prefix: normalizeOrderIdPrefix(rule.prefix),
         }))
         .filter(rule => rule.requirement && rule.prefix);
+}
+
+function isLegacyDefaultOrderIdRules(rules) {
+    const normalized = normalizeOrderIdRules(rules);
+    const legacy = [
+        { requirement: 'Synopsis', prefix: 'SP' },
+        { requirement: 'Guess Paper', prefix: 'GP' },
+        { requirement: 'Guide', prefix: 'GU' },
+    ];
+    return normalized.length > 0 &&
+        normalized.length <= legacy.length &&
+        normalized.every((rule, index) => (
+            rule.requirement === legacy[index].requirement &&
+            rule.prefix === legacy[index].prefix
+        ));
 }
 
 const DEFAULT_SETTINGS = {
@@ -263,11 +278,7 @@ const DEFAULT_SETTINGS = {
     orderColumns: [],
     orderColumnVisibility: {},
     orderColumnOrder: [],
-    orderIdRules: [
-        { requirement: 'Synopsis', prefix: 'SP' },
-        { requirement: 'Guess Paper', prefix: 'GP' },
-        { requirement: 'Guide', prefix: 'GU' },
-    ],
+    orderIdRules: [],
     orderIdCounters: {},
 };
 
@@ -287,9 +298,9 @@ function readSettings() {
                     ? parsed.orderColumnVisibility
                     : {},
                 orderColumnOrder: Array.isArray(parsed.orderColumnOrder) ? parsed.orderColumnOrder : [],
-                orderIdRules: normalizeOrderIdRules(
-                    Array.isArray(parsed.orderIdRules) ? parsed.orderIdRules : DEFAULT_SETTINGS.orderIdRules
-                ),
+                orderIdRules: isLegacyDefaultOrderIdRules(parsed.orderIdRules)
+                    ? []
+                    : normalizeOrderIdRules(Array.isArray(parsed.orderIdRules) ? parsed.orderIdRules : []),
                 orderIdCounters: parsed.orderIdCounters && typeof parsed.orderIdCounters === 'object'
                     ? parsed.orderIdCounters
                     : {},

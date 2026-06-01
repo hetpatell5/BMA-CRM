@@ -21,12 +21,7 @@ type OrderIdRule = {
 }
 
 function normalizeOrderIdPrefix(prefix: string) {
-    const normalized = prefix.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
-    return (normalized.replace(/\d+$/g, '') || normalized).slice(0, 8)
-}
-
-function cleanPrefixInput(prefix: string) {
-    return prefix.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)
+    return prefix.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)
 }
 
 export default function SettingsPage() {
@@ -302,9 +297,15 @@ export default function SettingsPage() {
                                         <p className="text-[13px] text-slate-500 dark:text-slate-400">Requirement based numbering</p>
                                     </div>
                                 </div>
-                                <Button type="button" variant="outline" size="sm" onClick={addOrderIdRule} className="h-8 gap-1.5 rounded-lg text-xs">
-                                    <Plus className="h-3.5 w-3.5" /> Add
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <Button type="button" variant="outline" size="sm" onClick={addOrderIdRule} className="h-8 gap-1.5 rounded-lg text-xs">
+                                        <Plus className="h-3.5 w-3.5" /> Add
+                                    </Button>
+                                    <Button type="button" size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="h-8 gap-1.5 rounded-lg bg-blue-600 text-xs text-white hover:bg-blue-700">
+                                        {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                        Save
+                                    </Button>
+                                </div>
                             </div>
 
                             <div className="space-y-3">
@@ -319,7 +320,7 @@ export default function SettingsPage() {
                                             <Input
                                                 value={rule.requirement}
                                                 onChange={e => updateOrderIdRule(index, { requirement: e.target.value })}
-                                                placeholder="Synopsis"
+                                                placeholder=""
                                                 className="h-9 rounded-lg text-sm"
                                             />
                                         </div>
@@ -327,10 +328,9 @@ export default function SettingsPage() {
                                             <Label className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">Prefix</Label>
                                             <Input
                                                 value={rule.prefix}
-                                                onChange={e => updateOrderIdRule(index, { prefix: cleanPrefixInput(e.target.value) })}
-                                                onBlur={e => updateOrderIdRule(index, { prefix: normalizeOrderIdPrefix(e.target.value) })}
-                                                placeholder="SP or SP001"
-                                                maxLength={8}
+                                                onChange={e => updateOrderIdRule(index, { prefix: normalizeOrderIdPrefix(e.target.value) })}
+                                                placeholder=""
+                                                maxLength={12}
                                                 className="h-9 rounded-lg text-sm font-mono uppercase"
                                             />
                                         </div>

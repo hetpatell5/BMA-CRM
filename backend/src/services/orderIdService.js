@@ -63,7 +63,7 @@ function fallbackPrefixForRequirement(requirement) {
 
 export function normalizeOrderIdPrefix(prefix) {
     const normalized = String(prefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    return (normalized.replace(/\d+$/g, '') || normalized).slice(0, 8);
+    return normalized.slice(0, 12);
 }
 
 export function getRequirementFromCustomFields(customFields) {
@@ -84,7 +84,7 @@ export function getOrderIdPrefixForRequirement(requirement, settings = readSetti
             (normalizedRequirement.includes(normalizedRule) || normalizedRule.includes(normalizedRequirement));
     });
 
-    const prefix = partial?.prefix || fallbackPrefixForRequirement(requirementText);
+    const prefix = partial?.prefix || '';
     return normalizeOrderIdPrefix(prefix);
 }
 
