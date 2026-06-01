@@ -724,6 +724,36 @@ router.get('/', async (req, res, next) => {
             },
         });
 
+        for (const student of students) {
+            const orderIdResult = await ensureOrderIdForCustomFields(
+                prisma,
+                student.customFields || {},
+                student.customFields || {},
+                student.controlNumber,
+            );
+            const nextCustomFields = Object.keys(orderIdResult.customFields).length > 0
+                ? orderIdResult.customFields
+                : null;
+            const shouldUpdateOrderId =
+                orderIdResult.orderId &&
+                (
+                    student.controlNumber !== orderIdResult.orderId ||
+                    JSON.stringify(student.customFields || {}) !== JSON.stringify(nextCustomFields || {})
+                );
+
+            if (shouldUpdateOrderId) {
+                await prisma.student.update({
+                    where: { id: student.id },
+                    data: {
+                        controlNumber: orderIdResult.orderId,
+                        customFields: nextCustomFields,
+                    },
+                });
+                student.controlNumber = orderIdResult.orderId;
+                student.customFields = nextCustomFields;
+            }
+        }
+
         // Get student IDs (as numbers for raw SQL)
         const studentIds = students.map(s => s.id);
 

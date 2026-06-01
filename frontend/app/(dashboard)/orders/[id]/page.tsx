@@ -21,7 +21,7 @@ import dynamic from 'next/dynamic'
 
 const ShiprocketModal = dynamic(() => import('@/components/shiprocket-modal'), { ssr: false })
 
-const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments', 'telecallerowners', 'orderidprefix', 'orderidrequirement', 'orderidgenerated'])
+const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments', 'telecallerowners', 'orderidprefix', 'orderidrequirement', 'orderidgenerated', 'orderidsignature'])
 const DEFAULT_ORDER_PDF_TEMPLATE = `<!DOCTYPE html>
 <html>
 <head>

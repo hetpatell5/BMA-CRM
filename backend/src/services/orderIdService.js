@@ -4,6 +4,7 @@ export const ORDER_ID_FIELD = 'Order ID';
 const ORDER_ID_PREFIX_FIELD = '_orderIdPrefix';
 const ORDER_ID_REQUIREMENT_FIELD = '_orderIdRequirement';
 const ORDER_ID_GENERATED_FIELD = '_orderIdGenerated';
+const ORDER_ID_SIGNATURE_FIELD = '_orderIdSignature';
 
 const REQUIREMENT_KEYS = [
     'requirement of',
@@ -42,23 +43,11 @@ function customFieldText(customFields, ...keywords) {
     return '';
 }
 
-function firstRequirementToken(requirement) {
+function requirementTokens(requirement) {
     return String(requirement || '')
-        .split(/[,/|]/)
-        .map(part => part.trim())
-        .filter(Boolean)[0] || '';
-}
-
-function fallbackPrefixForRequirement(requirement) {
-    const words = String(requirement || '')
-        .toUpperCase()
-        .replace(/[^A-Z0-9\s]/g, ' ')
-        .split(/\s+/)
+        .split(/[,/|+&]/)
+        .map(part => part.trim().replace(/^[()[\]{}]+|[()[\]{}]+$/g, '').trim())
         .filter(Boolean);
-
-    if (!words.length) return '';
-    if (words.length === 1) return words[0].slice(0, 2);
-    return words.slice(0, 2).map(word => word[0]).join('');
 }
 
 export function normalizeOrderIdPrefix(prefix) {
@@ -66,13 +55,30 @@ export function normalizeOrderIdPrefix(prefix) {
     return normalized.slice(0, 12);
 }
 
-export function getRequirementFromCustomFields(customFields) {
-    return firstRequirementToken(customFieldText(customFields, ...REQUIREMENT_KEYS));
+function parseOrderIdSeed(seed) {
+    const normalized = normalizeOrderIdPrefix(seed);
+    if (!normalized) return null;
+
+    const match = normalized.match(/^([A-Z0-9]*?)(\d+)$/);
+    if (!match || !match[1]) {
+        return { prefix: normalized, start: 1, width: 3, seed: normalized };
+    }
+
+    return {
+        prefix: match[1],
+        start: Number(match[2]) || 1,
+        width: Math.max(match[2].length, 3),
+        seed: normalized,
+    };
 }
 
-export function getOrderIdPrefixForRequirement(requirement, settings = readSettings()) {
+export function getRequirementsFromCustomFields(customFields) {
+    return requirementTokens(customFieldText(customFields, ...REQUIREMENT_KEYS));
+}
+
+export function getOrderIdRuleForRequirement(requirement, settings = readSettings()) {
     const requirementText = String(requirement || '').trim();
-    if (!requirementText) return '';
+    if (!requirementText) return null;
 
     const normalizedRequirement = normalizeComparable(requirementText);
     const rules = Array.isArray(settings.orderIdRules) ? settings.orderIdRules : [];
@@ -84,8 +90,14 @@ export function getOrderIdPrefixForRequirement(requirement, settings = readSetti
             (normalizedRequirement.includes(normalizedRule) || normalizedRule.includes(normalizedRequirement));
     });
 
-    const prefix = partial?.prefix || '';
-    return normalizeOrderIdPrefix(prefix);
+    const parsedSeed = parseOrderIdSeed(partial?.prefix);
+    if (!partial || !parsedSeed) return null;
+
+    return {
+        requirement: requirementText,
+        ruleRequirement: partial.requirement,
+        ...parsedSeed,
+    };
 }
 
 function parseSequence(orderId, prefix) {
@@ -93,40 +105,56 @@ function parseSequence(orderId, prefix) {
     return match ? Number(match[1]) : 0;
 }
 
+function parseMaxSequenceFromText(text, prefix) {
+    return String(text || '')
+        .split(/[,/|]/)
+        .map(part => parseSequence(part.trim(), prefix))
+        .reduce((max, seq) => Math.max(max, seq), 0);
+}
+
 async function findMaxExistingSequence(prisma, prefix) {
     if (!prefix) return 0;
 
     const candidates = await prisma.student.findMany({
         where: {
-            controlNumber: { startsWith: prefix },
+            OR: [
+                { controlNumber: { contains: prefix } },
+                { customFields: { string_contains: prefix } },
+            ],
         },
-        select: { controlNumber: true },
+        select: { controlNumber: true, customFields: true },
         take: 10000,
         orderBy: { createdAt: 'desc' },
     });
 
     return candidates.reduce((max, student) => {
+        const cf = student.customFields && typeof student.customFields === 'object' ? student.customFields : {};
+        const generatedOrderId = cf[ORDER_ID_GENERATED_FIELD] === true ? cf[ORDER_ID_FIELD] : '';
         return Math.max(
             max,
-            parseSequence(student.controlNumber, prefix),
+            parseMaxSequenceFromText(student.controlNumber, prefix),
+            parseMaxSequenceFromText(generatedOrderId, prefix),
         );
     }, 0);
 }
 
-async function nextOrderId(prisma, prefix, settings) {
+async function nextOrderId(prisma, rule, settings) {
     const counters = settings.orderIdCounters && typeof settings.orderIdCounters === 'object'
         ? { ...settings.orderIdCounters }
         : {};
-    const currentCounter = Number(counters[prefix]);
-    const currentMax = Number.isFinite(currentCounter)
-        ? currentCounter
-        : await findMaxExistingSequence(prisma, prefix);
+    const currentCounter = Number(counters[rule.prefix]);
+    const currentMax = Math.max(
+        Number.isFinite(currentCounter) ? currentCounter : 0,
+        rule.start - 1,
+        Number.isFinite(currentCounter) ? 0 : await findMaxExistingSequence(prisma, rule.prefix),
+    );
     const next = currentMax + 1;
 
-    counters[prefix] = next;
+    counters[rule.prefix] = next;
+    settings.orderIdCounters = counters;
     writeSettings({ ...settings, orderIdCounters: counters });
 
-    return `${prefix}${String(next).padStart(3, '0')}`;
+    return `${rule.prefix}${String(next).padStart(rule.width, '0')}`;
 }
 
 export async function ensureOrderIdForCustomFields(prisma, customFields, existingCustomFields = null, existingControlNumber = null) {
@@ -141,29 +169,52 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
     delete nextFields[ORDER_ID_PREFIX_FIELD];
     delete nextFields[ORDER_ID_REQUIREMENT_FIELD];
     delete nextFields[ORDER_ID_GENERATED_FIELD];
+    delete nextFields[ORDER_ID_SIGNATURE_FIELD];
 
-    const requirement = getRequirementFromCustomFields(nextFields) || getRequirementFromCustomFields(previousFields);
+    const requirements = getRequirementsFromCustomFields(nextFields);
+    const previousRequirements = getRequirementsFromCustomFields(previousFields);
+    const effectiveRequirements = requirements.length ? requirements : previousRequirements;
     const settings = readSettings();
-    const prefix = getOrderIdPrefixForRequirement(requirement, settings);
+    const rules = effectiveRequirements
+        .map(requirement => getOrderIdRuleForRequirement(requirement, settings))
+        .filter(Boolean);
 
-    if (!prefix) return { customFields: nextFields, orderId: existingControlNumber || null };
+    if (!rules.length) return { customFields: nextFields, orderId: existingControlNumber || null };
+
+    const uniqueRules = [];
+    const seenRuleKeys = new Set();
+    rules.forEach(rule => {
+        const key = `${normalizeComparable(rule.ruleRequirement)}:${rule.prefix}`;
+        if (seenRuleKeys.has(key)) return;
+        seenRuleKeys.add(key);
+        uniqueRules.push(rule);
+    });
+
+    const signature = uniqueRules
+        .map(rule => `${normalizeComparable(rule.requirement)}:${rule.prefix}:${rule.seed}`)
+        .join('|');
 
     const existingOrderId = previousFields[ORDER_ID_FIELD] || existingControlNumber;
     const isSystemGenerated = previousFields[ORDER_ID_GENERATED_FIELD] === true &&
-        previousFields[ORDER_ID_PREFIX_FIELD] === prefix &&
-        previousFields[ORDER_ID_REQUIREMENT_FIELD] === requirement;
-    if (isSystemGenerated && parseSequence(existingOrderId, prefix) > 0) {
+        previousFields[ORDER_ID_SIGNATURE_FIELD] === signature;
+    if (isSystemGenerated && existingOrderId) {
         nextFields[ORDER_ID_FIELD] = existingOrderId;
-        nextFields[ORDER_ID_PREFIX_FIELD] = prefix;
-        nextFields[ORDER_ID_REQUIREMENT_FIELD] = requirement;
+        nextFields[ORDER_ID_PREFIX_FIELD] = uniqueRules.map(rule => rule.prefix).join(',');
+        nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.requirement).join(',');
         nextFields[ORDER_ID_GENERATED_FIELD] = true;
+        nextFields[ORDER_ID_SIGNATURE_FIELD] = signature;
         return { customFields: nextFields, orderId: existingOrderId };
     }
 
-    const orderId = await nextOrderId(prisma, prefix, settings);
+    const orderIds = [];
+    for (const rule of uniqueRules) {
+        orderIds.push(await nextOrderId(prisma, rule, settings));
+    }
+    const orderId = orderIds.join(', ');
     nextFields[ORDER_ID_FIELD] = orderId;
-    nextFields[ORDER_ID_PREFIX_FIELD] = prefix;
-    nextFields[ORDER_ID_REQUIREMENT_FIELD] = requirement;
+    nextFields[ORDER_ID_PREFIX_FIELD] = uniqueRules.map(rule => rule.prefix).join(',');
+    nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.requirement).join(',');
     nextFields[ORDER_ID_GENERATED_FIELD] = true;
+    nextFields[ORDER_ID_SIGNATURE_FIELD] = signature;
     return { customFields: nextFields, orderId };
 }

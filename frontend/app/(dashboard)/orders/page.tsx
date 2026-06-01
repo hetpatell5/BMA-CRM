@@ -62,7 +62,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 ]
 
 
-const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments', 'telecallerowners', 'orderidprefix', 'orderidrequirement', 'orderidgenerated'])
+const INTERNAL_CUSTOM_FIELD_KEYS = new Set(['requirementassignments', 'telecallerowners', 'orderidprefix', 'orderidrequirement', 'orderidgenerated', 'orderidsignature'])
 const TELECALLER_OWNERS_FIELD = '_telecallerOwners'
 
 function normalizeFieldKey(key: string) {
