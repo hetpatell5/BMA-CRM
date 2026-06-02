@@ -282,6 +282,26 @@ const DEFAULT_SETTINGS = {
     orderIdCounters: {},
 };
 
+function normalizeSettingsForWrite(settings) {
+    const next = settings && typeof settings === 'object' ? settings : {};
+    return {
+        ...DEFAULT_SETTINGS,
+        ...next,
+        shiprocket: { ...DEFAULT_SETTINGS.shiprocket, ...(next.shiprocket || {}) },
+        emailConfig: { ...DEFAULT_SETTINGS.emailConfig, ...(next.emailConfig || {}) },
+        orderPdfConfig: { ...DEFAULT_SETTINGS.orderPdfConfig, ...(next.orderPdfConfig || {}) },
+        orderColumns: Array.isArray(next.orderColumns) ? next.orderColumns : [],
+        orderColumnVisibility: next.orderColumnVisibility && typeof next.orderColumnVisibility === 'object'
+            ? next.orderColumnVisibility
+            : {},
+        orderColumnOrder: Array.isArray(next.orderColumnOrder) ? next.orderColumnOrder : [],
+        orderIdRules: normalizeOrderIdRules(Array.isArray(next.orderIdRules) ? next.orderIdRules : []),
+        orderIdCounters: next.orderIdCounters && typeof next.orderIdCounters === 'object'
+            ? next.orderIdCounters
+            : {},
+    };
+}
+
 function readSettings() {
     try {
         if (existsSync(SETTINGS_FILE)) {
@@ -311,7 +331,8 @@ function readSettings() {
 }
 
 function writeSettings(settings) {
-    writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+    const normalized = normalizeSettingsForWrite(settings);
+    writeFileSync(SETTINGS_FILE, JSON.stringify(normalized, null, 2), 'utf8');
 }
 
 // GET /api/app-settings — returns current settings (password masked)
@@ -438,6 +459,33 @@ router.get('/order-columns', (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to load order columns' });
+    }
+});
+
+router.get('/order-id-rules', requireAdmin, (req, res) => {
+    try {
+        const settings = readSettings();
+        res.json({
+            success: true,
+            data: Array.isArray(settings.orderIdRules) ? settings.orderIdRules : [],
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to load order ID rules' });
+    }
+});
+
+router.put('/order-id-rules', requireAdmin, (req, res) => {
+    try {
+        const settings = readSettings();
+        settings.orderIdRules = normalizeOrderIdRules(req.body?.orderIdRules);
+        writeSettings(settings);
+        res.json({
+            success: true,
+            message: 'Order ID rules saved',
+            data: settings.orderIdRules,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to save order ID rules' });
     }
 });
 

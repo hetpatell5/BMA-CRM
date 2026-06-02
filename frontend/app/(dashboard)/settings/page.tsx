@@ -37,6 +37,11 @@ export default function SettingsPage() {
         queryFn: async () => (await appSettingsAPI.get()).data.data,
         enabled: isAdmin,
     })
+    const { data: orderIdRulesData, isLoading: isOrderIdRulesLoading } = useQuery({
+        queryKey: ['order-id-rules'],
+        queryFn: async () => (await appSettingsAPI.getOrderIdRules()).data.data,
+        enabled: isAdmin,
+    })
 
     const sr = settingsData?.shiprocket || {}
 
@@ -64,7 +69,8 @@ export default function SettingsPage() {
 
     useEffect(() => {
         if (settingsData) {
-            setForm({
+            setForm(current => ({
+                ...current,
                 email: sr.email || '',
                 password: sr.passwordSet ? '••••••••' : '',
                 pickupLocation: sr.pickupLocation || 'Office',
@@ -82,14 +88,27 @@ export default function SettingsPage() {
                 emailBodyTemplate: settingsData?.emailConfig?.bodyTemplate || '',
                 invoiceTemplate: settingsData?.emailConfig?.invoiceTemplate || '',
                 orderPdfTemplate: settingsData?.orderPdfConfig?.template || '',
-                orderIdRules: Array.isArray(settingsData?.orderIdRules)
-                    ? settingsData.orderIdRules
-                    : [],
-            })
+            }))
         }
     }, [settingsData])
+    useEffect(() => {
+        if (Array.isArray(orderIdRulesData)) {
+            setForm(current => ({
+                ...current,
+                orderIdRules: orderIdRulesData,
+            }))
+        }
+    }, [orderIdRulesData])
 
     const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }))
+    const buildOrderIdRulesPayload = () => (
+        form.orderIdRules
+            .map(rule => ({
+                requirement: rule.requirement.trim(),
+                prefix: normalizeOrderIdPrefix(rule.prefix),
+            }))
+            .filter(rule => rule.requirement && rule.prefix)
+    )
     const updateOrderIdRule = (index: number, updates: Partial<OrderIdRule>) => {
         setForm(f => ({
             ...f,
@@ -110,45 +129,54 @@ export default function SettingsPage() {
     }
 
     const saveMutation = useMutation({
-        mutationFn: () => appSettingsAPI.update({
-            shiprocket: {
-                email: form.email,
-                password: form.password,
-                pickupLocation: form.pickupLocation,
-                defaultWeight: form.defaultWeight,
-                defaultLength: form.defaultLength,
-                defaultWidth: form.defaultWidth,
-                defaultHeight: form.defaultHeight,
-                defaultPaymentMethod: form.defaultPaymentMethod,
-                hardCopyKeywords: form.hardCopyKeywordsStr
-                    .split(',')
-                    .map(s => s.trim().toLowerCase())
-                    .filter(Boolean),
-            },
-            emailConfig: {
-                user: form.emailUser,
-                pass: form.emailPass,
-                fromName: form.emailFromName,
-                bodyTemplate: form.emailBodyTemplate,
-                invoiceTemplate: form.invoiceTemplate,
-            },
-            orderPdfConfig: {
-                template: form.orderPdfTemplate,
-            },
-            orderIdRules: form.orderIdRules
-                .map(rule => ({
-                    requirement: rule.requirement.trim(),
-                    prefix: normalizeOrderIdPrefix(rule.prefix),
-                }))
-                .filter(rule => rule.requirement && rule.prefix),
-        }),
+        mutationFn: async () => {
+            await appSettingsAPI.update({
+                shiprocket: {
+                    email: form.email,
+                    password: form.password,
+                    pickupLocation: form.pickupLocation,
+                    defaultWeight: form.defaultWeight,
+                    defaultLength: form.defaultLength,
+                    defaultWidth: form.defaultWidth,
+                    defaultHeight: form.defaultHeight,
+                    defaultPaymentMethod: form.defaultPaymentMethod,
+                    hardCopyKeywords: form.hardCopyKeywordsStr
+                        .split(',')
+                        .map(s => s.trim().toLowerCase())
+                        .filter(Boolean),
+                },
+                emailConfig: {
+                    user: form.emailUser,
+                    pass: form.emailPass,
+                    fromName: form.emailFromName,
+                    bodyTemplate: form.emailBodyTemplate,
+                    invoiceTemplate: form.invoiceTemplate,
+                },
+                orderPdfConfig: {
+                    template: form.orderPdfTemplate,
+                },
+            })
+            await appSettingsAPI.updateOrderIdRules(buildOrderIdRulesPayload())
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['app-settings'] })
+            queryClient.invalidateQueries({ queryKey: ['order-id-rules'] })
             queryClient.invalidateQueries({ queryKey: ['shiprocket-config'] })
-            toast({ title: 'Settings Saved', description: 'Shiprocket configuration updated successfully.', variant: 'success' })
+            toast({ title: 'Settings Saved', description: 'Application settings updated successfully.', variant: 'success' })
         },
         onError: (e: any) => {
             toast({ title: 'Save Failed', description: e?.response?.data?.message || 'Could not save settings', variant: 'destructive' })
+        },
+    })
+    const saveOrderIdRulesMutation = useMutation({
+        mutationFn: () => appSettingsAPI.updateOrderIdRules(buildOrderIdRulesPayload()),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['order-id-rules'] })
+            queryClient.invalidateQueries({ queryKey: ['app-settings'] })
+            toast({ title: 'Order ID Rules Saved', description: 'Requirement prefixes are now stored for generation.', variant: 'success' })
+        },
+        onError: (e: any) => {
+            toast({ title: 'Save Failed', description: e?.response?.data?.message || 'Could not save Order ID rules', variant: 'destructive' })
         },
     })
 
@@ -200,7 +228,7 @@ export default function SettingsPage() {
                 </div>
             </div>
 
-            {isLoading ? (
+            {isLoading || isOrderIdRulesLoading ? (
                 <div className="flex items-center justify-center py-20 gap-3 text-slate-500 dark:text-muted-foreground">
                     <Loader2 className="w-5 h-5 animate-spin" /> Loading settings...
                 </div>
@@ -301,8 +329,8 @@ export default function SettingsPage() {
                                     <Button type="button" variant="outline" size="sm" onClick={addOrderIdRule} className="h-8 gap-1.5 rounded-lg text-xs">
                                         <Plus className="h-3.5 w-3.5" /> Add
                                     </Button>
-                                    <Button type="button" size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="h-8 gap-1.5 rounded-lg bg-blue-600 text-xs text-white hover:bg-blue-700">
-                                        {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                    <Button type="button" size="sm" onClick={() => saveOrderIdRulesMutation.mutate()} disabled={saveOrderIdRulesMutation.isPending} className="h-8 gap-1.5 rounded-lg bg-blue-600 text-xs text-white hover:bg-blue-700">
+                                        {saveOrderIdRulesMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                                         Save
                                     </Button>
                                 </div>

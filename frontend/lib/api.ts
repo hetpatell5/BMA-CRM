@@ -243,6 +243,9 @@ export const appSettingsAPI = {
     update: (settings: Record<string, any>) => api.put('/app-settings', settings),
     getOrderPdfConfig: () => api.get('/app-settings/order-pdf-config'),
     getOrderColumns: () => api.get('/app-settings/order-columns'),
+    getOrderIdRules: () => api.get('/app-settings/order-id-rules'),
+    updateOrderIdRules: (orderIdRules: Array<{ requirement: string; prefix: string }>) =>
+        api.put('/app-settings/order-id-rules', { orderIdRules }),
     updateOrderColumns: (columns: any[], visibility?: Record<string, 'all' | 'ops'>, order?: string[]) =>
         api.put('/app-settings/order-columns', { columns, visibility, order }),
 }

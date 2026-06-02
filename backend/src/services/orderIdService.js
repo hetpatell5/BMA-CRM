@@ -152,7 +152,14 @@ async function nextOrderId(prisma, rule, settings) {
 
     counters[rule.prefix] = next;
     settings.orderIdCounters = counters;
-    writeSettings({ ...settings, orderIdCounters: counters });
+    const latestSettings = readSettings();
+    writeSettings({
+        ...latestSettings,
+        orderIdRules: Array.isArray(latestSettings.orderIdRules) && latestSettings.orderIdRules.length
+            ? latestSettings.orderIdRules
+            : settings.orderIdRules,
+        orderIdCounters: counters,
+    });
 
     return `${rule.prefix}${String(next).padStart(rule.width, '0')}`;
 }
