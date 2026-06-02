@@ -162,6 +162,7 @@ export default function SettingsPage() {
             queryClient.invalidateQueries({ queryKey: ['app-settings'] })
             queryClient.invalidateQueries({ queryKey: ['order-id-rules'] })
             queryClient.invalidateQueries({ queryKey: ['shiprocket-config'] })
+            queryClient.invalidateQueries({ queryKey: ['students'] })
             toast({ title: 'Settings Saved', description: 'Application settings updated successfully.', variant: 'success' })
         },
         onError: (e: any) => {
@@ -173,6 +174,7 @@ export default function SettingsPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['order-id-rules'] })
             queryClient.invalidateQueries({ queryKey: ['app-settings'] })
+            queryClient.invalidateQueries({ queryKey: ['students'] })
             toast({ title: 'Order ID Rules Saved', description: 'Requirement prefixes are now stored for generation.', variant: 'success' })
         },
         onError: (e: any) => {

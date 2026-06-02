@@ -17,6 +17,44 @@ function normalizeComparable(value) {
     return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
+function editDistance(a, b) {
+    const left = normalizeComparable(a);
+    const right = normalizeComparable(b);
+    if (left === right) return 0;
+    if (!left) return right.length;
+    if (!right) return left.length;
+
+    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+    const current = Array(right.length + 1).fill(0);
+
+    for (let i = 1; i <= left.length; i += 1) {
+        current[0] = i;
+        for (let j = 1; j <= right.length; j += 1) {
+            const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+            current[j] = Math.min(
+                previous[j] + 1,
+                current[j - 1] + 1,
+                previous[j - 1] + cost,
+            );
+        }
+        for (let j = 0; j <= right.length; j += 1) previous[j] = current[j];
+    }
+
+    return previous[right.length];
+}
+
+function isCloseRequirementMatch(requirement, ruleRequirement) {
+    const normalizedRequirement = normalizeComparable(requirement);
+    const normalizedRule = normalizeComparable(ruleRequirement);
+    if (!normalizedRequirement || !normalizedRule) return false;
+    if (normalizedRequirement === normalizedRule) return true;
+    if (normalizedRequirement.includes(normalizedRule) || normalizedRule.includes(normalizedRequirement)) return true;
+
+    const distance = editDistance(normalizedRequirement, normalizedRule);
+    const allowedDistance = Math.min(2, Math.max(1, Math.floor(Math.max(normalizedRequirement.length, normalizedRule.length) / 4)));
+    return distance <= allowedDistance;
+}
+
 function customFieldText(customFields, ...keywords) {
     if (!customFields || typeof customFields !== 'object' || Array.isArray(customFields)) return '';
 
@@ -84,11 +122,7 @@ export function getOrderIdRuleForRequirement(requirement, settings = readSetting
     const rules = Array.isArray(settings.orderIdRules) ? settings.orderIdRules : [];
 
     const exact = rules.find(rule => normalizeComparable(rule.requirement) === normalizedRequirement);
-    const partial = exact || rules.find(rule => {
-        const normalizedRule = normalizeComparable(rule.requirement);
-        return normalizedRule &&
-            (normalizedRequirement.includes(normalizedRule) || normalizedRule.includes(normalizedRequirement));
-    });
+    const partial = exact || rules.find(rule => isCloseRequirementMatch(requirementText, rule.requirement));
 
     const parsedSeed = parseOrderIdSeed(partial?.prefix);
     if (!partial || !parsedSeed) return null;
