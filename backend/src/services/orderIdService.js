@@ -163,10 +163,10 @@ async function findMaxExistingSequence(prisma, prefix) {
 
     return candidates.reduce((max, student) => {
         const cf = student.customFields && typeof student.customFields === 'object' ? student.customFields : {};
-        const generatedOrderId = cf[ORDER_ID_GENERATED_FIELD] === true ? cf[ORDER_ID_FIELD] : '';
+        const isGenerated = cf[ORDER_ID_GENERATED_FIELD] === true;
+        const generatedOrderId = isGenerated ? (cf[ORDER_ID_FIELD] || student.controlNumber) : '';
         return Math.max(
             max,
-            parseMaxSequenceFromText(student.controlNumber, prefix),
             parseMaxSequenceFromText(generatedOrderId, prefix),
         );
     }, 0);
@@ -177,10 +177,11 @@ async function nextOrderId(prisma, rule, settings) {
         ? { ...settings.orderIdCounters }
         : {};
     const currentCounter = Number(counters[rule.prefix]);
+    const currentGeneratedMax = await findMaxExistingSequence(prisma, rule.prefix);
     const currentMax = Math.max(
         Number.isFinite(currentCounter) ? currentCounter : 0,
         rule.start - 1,
-        Number.isFinite(currentCounter) ? 0 : await findMaxExistingSequence(prisma, rule.prefix),
+        currentGeneratedMax,
     );
     const next = currentMax + 1;
 
@@ -198,13 +199,20 @@ async function nextOrderId(prisma, rule, settings) {
     return `${rule.prefix}${String(next).padStart(rule.width, '0')}`;
 }
 
-export async function ensureOrderIdForCustomFields(prisma, customFields, existingCustomFields = null, existingControlNumber = null) {
+export async function ensureOrderIdForCustomFields(prisma, customFields, existingCustomFields = null, existingControlNumber = null, settingsOverride = null) {
     const nextFields = customFields && typeof customFields === 'object' && !Array.isArray(customFields)
         ? { ...customFields }
         : {};
     const previousFields = existingCustomFields && typeof existingCustomFields === 'object' && !Array.isArray(existingCustomFields)
         ? existingCustomFields
         : {};
+    const hadOrderIdFields = [
+        ORDER_ID_FIELD,
+        ORDER_ID_PREFIX_FIELD,
+        ORDER_ID_REQUIREMENT_FIELD,
+        ORDER_ID_GENERATED_FIELD,
+        ORDER_ID_SIGNATURE_FIELD,
+    ].some(field => Object.prototype.hasOwnProperty.call(nextFields, field));
 
     delete nextFields[ORDER_ID_FIELD];
     delete nextFields[ORDER_ID_PREFIX_FIELD];
@@ -215,13 +223,13 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
     const requirements = getRequirementsFromCustomFields(nextFields);
     const previousRequirements = getRequirementsFromCustomFields(previousFields);
     const effectiveRequirements = requirements.length ? requirements : previousRequirements;
-    const settings = readSettings();
+    const settings = settingsOverride || readSettings();
     const rules = effectiveRequirements
         .map(requirement => getOrderIdRuleForRequirement(requirement, settings))
         .filter(Boolean);
 
     if (!rules.length) {
-        return { customFields: nextFields, orderId: existingControlNumber || null, generated: false };
+        return { customFields: nextFields, orderId: null, generated: false, changed: hadOrderIdFields };
     }
 
     const uniqueRules = [];
@@ -246,7 +254,7 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
         nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.requirement).join(',');
         nextFields[ORDER_ID_GENERATED_FIELD] = true;
         nextFields[ORDER_ID_SIGNATURE_FIELD] = signature;
-        return { customFields: nextFields, orderId: existingOrderId, generated: true };
+        return { customFields: nextFields, orderId: existingOrderId, generated: true, changed: hadOrderIdFields };
     }
 
     const orderIds = [];
@@ -259,5 +267,5 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
     nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.requirement).join(',');
     nextFields[ORDER_ID_GENERATED_FIELD] = true;
     nextFields[ORDER_ID_SIGNATURE_FIELD] = signature;
-    return { customFields: nextFields, orderId, generated: true };
+    return { customFields: nextFields, orderId, generated: true, changed: true };
 }

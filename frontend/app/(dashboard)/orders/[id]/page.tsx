@@ -362,7 +362,7 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
     const decidedPrice = customFields['Decided Price'] || customFields.decidedPrice
     const commission   = customFields['Commission'] || customFields.commission
     const requirementText = customFieldText(customFields, 'requirement of', 'requirement in', 'product type', 'requirement')
-    const displayOrderId = student.orderId || customFields['Order ID'] || student.controlNumber || id
+    const displayOrderId = student.orderId || id
 
     const extraFields = Object.entries(customFields).filter(([k, v]) =>
         !INTERNAL_CUSTOM_FIELD_KEYS.has(normalizeFieldKey(k)) &&

@@ -192,7 +192,7 @@ function getStudentRow(s: any) {
         : []
     return {
         name:                   s.fullName || cfGet(cf, 'name', 'full name'),
-        orderId:                s.orderId || cf?.['Order ID'] || s.controlNumber,
+        orderId:                s.orderId,
         email:                  s.email || cfGet(cf, 'email'),
         phone:                  s.phone || cfGet(cf, 'contact number', 'contact', 'mobile', 'phone'),
         programme:              s.programme || s.course || cfGet(cf, 'program name', 'programme', 'program', 'course'),

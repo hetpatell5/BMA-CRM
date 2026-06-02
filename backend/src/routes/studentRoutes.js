@@ -3,6 +3,7 @@ import prisma from '../config/database.js';
 import { Prisma } from '@prisma/client';
 import { notify, getAdminIds } from '../services/notificationService.js';
 import { ensureOrderIdForCustomFields } from '../services/orderIdService.js';
+import { readSettings } from './appSettingsRoutes.js';
 
 const router = express.Router();
 
@@ -107,10 +108,12 @@ const getStudentRegionalCenter = (student) => (
 
 const getGeneratedOrderId = (student) => {
     const customFields = readCustomFieldObject(student.customFields);
-    return customFields['Order ID'] || student.controlNumber || null;
+    return customFields._orderIdGenerated === true
+        ? (customFields['Order ID'] || student.controlNumber || null)
+        : null;
 };
 
-async function applyOrderIdBackfill(students) {
+async function applyOrderIdBackfill(students, settings = readSettings()) {
     let updated = 0;
 
     for (const student of students) {
@@ -119,27 +122,37 @@ async function applyOrderIdBackfill(students) {
             student.customFields || {},
             student.customFields || {},
             student.controlNumber,
+            settings,
         );
         const nextCustomFields = Object.keys(orderIdResult.customFields).length > 0
             ? orderIdResult.customFields
             : null;
         const shouldUpdateOrderId =
-            orderIdResult.generated === true &&
-            orderIdResult.orderId &&
+            orderIdResult.changed === true ||
             (
-                student.controlNumber !== orderIdResult.orderId ||
-                JSON.stringify(student.customFields || {}) !== JSON.stringify(nextCustomFields || {})
+                orderIdResult.generated === true &&
+                orderIdResult.orderId &&
+                (
+                    student.controlNumber !== orderIdResult.orderId ||
+                    JSON.stringify(student.customFields || {}) !== JSON.stringify(nextCustomFields || {})
+                )
             );
 
         if (shouldUpdateOrderId) {
+            const data = {
+                customFields: nextCustomFields,
+            };
+            if (orderIdResult.generated === true && orderIdResult.orderId) {
+                data.controlNumber = orderIdResult.orderId;
+            }
+
             await prisma.student.update({
                 where: { id: student.id },
-                data: {
-                    controlNumber: orderIdResult.orderId,
-                    customFields: nextCustomFields,
-                },
+                data,
             });
-            student.controlNumber = orderIdResult.orderId;
+            if (orderIdResult.generated === true && orderIdResult.orderId) {
+                student.controlNumber = orderIdResult.orderId;
+            }
             student.customFields = nextCustomFields;
             updated += 1;
         }
@@ -149,6 +162,7 @@ async function applyOrderIdBackfill(students) {
 }
 
 async function backfillOrderIdsForAllStudents() {
+    const settings = readSettings();
     const batchSize = 200;
     let cursorId = null;
     let updated = 0;
@@ -169,7 +183,7 @@ async function backfillOrderIdsForAllStudents() {
         if (!students.length) break;
 
         scanned += students.length;
-        updated += await applyOrderIdBackfill(students);
+        updated += await applyOrderIdBackfill(students, settings);
         cursorId = students[students.length - 1].id;
 
         if (students.length < batchSize) break;
@@ -797,7 +811,7 @@ router.get('/', async (req, res, next) => {
             },
         });
 
-        await applyOrderIdBackfill(students);
+        await applyOrderIdBackfill(students, readSettings());
 
         // Get student IDs (as numbers for raw SQL)
         const studentIds = students.map(s => s.id);
@@ -994,7 +1008,7 @@ router.post('/', async (req, res, next) => {
             });
         }
 
-        const orderIdResult = await ensureOrderIdForCustomFields(prisma, customFields || {});
+        const orderIdResult = await ensureOrderIdForCustomFields(prisma, customFields || {}, null, null, readSettings());
 
         const student = await prisma.student.create({
             data: {
@@ -1085,6 +1099,7 @@ router.put('/:id', async (req, res, next) => {
                 updateData.customFields,
                 existingStudent.customFields,
                 existingStudent.controlNumber,
+                readSettings(),
             );
             updateData.customFields = Object.keys(orderIdResult.customFields).length > 0 ? orderIdResult.customFields : null;
             updateData.controlNumber = orderIdResult.orderId || updateData.controlNumber || existingStudent.controlNumber || null;

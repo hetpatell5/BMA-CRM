@@ -436,6 +436,7 @@ router.put('/', requireAdmin, (req, res) => {
 
         if (req.body.orderIdRules !== undefined) {
             current.orderIdRules = normalizeOrderIdRules(req.body.orderIdRules);
+            current.orderIdCounters = {};
         }
 
         writeSettings(current);
@@ -504,6 +505,7 @@ router.put('/order-id-rules', requireAdmin, (req, res) => {
     try {
         const settings = readSettings();
         settings.orderIdRules = normalizeOrderIdRules(req.body?.orderIdRules);
+        settings.orderIdCounters = {};
         writeSettings(settings);
         res.json({
             success: true,

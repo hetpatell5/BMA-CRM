@@ -7,6 +7,7 @@ import prisma from '../config/database.js';
 import { mapHeaders, learnMappings, resultsToSuggestedMappings } from '../services/smartMapper.js';
 import { notify, getAdminIds } from '../services/notificationService.js';
 import { ensureOrderIdForCustomFields } from '../services/orderIdService.js';
+import { readSettings } from './appSettingsRoutes.js';
 
 const router = express.Router();
 
@@ -422,7 +423,7 @@ router.post('/process/:importId', async (req, res, next) => {
                             studentData.customFields = mappedData.customFields;
                         }
 
-                        const orderIdResult = await ensureOrderIdForCustomFields(prisma, studentData.customFields || {});
+                        const orderIdResult = await ensureOrderIdForCustomFields(prisma, studentData.customFields || {}, null, null, readSettings());
                         if (orderIdResult.orderId) {
                             studentData.controlNumber = studentData.controlNumber || orderIdResult.orderId;
                         }
