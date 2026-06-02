@@ -105,6 +105,11 @@ const getStudentRegionalCenter = (student) => (
     customFieldText(student.customFields, 'regional center', 'regional centre', 'regionalcenter', 'rc')
 );
 
+const getGeneratedOrderId = (student) => {
+    const customFields = readCustomFieldObject(student.customFields);
+    return customFields['Order ID'] || student.controlNumber || null;
+};
+
 async function applyOrderIdBackfill(students) {
     let updated = 0;
 
@@ -848,6 +853,7 @@ router.get('/', async (req, res, next) => {
         const serializedStudents = students.map(s => ({
             ...s,
             id: s.id.toString(),
+            orderId: getGeneratedOrderId(s),
             ...(guideMap[s.id.toString()] || { assignedGuideId: null, assignedGuide: null, assignedById: null, assignedBy: null, createdById: null, createdBy: null, coHandledById: null, coHandledBy: null }),
         }));
 
@@ -915,6 +921,8 @@ router.get('/:id', async (req, res, next) => {
             });
         }
 
+        await applyOrderIdBackfill([student]);
+
         // Fetch creator + co-handler via raw SQL (Prisma client may not have these relations yet)
         const [extra] = await prisma.$queryRaw`
             SELECT c.id as creator_id, c.full_name as creator_name,
@@ -928,6 +936,7 @@ router.get('/:id', async (req, res, next) => {
         const serializedStudent = {
             ...student,
             id: student.id.toString(),
+            orderId: getGeneratedOrderId(student),
             leadId: student.leadId?.toString(),
             importBatchId: student.importBatchId?.toString(),
             lead: student.lead ? {
@@ -1020,6 +1029,7 @@ router.post('/', async (req, res, next) => {
             data: {
                 ...student,
                 id: student.id.toString(),
+                orderId: getGeneratedOrderId(student),
             },
         });
     } catch (error) {
@@ -1091,6 +1101,7 @@ router.put('/:id', async (req, res, next) => {
             data: {
                 ...student,
                 id: student.id.toString(),
+                orderId: getGeneratedOrderId(student),
             },
         });
     } catch (error) {

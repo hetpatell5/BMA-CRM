@@ -8,6 +8,7 @@ import { invalidateTokenCache } from '../services/shiprocketService.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SETTINGS_FILE = path.join(__dirname, '../../app-settings.json');
+const ORDER_ID_RULES_FILE = path.join(__dirname, '../../order-id-rules.json');
 
 const router = Router();
 const requireAdmin = requireRole('ADMIN');
@@ -40,6 +41,25 @@ function isLegacyDefaultOrderIdRules(rules) {
             rule.requirement === legacy[index].requirement &&
             rule.prefix === legacy[index].prefix
         ));
+}
+
+function readOrderIdRulesFile() {
+    try {
+        if (!existsSync(ORDER_ID_RULES_FILE)) return [];
+        const parsed = JSON.parse(readFileSync(ORDER_ID_RULES_FILE, 'utf8'));
+        const rules = Array.isArray(parsed) ? parsed : parsed?.orderIdRules;
+        return normalizeOrderIdRules(rules);
+    } catch {
+        return [];
+    }
+}
+
+function writeOrderIdRulesFile(rules) {
+    writeFileSync(
+        ORDER_ID_RULES_FILE,
+        JSON.stringify({ orderIdRules: normalizeOrderIdRules(rules) }, null, 2),
+        'utf8',
+    );
 }
 
 const DEFAULT_SETTINGS = {
@@ -284,6 +304,10 @@ const DEFAULT_SETTINGS = {
 
 function normalizeSettingsForWrite(settings) {
     const next = settings && typeof settings === 'object' ? settings : {};
+    const incomingRules = normalizeOrderIdRules(Array.isArray(next.orderIdRules) ? next.orderIdRules : []);
+    const persistedRules = readOrderIdRulesFile();
+    const orderIdRules = incomingRules.length ? incomingRules : persistedRules;
+
     return {
         ...DEFAULT_SETTINGS,
         ...next,
@@ -295,7 +319,7 @@ function normalizeSettingsForWrite(settings) {
             ? next.orderColumnVisibility
             : {},
         orderColumnOrder: Array.isArray(next.orderColumnOrder) ? next.orderColumnOrder : [],
-        orderIdRules: normalizeOrderIdRules(Array.isArray(next.orderIdRules) ? next.orderIdRules : []),
+        orderIdRules,
         orderIdCounters: next.orderIdCounters && typeof next.orderIdCounters === 'object'
             ? next.orderIdCounters
             : {},
@@ -307,6 +331,9 @@ function readSettings() {
         if (existsSync(SETTINGS_FILE)) {
             const raw = readFileSync(SETTINGS_FILE, 'utf8');
             const parsed = JSON.parse(raw);
+            const parsedRules = isLegacyDefaultOrderIdRules(parsed.orderIdRules)
+                ? []
+                : normalizeOrderIdRules(Array.isArray(parsed.orderIdRules) ? parsed.orderIdRules : []);
             return {
                 ...DEFAULT_SETTINGS,
                 ...parsed,
@@ -318,21 +345,20 @@ function readSettings() {
                     ? parsed.orderColumnVisibility
                     : {},
                 orderColumnOrder: Array.isArray(parsed.orderColumnOrder) ? parsed.orderColumnOrder : [],
-                orderIdRules: isLegacyDefaultOrderIdRules(parsed.orderIdRules)
-                    ? []
-                    : normalizeOrderIdRules(Array.isArray(parsed.orderIdRules) ? parsed.orderIdRules : []),
+                orderIdRules: parsedRules.length ? parsedRules : readOrderIdRulesFile(),
                 orderIdCounters: parsed.orderIdCounters && typeof parsed.orderIdCounters === 'object'
                     ? parsed.orderIdCounters
                     : {},
             };
         }
     } catch {}
-    return DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, orderIdRules: readOrderIdRulesFile() };
 }
 
 function writeSettings(settings) {
     const normalized = normalizeSettingsForWrite(settings);
     writeFileSync(SETTINGS_FILE, JSON.stringify(normalized, null, 2), 'utf8');
+    writeOrderIdRulesFile(normalized.orderIdRules);
 }
 
 // GET /api/app-settings — returns current settings (password masked)
