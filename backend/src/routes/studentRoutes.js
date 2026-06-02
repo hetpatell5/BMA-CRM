@@ -105,6 +105,74 @@ const getStudentRegionalCenter = (student) => (
     customFieldText(student.customFields, 'regional center', 'regional centre', 'regionalcenter', 'rc')
 );
 
+async function applyOrderIdBackfill(students) {
+    let updated = 0;
+
+    for (const student of students) {
+        const orderIdResult = await ensureOrderIdForCustomFields(
+            prisma,
+            student.customFields || {},
+            student.customFields || {},
+            student.controlNumber,
+        );
+        const nextCustomFields = Object.keys(orderIdResult.customFields).length > 0
+            ? orderIdResult.customFields
+            : null;
+        const shouldUpdateOrderId =
+            orderIdResult.generated === true &&
+            orderIdResult.orderId &&
+            (
+                student.controlNumber !== orderIdResult.orderId ||
+                JSON.stringify(student.customFields || {}) !== JSON.stringify(nextCustomFields || {})
+            );
+
+        if (shouldUpdateOrderId) {
+            await prisma.student.update({
+                where: { id: student.id },
+                data: {
+                    controlNumber: orderIdResult.orderId,
+                    customFields: nextCustomFields,
+                },
+            });
+            student.controlNumber = orderIdResult.orderId;
+            student.customFields = nextCustomFields;
+            updated += 1;
+        }
+    }
+
+    return updated;
+}
+
+async function backfillOrderIdsForAllStudents() {
+    const batchSize = 200;
+    let cursorId = null;
+    let updated = 0;
+    let scanned = 0;
+
+    while (true) {
+        const students = await prisma.student.findMany({
+            where: cursorId ? { id: { gt: cursorId } } : {},
+            take: batchSize,
+            orderBy: { id: 'asc' },
+            select: {
+                id: true,
+                controlNumber: true,
+                customFields: true,
+            },
+        });
+
+        if (!students.length) break;
+
+        scanned += students.length;
+        updated += await applyOrderIdBackfill(students);
+        cursorId = students[students.length - 1].id;
+
+        if (students.length < batchSize) break;
+    }
+
+    return { scanned, updated };
+}
+
 // Get filter options (for dropdowns) - MUST be before /:id route
 router.get('/meta/filters', async (req, res, next) => {
     try {
@@ -724,35 +792,7 @@ router.get('/', async (req, res, next) => {
             },
         });
 
-        for (const student of students) {
-            const orderIdResult = await ensureOrderIdForCustomFields(
-                prisma,
-                student.customFields || {},
-                student.customFields || {},
-                student.controlNumber,
-            );
-            const nextCustomFields = Object.keys(orderIdResult.customFields).length > 0
-                ? orderIdResult.customFields
-                : null;
-            const shouldUpdateOrderId =
-                orderIdResult.orderId &&
-                (
-                    student.controlNumber !== orderIdResult.orderId ||
-                    JSON.stringify(student.customFields || {}) !== JSON.stringify(nextCustomFields || {})
-                );
-
-            if (shouldUpdateOrderId) {
-                await prisma.student.update({
-                    where: { id: student.id },
-                    data: {
-                        controlNumber: orderIdResult.orderId,
-                        customFields: nextCustomFields,
-                    },
-                });
-                student.controlNumber = orderIdResult.orderId;
-                student.customFields = nextCustomFields;
-            }
-        }
+        await applyOrderIdBackfill(students);
 
         // Get student IDs (as numbers for raw SQL)
         const studentIds = students.map(s => s.id);
@@ -822,6 +862,27 @@ router.get('/', async (req, res, next) => {
                     totalPages: Math.ceil(total / limitNum),
                 },
             },
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/backfill-order-ids', async (req, res, next) => {
+    try {
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'MANAGER') {
+            return res.status(403).json({
+                success: false,
+                message: 'Only admins and managers can backfill order IDs',
+            });
+        }
+
+        const result = await backfillOrderIdsForAllStudents();
+
+        res.json({
+            success: true,
+            message: 'Order IDs backfilled successfully',
+            data: result,
         });
     } catch (error) {
         next(error);

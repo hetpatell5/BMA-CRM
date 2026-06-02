@@ -105,6 +105,7 @@ export const studentsAPI = {
     getFilters: () => api.get('/students/meta/filters'),
     bulkUpdate: (ids: string[], status: string) => api.post('/students/bulk-update', { ids, status }),
     bulkDelete: (ids: string[]) => api.post('/students/bulk-delete', { ids }),
+    backfillOrderIds: () => api.post('/students/backfill-order-ids'),
     exportExcel: (params?: any) => api.get('/students/export/excel', { params, responseType: 'blob' }),
     assignToGuide: (studentId: string, guideId: number | null, commission?: string | null, forceDuplicate?: boolean) =>
         api.post(`/students/assign/${studentId}`, { guideId, commission, forceDuplicate }),

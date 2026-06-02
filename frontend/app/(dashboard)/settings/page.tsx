@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { appSettingsAPI, shiprocketAPI } from '@/lib/api'
+import { appSettingsAPI, shiprocketAPI, studentsAPI } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -157,6 +157,7 @@ export default function SettingsPage() {
                 },
             })
             await appSettingsAPI.updateOrderIdRules(buildOrderIdRulesPayload())
+            await studentsAPI.backfillOrderIds()
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['app-settings'] })
@@ -170,7 +171,10 @@ export default function SettingsPage() {
         },
     })
     const saveOrderIdRulesMutation = useMutation({
-        mutationFn: () => appSettingsAPI.updateOrderIdRules(buildOrderIdRulesPayload()),
+        mutationFn: async () => {
+            await appSettingsAPI.updateOrderIdRules(buildOrderIdRulesPayload())
+            await studentsAPI.backfillOrderIds()
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['order-id-rules'] })
             queryClient.invalidateQueries({ queryKey: ['app-settings'] })

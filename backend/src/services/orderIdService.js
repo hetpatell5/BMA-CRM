@@ -220,7 +220,9 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
         .map(requirement => getOrderIdRuleForRequirement(requirement, settings))
         .filter(Boolean);
 
-    if (!rules.length) return { customFields: nextFields, orderId: existingControlNumber || null };
+    if (!rules.length) {
+        return { customFields: nextFields, orderId: existingControlNumber || null, generated: false };
+    }
 
     const uniqueRules = [];
     const seenRuleKeys = new Set();
@@ -244,7 +246,7 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
         nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.requirement).join(',');
         nextFields[ORDER_ID_GENERATED_FIELD] = true;
         nextFields[ORDER_ID_SIGNATURE_FIELD] = signature;
-        return { customFields: nextFields, orderId: existingOrderId };
+        return { customFields: nextFields, orderId: existingOrderId, generated: true };
     }
 
     const orderIds = [];
@@ -257,5 +259,5 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
     nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.requirement).join(',');
     nextFields[ORDER_ID_GENERATED_FIELD] = true;
     nextFields[ORDER_ID_SIGNATURE_FIELD] = signature;
-    return { customFields: nextFields, orderId };
+    return { customFields: nextFields, orderId, generated: true };
 }
