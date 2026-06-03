@@ -18,7 +18,6 @@ export default function FollowUpsPage() {
     const [open, setOpen] = useState(false)
 
     // Form state
-    const [date, setDate] = useState('')
     const [number, setNumber] = useState('')
     const [description, setDescription] = useState('')
     const [followupDate, setFollowupDate] = useState('')
@@ -37,7 +36,7 @@ export default function FollowUpsPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         addFollowUp({
-            date,
+            date: new Date().toISOString(),
             number,
             description,
             followupDate,
@@ -45,7 +44,6 @@ export default function FollowUpsPage() {
         })
         toast({ title: 'Follow up added successfully' })
         setOpen(false)
-        setDate('')
         setNumber('')
         setDescription('')
         setFollowupDate('')
@@ -82,10 +80,6 @@ export default function FollowUpsPage() {
                             <DialogTitle>Add New Follow Up</DialogTitle>
                         </DialogHeader>
                         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="date">Date</Label>
-                                <Input id="date" type="date" value={date} onChange={e => setDate(e.target.value)} required />
-                            </div>
                             <div className="space-y-2">
                                 <Label htmlFor="number">Number</Label>
                                 <Input id="number" type="tel" placeholder="Phone number" value={number} onChange={e => setNumber(e.target.value)} required />
