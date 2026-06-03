@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export interface FollowUp {
     id: string;
+    name: string;
     date: string;
     number: string;
     description: string;

@@ -18,6 +18,7 @@ export default function FollowUpsPage() {
     const [open, setOpen] = useState(false)
 
     // Form state
+    const [name, setName] = useState('')
     const [number, setNumber] = useState('')
     const [description, setDescription] = useState('')
     const [followupDate, setFollowupDate] = useState('')
@@ -36,6 +37,7 @@ export default function FollowUpsPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         addFollowUp({
+            name,
             date: new Date().toISOString(),
             number,
             description,
@@ -44,6 +46,7 @@ export default function FollowUpsPage() {
         })
         toast({ title: 'Follow up added successfully' })
         setOpen(false)
+        setName('')
         setNumber('')
         setDescription('')
         setFollowupDate('')
@@ -81,6 +84,10 @@ export default function FollowUpsPage() {
                         </DialogHeader>
                         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                             <div className="space-y-2">
+                                <Label htmlFor="name">Name</Label>
+                                <Input id="name" placeholder="Contact name" value={name} onChange={e => setName(e.target.value)} required />
+                            </div>
+                            <div className="space-y-2">
                                 <Label htmlFor="number">Number</Label>
                                 <Input id="number" type="tel" placeholder="Phone number" value={number} onChange={e => setNumber(e.target.value)} required />
                             </div>
@@ -117,7 +124,9 @@ export default function FollowUpsPage() {
                                 {upcomingFollowUps.map(f => (
                                     <div key={f.id} className="flex items-center justify-between bg-white/5 hover:bg-white/10 transition-colors p-3 rounded-lg text-sm border border-amber-500/20">
                                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                                            <span className="font-semibold text-amber-800 dark:text-amber-400 font-mono text-base">{f.number}</span>
+                                            <span className="font-semibold text-amber-800 dark:text-amber-400 text-base">{f.name}</span>
+                                            <span className="hidden sm:inline text-amber-700/40 dark:text-amber-500/40">•</span>
+                                            <span className="font-semibold text-amber-800/80 dark:text-amber-400/80 font-mono text-sm">{f.number}</span>
                                             <span className="hidden sm:inline text-amber-700/40 dark:text-amber-500/40">•</span>
                                             <span className="text-amber-900/80 dark:text-amber-400/80 truncate max-w-[200px] sm:max-w-[300px]">{f.description}</span>
                                         </div>
@@ -144,6 +153,7 @@ export default function FollowUpsPage() {
                         <thead>
                             <tr className="border-b border-white/10 bg-white/5">
                                 <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date</th>
+                                <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
                                 <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Number</th>
                                 <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Description</th>
                                 <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Requirement</th>
@@ -154,7 +164,7 @@ export default function FollowUpsPage() {
                         <tbody>
                             {followUps.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="p-12 text-center">
+                                    <td colSpan={7} className="p-12 text-center">
                                         <ClipboardList className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
                                         <p className="text-lg font-medium mb-2">No follow-ups found</p>
                                         <p className="text-muted-foreground mb-4">Start by adding a new follow-up for your daily tasks.</p>
@@ -171,6 +181,7 @@ export default function FollowUpsPage() {
                                                     {format(new Date(f.date), 'MMM dd, yyyy')}
                                                 </div>
                                             </td>
+                                            <td className="p-4 text-sm font-medium">{f.name}</td>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-1.5 text-sm">
                                                     <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
