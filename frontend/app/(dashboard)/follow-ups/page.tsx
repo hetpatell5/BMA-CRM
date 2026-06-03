@@ -175,7 +175,7 @@ export default function FollowUpsPage() {
                                 followUps.map((f) => {
                                     const isUrgent = upcomingFollowUps.some(u => u.id === f.id)
                                     return (
-                                        <tr key={f.id} className={`border-b border-white/5 hover:bg-white/[0.04] transition-colors ${isUrgent ? 'bg-amber-500/5' : ''}`}>
+                                        <tr key={f.id} className={`border-b border-white/5 hover:bg-white/5 transition-colors ${isUrgent ? 'bg-amber-500/5' : ''}`}>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2 text-sm">
                                                     <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -192,7 +192,7 @@ export default function FollowUpsPage() {
                                             <td className="p-4 text-sm max-w-[200px] truncate">{f.description}</td>
                                             <td className="p-4 text-sm max-w-[200px] truncate">{f.requirement}</td>
                                             <td className="p-4">
-                                                <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${isUrgent ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30' : 'bg-white/10 text-white'}`}>
+                                                <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${isUrgent ? 'bg-amber-500/15 text-amber-600 dark:text-amber-500 border border-amber-500/30' : 'bg-white/10 text-slate-700 dark:text-white'}`}>
                                                     {format(new Date(f.followupDate), 'MMM dd, yyyy')}
                                                 </span>
                                             </td>
