@@ -155,6 +155,7 @@ export default function SettingsPage() {
                 orderPdfConfig: {
                     template: form.orderPdfTemplate,
                 },
+                orderIdRules: buildOrderIdRulesPayload(),
             })
             await appSettingsAPI.updateOrderIdRules(buildOrderIdRulesPayload())
             await studentsAPI.backfillOrderIds()
@@ -172,7 +173,9 @@ export default function SettingsPage() {
     })
     const saveOrderIdRulesMutation = useMutation({
         mutationFn: async () => {
-            await appSettingsAPI.updateOrderIdRules(buildOrderIdRulesPayload())
+            const orderIdRules = buildOrderIdRulesPayload()
+            await appSettingsAPI.update({ orderIdRules })
+            await appSettingsAPI.updateOrderIdRules(orderIdRules)
             await studentsAPI.backfillOrderIds()
         },
         onSuccess: () => {
