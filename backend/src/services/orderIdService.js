@@ -13,6 +13,12 @@ const REQUIREMENT_KEYS = [
     'requirement',
 ];
 
+const FALLBACK_ORDER_ID_RULES = [
+    { requirement: 'Synopsis', prefix: 'SY001' },
+    { requirement: 'Guide', prefix: 'GU001' },
+    { requirement: 'Report', prefix: 'RP001' },
+];
+
 function normalizeComparable(value) {
     return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
@@ -119,7 +125,8 @@ export function getOrderIdRuleForRequirement(requirement, settings = readSetting
     if (!requirementText) return null;
 
     const normalizedRequirement = normalizeComparable(requirementText);
-    const rules = Array.isArray(settings.orderIdRules) ? settings.orderIdRules : [];
+    const savedRules = Array.isArray(settings.orderIdRules) ? settings.orderIdRules : [];
+    const rules = savedRules.length ? savedRules : FALLBACK_ORDER_ID_RULES;
 
     const exact = rules.find(rule => normalizeComparable(rule.requirement) === normalizedRequirement);
     const partial = exact || rules.find(rule => isCloseRequirementMatch(requirementText, rule.requirement));

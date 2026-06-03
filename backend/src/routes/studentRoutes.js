@@ -163,10 +163,6 @@ async function applyOrderIdBackfill(students, settings = readSettings()) {
 
 async function backfillOrderIdsForAllStudents() {
     const settings = readSettings();
-    const rules = Array.isArray(settings.orderIdRules) ? settings.orderIdRules : [];
-    if (!rules.length) {
-        return { scanned: 0, updated: 0, rulesCount: 0 };
-    }
     const batchSize = 200;
     let cursorId = null;
     let updated = 0;
@@ -193,6 +189,7 @@ async function backfillOrderIdsForAllStudents() {
         if (students.length < batchSize) break;
     }
 
+    const rules = Array.isArray(settings.orderIdRules) ? settings.orderIdRules : [];
     return { scanned, updated, rulesCount: rules.length };
 }
 
@@ -902,13 +899,6 @@ router.post('/backfill-order-ids', async (req, res, next) => {
         }
 
         const result = await backfillOrderIdsForAllStudents();
-        if (!result.rulesCount) {
-            return res.status(400).json({
-                success: false,
-                message: 'No Order ID rules are saved. Save at least one requirement prefix first.',
-                data: result,
-            });
-        }
 
         res.json({
             success: true,
