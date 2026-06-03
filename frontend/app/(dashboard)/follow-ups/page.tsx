@@ -69,9 +69,6 @@ export default function FollowUpsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold">Daily Follow Ups</h1>
-                    <p className="text-muted-foreground text-sm">
-                        Manage your independent follow-ups efficiently
-                    </p>
                 </div>
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
@@ -113,14 +110,34 @@ export default function FollowUpsPage() {
 
             {/* Alert for upcoming follow-ups */}
             {upcomingFollowUps.length > 0 && (
-                <div className="glass rounded-xl p-4 border border-amber-500/30 bg-amber-500/10">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                            <BellRing className="w-5 h-5 text-amber-500 animate-pulse" />
+                <div className="glass rounded-xl p-4 border border-amber-500/30 bg-amber-500/10 mb-6 transition-colors">
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0 mt-1">
+                            <BellRing className="w-5 h-5 text-amber-600 dark:text-amber-500 animate-pulse" />
                         </div>
-                        <div>
-                            <h3 className="font-semibold text-amber-500">Upcoming Follow Ups Alert</h3>
-                            <p className="text-sm text-amber-500/80">You have {upcomingFollowUps.length} follow-up(s) scheduled for today or overdue.</p>
+                        <div className="flex-1">
+                            <h3 className="font-semibold text-amber-700 dark:text-amber-500 text-lg mb-2">
+                                Attention Needed ({upcomingFollowUps.length})
+                            </h3>
+                            <div className="grid gap-2">
+                                {upcomingFollowUps.map(f => (
+                                    <div key={f.id} className="flex items-center justify-between bg-white/5 hover:bg-white/10 transition-colors p-3 rounded-lg text-sm border border-amber-500/20">
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                            <span className="font-semibold text-amber-800 dark:text-amber-400 font-mono text-base">{f.number}</span>
+                                            <span className="hidden sm:inline text-amber-700/40 dark:text-amber-500/40">•</span>
+                                            <span className="text-amber-900/80 dark:text-amber-400/80 truncate max-w-[200px] sm:max-w-[300px]">{f.description}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                            <span className="text-xs font-bold bg-amber-500/20 text-amber-800 dark:text-amber-400 px-2 py-1 rounded">
+                                                {format(new Date(f.followupDate), 'MMM dd, yyyy')}
+                                            </span>
+                                            <Button variant="ghost" size="sm" onClick={() => removeFollowUp(f.id)} className="h-7 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors shrink-0">
+                                                Complete
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
