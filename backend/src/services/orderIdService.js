@@ -135,7 +135,9 @@ export function getOrderIdRuleForRequirement(requirement, settings = readSetting
 }
 
 function parseSequence(orderId, prefix) {
-    const match = String(orderId || '').trim().match(new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)$`, 'i'));
+    const raw = String(orderId || '').trim();
+    const candidate = raw.includes('-') ? raw.split('-').pop().trim() : raw;
+    const match = candidate.match(new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)$`, 'i'));
     return match ? Number(match[1]) : 0;
 }
 
@@ -170,6 +172,30 @@ async function findMaxExistingSequence(prisma, prefix) {
             parseMaxSequenceFromText(generatedOrderId, prefix),
         );
     }, 0);
+}
+
+function formatOrderIdDisplay(rules, orderIds) {
+    if (rules.length <= 1) return orderIds[0] || '';
+
+    return rules
+        .map((rule, index) => `${rule.ruleRequirement || rule.requirement}-${orderIds[index]}`)
+        .join(', ');
+}
+
+function extractExistingGeneratedIds(existingOrderId, rules) {
+    const parts = String(existingOrderId || '')
+        .split(',')
+        .map(part => part.trim())
+        .filter(Boolean);
+
+    if (parts.length !== rules.length) return null;
+
+    const ids = parts.map((part, index) => {
+        const rawId = part.includes('-') ? part.split('-').pop().trim() : part;
+        return parseSequence(rawId, rules[index].prefix) ? rawId.toUpperCase() : null;
+    });
+
+    return ids.every(Boolean) ? ids : null;
 }
 
 async function nextOrderId(prisma, rule, settings) {
@@ -242,29 +268,35 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
     });
 
     const signature = uniqueRules
-        .map(rule => `${normalizeComparable(rule.requirement)}:${rule.prefix}:${rule.seed}`)
+        .map(rule => `${normalizeComparable(rule.ruleRequirement)}:${rule.prefix}:${rule.seed}`)
         .join('|');
 
     const existingOrderId = previousFields[ORDER_ID_FIELD] || existingControlNumber;
     const isSystemGenerated = previousFields[ORDER_ID_GENERATED_FIELD] === true &&
         previousFields[ORDER_ID_SIGNATURE_FIELD] === signature;
     if (isSystemGenerated && existingOrderId) {
-        nextFields[ORDER_ID_FIELD] = existingOrderId;
+        const existingIds = extractExistingGeneratedIds(existingOrderId, uniqueRules);
+        const normalizedOrderId = existingIds
+            ? formatOrderIdDisplay(uniqueRules, existingIds)
+            : existingOrderId;
+        const displayChanged = normalizedOrderId !== existingOrderId;
+
+        nextFields[ORDER_ID_FIELD] = normalizedOrderId;
         nextFields[ORDER_ID_PREFIX_FIELD] = uniqueRules.map(rule => rule.prefix).join(',');
-        nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.requirement).join(',');
+        nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.ruleRequirement || rule.requirement).join(',');
         nextFields[ORDER_ID_GENERATED_FIELD] = true;
         nextFields[ORDER_ID_SIGNATURE_FIELD] = signature;
-        return { customFields: nextFields, orderId: existingOrderId, generated: true, changed: hadOrderIdFields };
+        return { customFields: nextFields, orderId: normalizedOrderId, generated: true, changed: hadOrderIdFields || displayChanged };
     }
 
     const orderIds = [];
     for (const rule of uniqueRules) {
         orderIds.push(await nextOrderId(prisma, rule, settings));
     }
-    const orderId = orderIds.join(', ');
+    const orderId = formatOrderIdDisplay(uniqueRules, orderIds);
     nextFields[ORDER_ID_FIELD] = orderId;
     nextFields[ORDER_ID_PREFIX_FIELD] = uniqueRules.map(rule => rule.prefix).join(',');
-    nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.requirement).join(',');
+    nextFields[ORDER_ID_REQUIREMENT_FIELD] = uniqueRules.map(rule => rule.ruleRequirement || rule.requirement).join(',');
     nextFields[ORDER_ID_GENERATED_FIELD] = true;
     nextFields[ORDER_ID_SIGNATURE_FIELD] = signature;
     return { customFields: nextFields, orderId, generated: true, changed: true };
