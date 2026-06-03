@@ -44,7 +44,7 @@ const navigation = [
     { name: 'Payments', href: '/payment', icon: Users, roles: ['ADMIN', 'MANAGER'] },
     { name: 'Team Management', href: '/team', icon: UserPlus, roles: ['ADMIN', 'MANAGER'], exact: true },
     { name: 'Form Templates', href: '/team/templates', icon: Settings, roles: ['ADMIN', 'MANAGER'], staffRoles: ['TELECALLER'] },
-    { name: 'Follow Ups', href: '/follow-ups', icon: ClipboardList, staffRoles: ['TELECALLER'] },
+    { name: 'Follow Ups', href: '/follow-ups', icon: ClipboardList, roles: ['ADMIN', 'MANAGER'], staffRoles: ['TELECALLER'] },
     { name: 'Settings', href: '/settings', icon: Settings2, roles: ['ADMIN'], exact: true },
 ]
 

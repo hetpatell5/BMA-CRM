@@ -54,12 +54,13 @@ export default function FollowUpsPage() {
     }
 
     // Role check
-    if (user?.staffRole !== 'TELECALLER') {
+    const hasAccess = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.staffRole === 'TELECALLER'
+    if (!hasAccess) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
                 <ClipboardList className="w-16 h-16 text-muted-foreground/50 mb-4" />
                 <h1 className="text-2xl font-bold">Access Denied</h1>
-                <p className="text-muted-foreground mt-2">Only telecallers can access this page.</p>
+                <p className="text-muted-foreground mt-2">Only Admins, Managers, and Telecallers can access this page.</p>
             </div>
         )
     }
