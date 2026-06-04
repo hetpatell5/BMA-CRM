@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, BellRing, Phone, Calendar, ClipboardList } from 'lucide-react'
+import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,15 +13,45 @@ import { format, isBefore, addDays, startOfDay } from 'date-fns'
 
 export default function FollowUpsPage() {
     const { user } = useAuthStore()
-    const { followUps, addFollowUp, removeFollowUp } = useFollowUpStore()
+    const { followUps, addFollowUp, updateFollowUp, removeFollowUp } = useFollowUpStore()
     const { toast } = useToast()
     const [open, setOpen] = useState(false)
     const [detailsOpen, setDetailsOpen] = useState(false)
     const [selectedFollowUp, setSelectedFollowUp] = useState<FollowUp | null>(null)
+    const [isEditing, setIsEditing] = useState(false)
+    const [editDescription, setEditDescription] = useState('')
+    const [editRequirement, setEditRequirement] = useState('')
+    const [editFollowupDate, setEditFollowupDate] = useState('')
 
     const handleNumberClick = (f: FollowUp) => {
         setSelectedFollowUp(f)
+        setIsEditing(false)
         setDetailsOpen(true)
+    }
+
+    const handleStartEdit = () => {
+        if (!selectedFollowUp) return
+        setEditDescription(selectedFollowUp.description)
+        setEditRequirement(selectedFollowUp.requirement)
+        setEditFollowupDate(selectedFollowUp.followupDate)
+        setIsEditing(true)
+    }
+
+    const handleSaveEdit = () => {
+        if (!selectedFollowUp) return
+        updateFollowUp(selectedFollowUp.id, {
+            description: editDescription,
+            requirement: editRequirement,
+            followupDate: editFollowupDate,
+        })
+        setSelectedFollowUp({
+            ...selectedFollowUp,
+            description: editDescription,
+            requirement: editRequirement,
+            followupDate: editFollowupDate,
+        })
+        setIsEditing(false)
+        toast({ title: 'Follow-up updated successfully' })
     }
 
     // Form state
@@ -239,16 +269,39 @@ export default function FollowUpsPage() {
                                     <p className="font-medium">{format(new Date(selectedFollowUp.date), 'MMM dd, yyyy')}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Deadline</p>
-                                    <p className="font-medium">{format(new Date(selectedFollowUp.followupDate), 'MMM dd, yyyy')}</p>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Next Follow-up Date</p>
+                                    {isEditing ? (
+                                        <Input type="date" value={editFollowupDate} onChange={e => setEditFollowupDate(e.target.value)} className="h-8 text-sm" />
+                                    ) : (
+                                        <p className="font-medium">{format(new Date(selectedFollowUp.followupDate), 'MMM dd, yyyy')}</p>
+                                    )}
                                 </div>
                                 <div className="col-span-2">
                                     <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Description</p>
-                                    <p className="font-medium text-sm">{selectedFollowUp.description}</p>
+                                    {isEditing ? (
+                                        <Input value={editDescription} onChange={e => setEditDescription(e.target.value)} className="h-8 text-sm" />
+                                    ) : (
+                                        <p className="font-medium text-sm">{selectedFollowUp.description}</p>
+                                    )}
                                 </div>
                                 <div className="col-span-2">
                                     <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Requirement</p>
-                                    <p className="font-medium text-sm">{selectedFollowUp.requirement}</p>
+                                    {isEditing ? (
+                                        <Input value={editRequirement} onChange={e => setEditRequirement(e.target.value)} className="h-8 text-sm" />
+                                    ) : (
+                                        <p className="font-medium text-sm">{selectedFollowUp.requirement}</p>
+                                    )}
+                                </div>
+                                <div className="col-span-2 flex justify-end">
+                                    {isEditing ? (
+                                        <Button size="sm" onClick={handleSaveEdit} className="gap-1.5 gradient-primary text-white">
+                                            <Check className="w-3.5 h-3.5" /> Save Changes
+                                        </Button>
+                                    ) : (
+                                        <Button size="sm" variant="outline" onClick={handleStartEdit} className="gap-1.5">
+                                            <Pencil className="w-3.5 h-3.5" /> Edit
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                             
@@ -265,7 +318,7 @@ export default function FollowUpsPage() {
                                             <div key={f.id} className={`p-4 rounded-xl border transition-colors ${f.id === selectedFollowUp.id ? 'border-primary/50 bg-primary/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
-                                                        <span className="text-xs text-muted-foreground uppercase tracking-wider block mb-0.5">Deadline</span>
+                                                        <span className="text-xs text-muted-foreground uppercase tracking-wider block mb-0.5">Next Follow-up Date</span>
                                                         <span className="font-bold text-sm">{format(new Date(f.followupDate), 'MMM dd, yyyy')}</span>
                                                     </div>
                                                     <div className="text-right">

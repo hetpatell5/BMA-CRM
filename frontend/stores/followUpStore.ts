@@ -15,6 +15,7 @@ export interface FollowUp {
 interface FollowUpState {
     followUps: FollowUp[];
     addFollowUp: (followUp: Omit<FollowUp, 'id' | 'createdAt'>) => void;
+    updateFollowUp: (id: string, data: Partial<Pick<FollowUp, 'description' | 'requirement' | 'followupDate'>>) => void;
     removeFollowUp: (id: string) => void;
 }
 
@@ -31,6 +32,9 @@ export const useFollowUpStore = create<FollowUpState>()(
                         createdAt: new Date().toISOString()
                     }
                 ]
+            })),
+            updateFollowUp: (id, data) => set((state) => ({
+                followUps: state.followUps.map((f) => f.id === id ? { ...f, ...data } : f)
             })),
             removeFollowUp: (id) => set((state) => ({
                 followUps: state.followUps.filter((f) => f.id !== id)
