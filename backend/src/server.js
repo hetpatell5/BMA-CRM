@@ -28,6 +28,7 @@ import orderFormConfigRoutes from './routes/orderFormConfigRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import shiprocketRoutes from './routes/shiprocketRoutes.js';
 import appSettingsRoutes from './routes/appSettingsRoutes.js';
+import followUpRoutes from './routes/followUpRoutes.js';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -141,6 +142,7 @@ app.use('/api/order-form-config', orderFormConfigRoutes);
 app.use('/api/notifications', authenticateToken, notificationRoutes);
 app.use('/api/shiprocket', authenticateToken, shiprocketRoutes);
 app.use('/api/app-settings', authenticateToken, appSettingsRoutes);
+app.use('/api/follow-ups', authenticateToken, followUpRoutes);
 
 
 // Error handling

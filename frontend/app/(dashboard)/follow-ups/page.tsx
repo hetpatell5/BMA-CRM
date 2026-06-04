@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, Clock, AlertTriangle, User, FileText, Target } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,7 +13,7 @@ import { format, isBefore, addDays, startOfDay } from 'date-fns'
 
 export default function FollowUpsPage() {
     const { user } = useAuthStore()
-    const { followUps, addFollowUp, updateFollowUp, removeFollowUp } = useFollowUpStore()
+    const { followUps, isLoading, fetchFollowUps, addFollowUp, updateFollowUp, removeFollowUp } = useFollowUpStore()
     const { toast } = useToast()
     const [open, setOpen] = useState(false)
     const [detailsOpen, setDetailsOpen] = useState(false)
@@ -22,6 +22,20 @@ export default function FollowUpsPage() {
     const [editDescription, setEditDescription] = useState('')
     const [editRequirement, setEditRequirement] = useState('')
     const [editFollowupDate, setEditFollowupDate] = useState('')
+    const [searchQuery, setSearchQuery] = useState('')
+
+    // Fetch follow-ups from backend on mount
+    useEffect(() => {
+        fetchFollowUps()
+    }, [fetchFollowUps])
+
+    // Debounced search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchFollowUps(searchQuery || undefined)
+        }, 400)
+        return () => clearTimeout(timer)
+    }, [searchQuery, fetchFollowUps])
 
     const handleNumberClick = (f: FollowUp) => {
         setSelectedFollowUp(f)
@@ -33,26 +47,30 @@ export default function FollowUpsPage() {
         if (!selectedFollowUp) return
         setEditDescription(selectedFollowUp.description)
         setEditRequirement(selectedFollowUp.requirement)
-        setEditFollowupDate(selectedFollowUp.followupDate)
+        setEditFollowupDate(selectedFollowUp.followupDate ? selectedFollowUp.followupDate.split('T')[0] : '')
         setIsEditing(true)
     }
 
-    const handleSaveEdit = () => {
+    const handleSaveEdit = async () => {
         if (!selectedFollowUp) return
-        updateFollowUp(selectedFollowUp.id, {
-            description: editDescription,
-            requirement: editRequirement,
-            followupDate: editFollowupDate,
-        })
-        setSelectedFollowUp({
-            ...selectedFollowUp,
-            description: editDescription,
-            requirement: editRequirement,
-            followupDate: editFollowupDate,
-        })
-        setIsEditing(false)
-        setDetailsOpen(false)
-        toast({ title: 'Follow-up updated successfully' })
+        try {
+            await updateFollowUp(selectedFollowUp.id, {
+                description: editDescription,
+                requirement: editRequirement,
+                followupDate: editFollowupDate,
+            })
+            setSelectedFollowUp({
+                ...selectedFollowUp,
+                description: editDescription,
+                requirement: editRequirement,
+                followupDate: editFollowupDate,
+            })
+            setIsEditing(false)
+            setDetailsOpen(false)
+            toast({ title: 'Follow-up updated successfully' })
+        } catch {
+            toast({ title: 'Failed to update follow-up', variant: 'destructive' })
+        }
     }
 
     // Form state
@@ -72,23 +90,35 @@ export default function FollowUpsPage() {
         })
     }, [followUps])
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        addFollowUp({
-            name,
-            date: new Date().toISOString(),
-            number,
-            description,
-            followupDate,
-            requirement
-        })
-        toast({ title: 'Follow up added successfully' })
-        setOpen(false)
-        setName('')
-        setNumber('')
-        setDescription('')
-        setFollowupDate('')
-        setRequirement('')
+        try {
+            await addFollowUp({
+                name,
+                number,
+                description,
+                followupDate,
+                requirement
+            })
+            toast({ title: 'Follow up added successfully' })
+            setOpen(false)
+            setName('')
+            setNumber('')
+            setDescription('')
+            setFollowupDate('')
+            setRequirement('')
+        } catch {
+            toast({ title: 'Failed to add follow-up', variant: 'destructive' })
+        }
+    }
+
+    const handleComplete = async (id: string) => {
+        try {
+            await removeFollowUp(id)
+            toast({ title: 'Follow-up completed' })
+        } catch {
+            toast({ title: 'Failed to complete follow-up', variant: 'destructive' })
+        }
     }
 
     // Role check
@@ -200,6 +230,22 @@ export default function FollowUpsPage() {
                 </div>
             </div>
 
+            {/* Search Bar */}
+            <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 shadow-lg dark:shadow-none transition-colors">
+                <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 dark:text-slate-500" />
+                    <Input
+                        placeholder="Search by name, number, description or requirement..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="pl-11 h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 focus:border-primary text-[14px] placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                    />
+                    {isLoading && (
+                        <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
+                    )}
+                </div>
+            </div>
+
             {/* Alert for upcoming follow-ups */}
             {upcomingFollowUps.length > 0 && (
                 <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-amber-300/50 dark:border-amber-500/20 p-5 md:p-6 shadow-lg dark:shadow-none transition-colors">
@@ -228,7 +274,7 @@ export default function FollowUpsPage() {
                                             <span className="text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2.5 py-1 rounded-lg border border-amber-500/20">
                                                 {format(new Date(f.followupDate), 'MMM dd, yyyy')}
                                             </span>
-                                            <Button variant="ghost" size="sm" onClick={() => removeFollowUp(f.id)} className="h-8 px-3 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors shrink-0 text-xs font-bold">
+                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-8 px-3 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors shrink-0 text-xs font-bold">
                                                 ✓ Complete
                                             </Button>
                                         </div>
@@ -256,14 +302,25 @@ export default function FollowUpsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                            {followUps.length === 0 ? (
+                            {isLoading && followUps.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="p-16 text-center">
+                                        <Loader2 className="w-8 h-8 mx-auto mb-4 text-primary animate-spin" />
+                                        <p className="text-sm text-muted-foreground">Loading follow-ups...</p>
+                                    </td>
+                                </tr>
+                            ) : followUps.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="p-16 text-center">
                                         <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center mx-auto mb-4">
                                             <ClipboardList className="w-8 h-8 text-muted-foreground/40" />
                                         </div>
-                                        <p className="text-base font-semibold mb-1.5 text-slate-700 dark:text-white">No follow-ups found</p>
-                                        <p className="text-sm text-muted-foreground">Start by adding a new follow-up for your daily tasks.</p>
+                                        <p className="text-base font-semibold mb-1.5 text-slate-700 dark:text-white">
+                                            {searchQuery ? 'No results found' : 'No follow-ups found'}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {searchQuery ? `No follow-ups match "${searchQuery}".` : 'Start by adding a new follow-up for your daily tasks.'}
+                                        </p>
                                     </td>
                                 </tr>
                             ) : (
@@ -274,7 +331,7 @@ export default function FollowUpsPage() {
                                             <td className="px-5 py-4">
                                                 <div className="flex items-center gap-2.5 text-[13px] font-medium text-slate-600 dark:text-slate-300">
                                                     <Calendar className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                                                    {format(new Date(f.date), 'MMM dd, yyyy')}
+                                                    {format(new Date(f.createdAt), 'MMM dd, yyyy')}
                                                 </div>
                                             </td>
                                             <td className="px-5 py-4">
@@ -299,7 +356,7 @@ export default function FollowUpsPage() {
                                                 </span>
                                             </td>
                                             <td className="px-5 py-4">
-                                                <Button variant="ghost" size="sm" onClick={() => removeFollowUp(f.id)} className="h-8 px-3 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 transition-all text-xs font-bold">
+                                                <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-8 px-3 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 transition-all text-xs font-bold">
                                                     ✓ Complete
                                                 </Button>
                                             </td>
@@ -340,7 +397,7 @@ export default function FollowUpsPage() {
                                 </div>
                                 <div className="text-right shrink-0">
                                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Created</p>
-                                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{format(new Date(selectedFollowUp.date), 'MMM dd, yyyy')}</p>
+                                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{format(new Date(selectedFollowUp.createdAt), 'MMM dd, yyyy')}</p>
                                 </div>
                             </div>
 
@@ -422,7 +479,7 @@ export default function FollowUpsPage() {
                                                         <span className="font-bold text-[13px] text-slate-800 dark:text-white">{format(new Date(f.followupDate), 'MMM dd, yyyy')}</span>
                                                     </div>
                                                     <span className="text-[10px] font-medium text-muted-foreground bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-md border border-slate-200/50 dark:border-white/5">
-                                                        {format(new Date(f.date), 'MMM dd')}
+                                                        {format(new Date(f.createdAt), 'MMM dd')}
                                                     </span>
                                                 </div>
                                                 <p className="text-[13px] text-slate-600 dark:text-slate-400 pl-4 leading-relaxed">{f.description}</p>

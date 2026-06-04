@@ -62,6 +62,7 @@ model User {
   availability      UserAvailability?
   activityLogs      ActivityLog[]
   notifications     Notification[]
+  createdFollowUps  DailyFollowUp[] @relation("CreatedFollowUps")
   
   // Team Hierarchy
   leaderId          Int?            @map("leader_id")
@@ -586,4 +587,28 @@ model OrderFormConfig {
   updatedAt DateTime @updatedAt
 
   @@map("order_form_config")
+}
+
+// ============================================
+// DAILY FOLLOW-UPS
+// ============================================
+
+model DailyFollowUp {
+  id           BigInt   @id @default(autoincrement())
+  name         String
+  number       String
+  description  String   @db.Text
+  requirement  String   @db.Text
+  followupDate DateTime @map("followup_date")
+
+  createdById  Int      @map("created_by")
+  createdBy    User     @relation("CreatedFollowUps", fields: [createdById], references: [id])
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([createdById])
+  @@index([followupDate])
+  @@index([number])
+  @@map("daily_follow_ups")
 }

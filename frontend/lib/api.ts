@@ -250,3 +250,11 @@ export const appSettingsAPI = {
     updateOrderColumns: (columns: any[], visibility?: Record<string, 'all' | 'ops'>, order?: string[]) =>
         api.put('/app-settings/order-columns', { columns, visibility, order }),
 }
+
+// Follow-ups API
+export const followUpsAPI = {
+    getAll: (search?: string) => api.get('/follow-ups', { params: search ? { search } : {} }),
+    create: (data: any) => api.post('/follow-ups', data),
+    update: (id: string, data: any) => api.put(`/follow-ups/${id}`, data),
+    remove: (id: string) => api.delete(`/follow-ups/${id}`),
+}
