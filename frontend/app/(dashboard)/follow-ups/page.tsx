@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { useFollowUpStore } from '@/stores/followUpStore'
+import { useFollowUpStore, FollowUp } from '@/stores/followUpStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/hooks/use-toast'
 import { format, isBefore, addDays, startOfDay } from 'date-fns'
@@ -16,6 +16,13 @@ export default function FollowUpsPage() {
     const { followUps, addFollowUp, removeFollowUp } = useFollowUpStore()
     const { toast } = useToast()
     const [open, setOpen] = useState(false)
+    const [detailsOpen, setDetailsOpen] = useState(false)
+    const [selectedFollowUp, setSelectedFollowUp] = useState<FollowUp | null>(null)
+
+    const handleNumberClick = (f: FollowUp) => {
+        setSelectedFollowUp(f)
+        setDetailsOpen(true)
+    }
 
     // Form state
     const [name, setName] = useState('')
@@ -127,7 +134,7 @@ export default function FollowUpsPage() {
                                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                                             <span className="font-semibold text-amber-800 dark:text-amber-400 text-base">{f.name}</span>
                                             <span className="hidden sm:inline text-amber-700/40 dark:text-amber-500/40">•</span>
-                                            <span className="font-semibold text-amber-800/80 dark:text-amber-400/80 font-mono text-sm">{f.number}</span>
+                                            <span onClick={() => handleNumberClick(f)} className="font-semibold text-amber-800/80 hover:text-amber-600 dark:text-amber-400/80 dark:hover:text-amber-300 font-mono text-sm cursor-pointer underline decoration-amber-500/30 underline-offset-2 transition-colors">{f.number}</span>
                                             <span className="hidden sm:inline text-amber-700/40 dark:text-amber-500/40">•</span>
                                             <span className="text-amber-900/80 dark:text-amber-400/80 truncate max-w-[200px] sm:max-w-[300px]">{f.description}</span>
                                         </div>
@@ -186,7 +193,7 @@ export default function FollowUpsPage() {
                                             <td className="p-4">
                                                 <div className="flex items-center gap-1.5 text-sm">
                                                     <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                                    <span className="font-mono">{f.number}</span>
+                                                    <span onClick={() => handleNumberClick(f)} className="font-mono cursor-pointer text-primary hover:text-primary/80 hover:underline underline-offset-2 transition-colors">{f.number}</span>
                                                 </div>
                                             </td>
                                             <td className="p-4 text-sm max-w-[200px] truncate">{f.description}</td>
@@ -209,6 +216,74 @@ export default function FollowUpsPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Follow-up Details Dialog */}
+            <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <DialogContent className="sm:max-w-[600px] glass border-white/20">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Follow-up Details</DialogTitle>
+                    </DialogHeader>
+                    {selectedFollowUp && (
+                        <div className="space-y-6 mt-4">
+                            <div className="grid grid-cols-2 gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Name</p>
+                                    <p className="font-medium">{selectedFollowUp.name}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Number</p>
+                                    <p className="font-medium">{selectedFollowUp.number}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Created Date</p>
+                                    <p className="font-medium">{format(new Date(selectedFollowUp.date), 'MMM dd, yyyy')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Deadline</p>
+                                    <p className="font-medium">{format(new Date(selectedFollowUp.followupDate), 'MMM dd, yyyy')}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Description</p>
+                                    <p className="font-medium text-sm">{selectedFollowUp.description}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Requirement</p>
+                                    <p className="font-medium text-sm">{selectedFollowUp.requirement}</p>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                                    <ClipboardList className="w-5 h-5 text-primary" />
+                                    Related Follow-ups
+                                </h3>
+                                <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2">
+                                    {followUps
+                                        .filter(f => f.number === selectedFollowUp.number)
+                                        .sort((a, b) => new Date(a.followupDate).getTime() - new Date(b.followupDate).getTime())
+                                        .map(f => (
+                                            <div key={f.id} className={`p-4 rounded-xl border transition-colors ${f.id === selectedFollowUp.id ? 'border-primary/50 bg-primary/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <span className="text-xs text-muted-foreground uppercase tracking-wider block mb-0.5">Deadline</span>
+                                                        <span className="font-bold text-sm">{format(new Date(f.followupDate), 'MMM dd, yyyy')}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-xs text-muted-foreground block mb-0.5">Created</span>
+                                                        <span className="text-xs text-muted-foreground">{format(new Date(f.date), 'MMM dd, yyyy')}</span>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm mt-2 text-foreground/80">{f.description}</p>
+                                                <p className="text-sm mt-1 text-foreground/80"><span className="font-medium text-xs text-muted-foreground uppercase tracking-wider">Req:</span> {f.requirement}</p>
+                                            </div>
+                                        ))
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
