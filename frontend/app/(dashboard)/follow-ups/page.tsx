@@ -51,6 +51,7 @@ export default function FollowUpsPage() {
             followupDate: editFollowupDate,
         })
         setIsEditing(false)
+        setDetailsOpen(false)
         toast({ title: 'Follow-up updated successfully' })
     }
 
