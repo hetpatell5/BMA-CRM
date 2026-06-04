@@ -181,54 +181,6 @@ export default function FollowUpsPage() {
                 </Dialog>
             </div>
 
-            {/* Stats Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-                <div className="group relative overflow-hidden rounded-[20px] bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 p-5 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-white/[0.05] hover:border-slate-300 dark:hover:border-white/10 shadow-lg dark:shadow-2xl">
-                    <div className="flex items-start justify-between mb-6">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-all duration-300">
-                            <ClipboardList className="h-6 w-6" />
-                        </div>
-                    </div>
-                    <div className="space-y-1">
-                        <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">{followUps.length}</div>
-                        <p className="text-base font-semibold text-slate-500 dark:text-slate-400 tracking-tight">Total Follow-ups</p>
-                    </div>
-                    <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all duration-500" />
-                </div>
-
-                <div className="group relative overflow-hidden rounded-[20px] bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 p-5 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-white/[0.05] hover:border-slate-300 dark:hover:border-white/10 shadow-lg dark:shadow-2xl">
-                    <div className="flex items-start justify-between mb-6">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-all duration-300">
-                            <AlertTriangle className="h-6 w-6" />
-                        </div>
-                        {upcomingFollowUps.length > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold tracking-tight bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/10">
-                                Urgent
-                            </span>
-                        )}
-                    </div>
-                    <div className="space-y-1">
-                        <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">{upcomingFollowUps.length}</div>
-                        <p className="text-base font-semibold text-slate-500 dark:text-slate-400 tracking-tight">Attention Needed</p>
-                    </div>
-                    <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all duration-500" />
-                </div>
-
-                <div className="group relative overflow-hidden rounded-[20px] bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 p-5 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-white/[0.05] hover:border-slate-300 dark:hover:border-white/10 shadow-lg dark:shadow-2xl">
-                    <div className="flex items-start justify-between mb-6">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-all duration-300">
-                            <Target className="h-6 w-6" />
-                        </div>
-                    </div>
-                    <div className="space-y-1">
-                        <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
-                            {new Set(followUps.map(f => f.number)).size}
-                        </div>
-                        <p className="text-base font-semibold text-slate-500 dark:text-slate-400 tracking-tight">Unique Contacts</p>
-                    </div>
-                    <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all duration-500" />
-                </div>
-            </div>
 
             {/* Search Bar */}
             <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 shadow-lg dark:shadow-none transition-colors">
