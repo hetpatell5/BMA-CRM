@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2 } from 'lucide-react'
+import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -112,12 +112,13 @@ export default function FollowUpsPage() {
         }
     }
 
-    const handleComplete = async (id: string) => {
+    const handleDelete = async (id: string) => {
+        if (!window.confirm("Are you sure you want to delete this follow-up?")) return;
         try {
             await removeFollowUp(id)
-            toast({ title: 'Follow-up completed' })
+            toast({ title: 'Follow-up deleted' })
         } catch {
-            toast({ title: 'Failed to complete follow-up', variant: 'destructive' })
+            toast({ title: 'Failed to delete follow-up', variant: 'destructive' })
         }
     }
 
@@ -226,8 +227,8 @@ export default function FollowUpsPage() {
                                             <span className="text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2.5 py-1 rounded-lg border border-amber-500/20">
                                                 {format(new Date(f.followupDate), 'MMM dd, yyyy')}
                                             </span>
-                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-8 px-3 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors shrink-0 text-xs font-bold">
-                                                ✓ Complete
+                                            <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors shrink-0 text-xs font-bold gap-1.5">
+                                                <Trash2 className="w-3.5 h-3.5" /> Delete
                                             </Button>
                                         </div>
                                     </div>
@@ -308,8 +309,8 @@ export default function FollowUpsPage() {
                                                 </span>
                                             </td>
                                             <td className="px-5 py-4">
-                                                <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-8 px-3 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 transition-all text-xs font-bold">
-                                                    ✓ Complete
+                                                <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all text-xs font-bold gap-1.5">
+                                                    <Trash2 className="w-3.5 h-3.5" /> Delete
                                                 </Button>
                                             </td>
                                         </tr>
