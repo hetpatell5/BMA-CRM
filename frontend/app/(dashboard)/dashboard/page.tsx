@@ -44,7 +44,8 @@ function StatCard({
     change,
     changeType,
     icon: Icon,
-    gradient,
+    iconContainerClassName,
+    glowClassName,
     href,
     className,
 }: {
@@ -53,7 +54,8 @@ function StatCard({
     change?: string
     changeType?: 'up' | 'down'
     icon: any
-    gradient: string
+    iconContainerClassName?: string
+    glowClassName?: string
     href?: string
     className?: string
 }) {
@@ -73,7 +75,7 @@ function StatCard({
             )}
         >
             <div className="flex items-start justify-between mb-10">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-all duration-300">
+                <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl border transition-all duration-300", iconContainerClassName || "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white")}>
                     <Icon className="h-6 w-6" />
                 </div>
                 {change && (
@@ -96,7 +98,7 @@ function StatCard({
             </div>
 
             {/* Subtle glow effect on hover */}
-            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/5 rounded-full blur-2xl group-hover:bg-white/10 transition-all duration-500" />
+            <div className={cn("absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-2xl transition-all duration-500", glowClassName || "bg-white/5 group-hover:bg-white/10")} />
         </Card>
     )
 }
@@ -115,7 +117,7 @@ function OrderBreakdownCard({ stats, total }: { stats: any, total: number }) {
     return (
         <div className="group relative overflow-hidden rounded-[20px] bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 p-6 transition-all duration-300 shadow-lg dark:shadow-2xl h-full flex flex-col">
             <div className="flex items-start justify-between mb-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-all duration-300">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-all duration-300">
                     <ClipboardList className="h-6 w-6" />
                 </div>
                 <div className="text-right">
@@ -269,42 +271,48 @@ export default function DashboardPage() {
                                 title="Active Orders"
                                 value={formatNumber(stats?.students?.active || 0)}
                                 icon={Activity}
-                                gradient="gradient-success"
+                                iconContainerClassName="bg-blue-500/10 border-blue-500/20 text-blue-500 dark:text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-300"
+                                glowClassName="bg-blue-500/5 group-hover:bg-blue-500/10"
                                 href="/orders?status=REPORT_IN_PROGRESS"
                             />
                             <StatCard
                                 title="Completed Orders"
                                 value={formatNumber(stats?.students?.alumni || 0)}
                                 icon={CheckCircle}
-                                gradient="bg-gradient-to-r from-emerald-500 to-teal-500"
+                                iconContainerClassName="bg-emerald-500/10 border-emerald-500/20 text-emerald-500 dark:text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300"
+                                glowClassName="bg-emerald-500/5 group-hover:bg-emerald-500/10"
                                 href="/orders?status=ALL_DONE"
                             />
                             <StatCard
                                 title="Soft Copy Revenue"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.softCopyTotal)}
                                 icon={IndianRupee}
-                                gradient="bg-gradient-to-r from-cyan-500 to-blue-500"
+                                iconContainerClassName="bg-cyan-500/10 border-cyan-500/20 text-cyan-500 dark:text-cyan-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-300"
+                                glowClassName="bg-cyan-500/5 group-hover:bg-cyan-500/10"
                                 href="/orders"
                             />
                             <StatCard
                                 title="Hard Copy Revenue"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.hardCopyTotal)}
                                 icon={Wallet}
-                                gradient="bg-gradient-to-r from-orange-500 to-rose-500"
+                                iconContainerClassName="bg-amber-500/10 border-amber-500/20 text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300"
+                                glowClassName="bg-amber-500/5 group-hover:bg-amber-500/10"
                                 href="/orders"
                             />
                             <StatCard
                                 title="Total Collected"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.totalCollected)}
                                 icon={CreditCard}
-                                gradient="bg-gradient-to-r from-violet-500 to-purple-500"
+                                iconContainerClassName="bg-purple-500/10 border-purple-500/20 text-purple-500 dark:text-purple-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
+                                glowClassName="bg-purple-500/5 group-hover:bg-purple-500/10"
                                 href="/orders"
                             />
                             <StatCard
                                 title="Payment Pending"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.totalPending)}
                                 icon={Hourglass}
-                                gradient="bg-gradient-to-r from-amber-500 to-orange-500"
+                                iconContainerClassName="bg-rose-500/10 border-rose-500/20 text-rose-500 dark:text-rose-400 group-hover:text-rose-600 dark:group-hover:text-rose-300"
+                                glowClassName="bg-rose-500/5 group-hover:bg-rose-500/10"
                                 href="/orders"
                             />
                         </>
