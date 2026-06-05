@@ -134,7 +134,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 {/* Branding */}
                 <div className="flex items-center gap-2 mb-6 justify-center opacity-60">
                     <GraduationCap className="w-4 h-4 text-[#7c4dff]" />
-                    <span className="text-xs text-gray-600 font-medium">Powered by CRM Admin</span>
+                    <span className="text-xs text-gray-600 font-medium">Powered by BMA CRM</span>
                 </div>
 
                 {/* Header card */}
