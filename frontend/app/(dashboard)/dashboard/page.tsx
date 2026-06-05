@@ -829,13 +829,13 @@ function ExpertWorkloadWidget() {
                                                         {staff.fullName?.split(' ')[1]?.charAt(0)?.toUpperCase() || ''}
                                                     </span>
                                                 </div>
-                                                <span className="font-bold text-slate-800 dark:text-foreground text-[15px]">
+                                                <span className="font-bold text-slate-800 dark:text-foreground text-[15px] capitalize">
                                                     {staff.fullName?.toLowerCase()}
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="py-2.5 px-6 text-[13px] text-muted-foreground font-semibold uppercase tracking-wider">
-                                            {staff.staffRole || 'STAFF'}
+                                        <td className="py-2.5 px-6 text-[13px] text-muted-foreground font-semibold capitalize tracking-wider">
+                                            {(staff.staffRole || 'Staff').toLowerCase()}
                                         </td>
                                         <td className="py-2.5 px-6 text-center text-[15px] font-bold text-slate-700 dark:text-slate-300">
                                             {staff.ordersHandled}
@@ -860,8 +860,8 @@ function ExpertWorkloadWidget() {
                             const pct = Math.round((staff.ordersHandled / maxOrders) * 100) || 0;
                             return (
                                 <div key={staff.id} className="flex items-center gap-4 group">
-                                    <div className="w-[140px] md:w-[200px] truncate text-[13px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                                        {staff.fullName}
+                                    <div className="w-[140px] md:w-[200px] truncate text-[13px] font-medium text-muted-foreground group-hover:text-foreground transition-colors capitalize">
+                                        {staff.fullName?.toLowerCase()}
                                     </div>
                                     <div className="flex-1 flex items-center gap-4">
                                         <div className="flex-1 max-w-[400px] h-[10px] bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
