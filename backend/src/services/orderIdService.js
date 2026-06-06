@@ -87,11 +87,25 @@ function customFieldText(customFields, ...keywords) {
     return '';
 }
 
-function requirementTokens(requirement) {
-    return String(requirement || '')
+function requirementTokens(requirement, rules = []) {
+    const rawTokens = String(requirement || '')
         .split(/[,/|+&]/)
         .map(part => part.trim().replace(/^[()[\]{}]+|[()[\]{}]+$/g, '').trim())
         .filter(Boolean);
+
+    const expanded = [];
+    for (const token of rawTokens) {
+        if (token.toLowerCase() === 'all') {
+            if (rules && rules.length > 0) {
+                rules.forEach(rule => expanded.push(rule.requirement || rule.ruleRequirement));
+            } else {
+                expanded.push('Synopsis', 'Guide', 'Report');
+            }
+        } else {
+            expanded.push(token);
+        }
+    }
+    return expanded;
 }
 
 export function normalizeOrderIdPrefix(prefix) {
@@ -116,8 +130,11 @@ function parseOrderIdSeed(seed) {
     };
 }
 
-export function getRequirementsFromCustomFields(customFields) {
-    return requirementTokens(customFieldText(customFields, ...REQUIREMENT_KEYS));
+export function getRequirementsFromCustomFields(customFields, settings) {
+    const rules = settings && Array.isArray(settings.orderIdRules) && settings.orderIdRules.length > 0
+        ? settings.orderIdRules
+        : FALLBACK_ORDER_ID_RULES;
+    return requirementTokens(customFieldText(customFields, ...REQUIREMENT_KEYS), rules);
 }
 
 export function getOrderIdRuleForRequirement(requirement, settings = readSettings()) {
@@ -253,10 +270,10 @@ export async function ensureOrderIdForCustomFields(prisma, customFields, existin
     delete nextFields[ORDER_ID_GENERATED_FIELD];
     delete nextFields[ORDER_ID_SIGNATURE_FIELD];
 
-    const requirements = getRequirementsFromCustomFields(nextFields);
-    const previousRequirements = getRequirementsFromCustomFields(previousFields);
-    const effectiveRequirements = requirements.length ? requirements : previousRequirements;
     const settings = settingsOverride || readSettings();
+    const requirements = getRequirementsFromCustomFields(nextFields, settings);
+    const previousRequirements = getRequirementsFromCustomFields(previousFields, settings);
+    const effectiveRequirements = requirements.length ? requirements : previousRequirements;
     const rules = effectiveRequirements
         .map(requirement => getOrderIdRuleForRequirement(requirement, settings))
         .filter(Boolean);
