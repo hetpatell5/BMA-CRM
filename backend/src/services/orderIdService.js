@@ -134,7 +134,28 @@ export function getRequirementsFromCustomFields(customFields, settings) {
     const rules = settings && Array.isArray(settings.orderIdRules) && settings.orderIdRules.length > 0
         ? settings.orderIdRules
         : FALLBACK_ORDER_ID_RULES;
-    return requirementTokens(customFieldText(customFields, ...REQUIREMENT_KEYS), rules);
+
+    // 1. Primary: look for the requirement by matching known field KEYS (e.g. "Requirement of")
+    const fromKey = customFieldText(customFields, ...REQUIREMENT_KEYS);
+    if (fromKey) return requirementTokens(fromKey, rules);
+
+    // 2. Fallback: scan all field VALUES and check if any VALUE directly matches a rule requirement name.
+    //    This handles any form field label (e.g. "What do you need?", "Type", etc.)
+    if (customFields && typeof customFields === 'object' && !Array.isArray(customFields)) {
+        for (const [key, value] of Object.entries(customFields)) {
+            if (!value || typeof value === 'object') continue;
+            const text = String(value).trim();
+            if (!text) continue;
+            // Check if this value (or a token within it) matches any configured rule
+            const tokens = requirementTokens(text, rules);
+            const matchedTokens = tokens.filter(token =>
+                rules.some(rule => isCloseRequirementMatch(token, rule.requirement))
+            );
+            if (matchedTokens.length > 0) return matchedTokens;
+        }
+    }
+
+    return [];
 }
 
 export function getOrderIdRuleForRequirement(requirement, settings = readSettings()) {
