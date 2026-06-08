@@ -1,7 +1,8 @@
 import express from 'express';
 import prisma from '../config/database.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
-
+import { ensureOrderIdForCustomFields } from '../services/orderIdService.js';
+import { readSettings } from './appSettingsRoutes.js';
 const router = express.Router();
 const requireTemplateManager = requireRole('ADMIN', 'MANAGER');
 const requireTemplateViewer  = requireRole('ADMIN', 'MANAGER', 'STAFF');
@@ -60,6 +61,8 @@ router.post('/public/:id/submit', async (req, res) => {
         const tcId = telecallerId ? parseInt(telecallerId) : null;
 
         // 1. Create Student record
+        const orderIdResult = await ensureOrderIdForCustomFields(prisma, responses || {}, null, null, readSettings());
+        
         const student = await prisma.student.create({
             data: {
                 fullName,
@@ -70,7 +73,8 @@ router.post('/public/:id/submit', async (req, res) => {
                 state:     state     || null,
                 source:    'form_submission',
                 status:    'NEW_LEAD',
-                customFields: responses,
+                customFields: orderIdResult.customFields,
+                controlNumber: orderIdResult.orderId || null,
                 // Track which telecaller's form this came from
                 ...(tcId && { createdById: tcId, assignedById: tcId }),
             }
