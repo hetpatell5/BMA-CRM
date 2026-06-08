@@ -175,27 +175,28 @@ function parseMaxSequenceFromText(text, prefix) {
 async function findMaxExistingSequence(prisma, prefix) {
     if (!prefix) return 0;
 
-    const candidates = await prisma.student.findMany({
-        where: {
-            OR: [
-                { controlNumber: { contains: prefix } },
-                { customFields: { string_contains: prefix } },
-            ],
-        },
-        select: { controlNumber: true, customFields: true },
-        take: 10000,
-        orderBy: { createdAt: 'desc' },
-    });
+    try {
+        const candidates = await prisma.student.findMany({
+            where: {
+                controlNumber: { contains: prefix },
+            },
+            select: { controlNumber: true, customFields: true },
+            take: 10000,
+            orderBy: { createdAt: 'desc' },
+        });
 
-    return candidates.reduce((max, student) => {
-        const cf = student.customFields && typeof student.customFields === 'object' ? student.customFields : {};
-        const isGenerated = cf[ORDER_ID_GENERATED_FIELD] === true;
-        const generatedOrderId = isGenerated ? (cf[ORDER_ID_FIELD] || student.controlNumber) : '';
-        return Math.max(
-            max,
-            parseMaxSequenceFromText(generatedOrderId, prefix),
-        );
-    }, 0);
+        return candidates.reduce((max, student) => {
+            const cf = student.customFields && typeof student.customFields === 'object' ? student.customFields : {};
+            const isGenerated = cf[ORDER_ID_GENERATED_FIELD] === true;
+            const generatedOrderId = isGenerated ? (cf[ORDER_ID_FIELD] || student.controlNumber) : student.controlNumber || '';
+            return Math.max(
+                max,
+                parseMaxSequenceFromText(generatedOrderId, prefix),
+            );
+        }, 0);
+    } catch {
+        return 0;
+    }
 }
 
 function formatOrderIdDisplay(rules, orderIds) {
