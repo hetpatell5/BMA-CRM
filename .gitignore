@@ -10,3 +10,6 @@ uploads/
 Thumbs.db
 
 backend/prisma.zip
+backend/app-settings.json
+backend/order-id-rules.json
+backend/test-*.js
