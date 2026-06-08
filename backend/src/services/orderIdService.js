@@ -57,7 +57,7 @@ function isCloseRequirementMatch(requirement, ruleRequirement) {
     if (normalizedRequirement.includes(normalizedRule) || normalizedRule.includes(normalizedRequirement)) return true;
 
     const distance = editDistance(normalizedRequirement, normalizedRule);
-    const allowedDistance = Math.min(2, Math.max(1, Math.floor(Math.max(normalizedRequirement.length, normalizedRule.length) / 4)));
+    const allowedDistance = Math.min(3, Math.max(1, Math.floor(Math.max(normalizedRequirement.length, normalizedRule.length) / 3)));
     return distance <= allowedDistance;
 }
 
