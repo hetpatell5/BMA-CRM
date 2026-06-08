@@ -64,24 +64,25 @@ function isCloseRequirementMatch(requirement, ruleRequirement) {
 function customFieldText(customFields, ...keywords) {
     if (!customFields || typeof customFields !== 'object' || Array.isArray(customFields)) return '';
 
+    const toText = (value) => {
+        if (value === null || value === undefined) return '';
+        if (Array.isArray(value)) return value.filter(v => v !== null && v !== undefined && typeof v !== 'object').join(', ');
+        if (typeof value === 'object') return '';
+        return String(value).trim();
+    };
+
     const entries = Object.entries(customFields);
     for (const keyword of keywords) {
         const normalizedKeyword = normalizeComparable(keyword);
         const exact = entries.find(([key, value]) => (
-            normalizeComparable(key) === normalizedKeyword &&
-            value !== null &&
-            value !== undefined &&
-            typeof value !== 'object'
+            normalizeComparable(key) === normalizedKeyword && toText(value)
         ));
-        if (exact) return String(exact[1]).trim();
+        if (exact) return toText(exact[1]);
 
         const partial = entries.find(([key, value]) => (
-            normalizeComparable(key).includes(normalizedKeyword) &&
-            value !== null &&
-            value !== undefined &&
-            typeof value !== 'object'
+            normalizeComparable(key).includes(normalizedKeyword) && toText(value)
         ));
-        if (partial) return String(partial[1]).trim();
+        if (partial) return toText(partial[1]);
     }
 
     return '';
@@ -143,11 +144,14 @@ export function getRequirementsFromCustomFields(customFields, settings) {
     //    This handles any form field label (e.g. "What do you need?", "Type", etc.)
     if (customFields && typeof customFields === 'object' && !Array.isArray(customFields)) {
         for (const [key, value] of Object.entries(customFields)) {
-            if (!value || typeof value === 'object') continue;
-            const text = String(value).trim();
-            if (!text) continue;
+            if (!value) continue;
+            // Support both string and array values (e.g. dropdown/multiple_choice form fields)
+            const textValue = Array.isArray(value)
+                ? value.filter(v => v && typeof v !== 'object').join(', ')
+                : (typeof value === 'object' ? '' : String(value).trim());
+            if (!textValue) continue;
             // Check if this value (or a token within it) matches any configured rule
-            const tokens = requirementTokens(text, rules);
+            const tokens = requirementTokens(textValue, rules);
             const matchedTokens = tokens.filter(token =>
                 rules.some(rule => isCloseRequirementMatch(token, rule.requirement))
             );
