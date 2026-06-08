@@ -78,7 +78,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
         res.json({ success: true, count: tasks.length, data: tasks });
     } catch (error) {
-        console.error('Get tasks error:', error);
+        console.error('Get tasks error:', error);   
         res.status(500).json({ success: false, message: 'Failed to fetch tasks', error: error.message });
     }
 });
