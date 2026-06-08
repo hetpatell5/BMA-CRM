@@ -120,6 +120,7 @@ export const leadsAPI = {
     create: (data: any) => api.post('/leads', data),
     update: (id: string | number, data: any) => api.put(`/leads/${id}`, data),
     delete: (id: string | number) => api.delete(`/leads/${id}`),
+    bulkDelete: (ids: string[]) => api.post('/leads/bulk-delete', { ids }),
     addActivity: (id: string | number, data: any) => api.post(`/leads/${id}/activities`, data),
     convert: (id: string | number, data: any) => api.post(`/leads/${id}/convert`, data),
     getPipeline: () => api.get('/leads/pipeline'),

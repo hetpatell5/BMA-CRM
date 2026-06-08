@@ -358,6 +358,201 @@ router.put('/:id', async (req, res, next) => {
                 id: lead.id.toString(),
             },
         });
+            ...lead,
+            id: lead.id.toString(),
+            activities: lead.activities.map(a => ({
+                ...a,
+                id: a.id.toString(),
+                leadId: a.leadId.toString(),
+            })),
+            convertedStudents: lead.convertedStudents.map(s => ({
+                ...s,
+                id: s.id.toString(),
+            })),
+        };
+
+        res.json({
+            success: true,
+            data: serializedLead,
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Create lead
+router.post('/', async (req, res, next) => {
+    try {
+        const {
+            fullName,
+            email,
+            phone,
+            alternatePhone,
+            interestedCourse,
+            source,
+            sourceDetails,
+            priority,
+            assignedToId,
+            nextFollowUp,
+            followUpNotes,
+            customFields,
+        } = req.body;
+
+        if (!fullName || !phone) {
+            return res.status(400).json({
+                success: false,
+                message: 'Full name and phone are required',
+            });
+        }
+
+        const lead = await prisma.lead.create({
+            data: {
+                fullName,
+                email,
+                phone,
+                alternatePhone,
+                interestedCourse,
+                source: source || 'MANUAL',
+                sourceDetails,
+                priority: priority || 'MEDIUM',
+                assignedToId: assignedToId ? parseInt(assignedToId) : null,
+                nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : null,
+                followUpNotes,
+                createdById: req.user.id,
+                customFields,
+            },
+            include: {
+                assignedTo: {
+                    select: { id: true, fullName: true },
+                },
+            },
+        });
+
+        // Create activity
+        await prisma.leadActivity.create({
+            data: {
+                leadId: lead.id,
+                activityType: 'NOTE',
+                description: 'Lead created',
+                createdById: req.user.id,
+            },
+        });
+
+        // Notify admins of new lead
+        const io = req.app.get('io');
+        const adminIds = await getAdminIds();
+        const notifyIds = adminIds.filter(id => id !== req.user.id);
+        await notify(io, {
+            userIds: notifyIds,
+            type: 'NEW_LEAD',
+            title: 'New Lead Added',
+            message: `${lead.fullName} (${lead.phone}) was added as a new lead.`,
+            link: `/leads/${lead.id}`,
+        });
+
+        // If assigned to someone, notify them too
+        if (lead.assignedToId && lead.assignedToId !== req.user.id) {
+            await notify(io, {
+                userIds: [lead.assignedToId],
+                type: 'LEAD_ASSIGNED',
+                title: 'Lead Assigned to You',
+                message: `You have been assigned the lead: ${lead.fullName}.`,
+                link: `/leads/${lead.id}`,
+            });
+        }
+
+        res.status(201).json({
+            success: true,
+            message: 'Lead created successfully',
+            data: {
+                ...lead,
+                id: lead.id.toString(),
+            },
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Update lead
+router.put('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const updateData = { ...req.body };
+
+        // Get current lead for stage change tracking
+        const currentLead = await prisma.lead.findUnique({
+            where: { id: BigInt(id) },
+        });
+
+        if (!currentLead) {
+            return res.status(404).json({
+                success: false,
+                message: 'Lead not found',
+            });
+        }
+
+        // Convert dates
+        if (updateData.nextFollowUp) {
+            updateData.nextFollowUp = new Date(updateData.nextFollowUp);
+        }
+        if (updateData.assignedToId) {
+            updateData.assignedToId = parseInt(updateData.assignedToId);
+        }
+
+        // Track stage change
+        const stageChanged = updateData.stage && updateData.stage !== currentLead.stage;
+
+        // Handle conversion
+        if (updateData.stage === 'WON' && !currentLead.convertedAt) {
+            updateData.convertedAt = new Date();
+        }
+
+        // Remove fields that shouldn't be updated
+        delete updateData.id;
+        delete updateData.createdAt;
+        delete updateData.createdById;
+
+        const lead = await prisma.lead.update({
+            where: { id: BigInt(id) },
+            data: updateData,
+        });
+
+        // Create stage change activity
+        if (stageChanged) {
+            await prisma.leadActivity.create({
+                data: {
+                    leadId: lead.id,
+                    activityType: 'STAGE_CHANGE',
+                    description: `Stage changed from ${currentLead.stage} to ${updateData.stage}`,
+                    previousStage: currentLead.stage,
+                    newStage: updateData.stage,
+                    createdById: req.user.id,
+                },
+            });
+        }
+
+        // Notify when a lead is freshly assigned
+        const io = req.app.get('io');
+        const newAssignee = updateData.assignedToId;
+        if (newAssignee && newAssignee !== currentLead.assignedToId && newAssignee !== req.user.id) {
+            await notify(io, {
+                userIds: [newAssignee],
+                type: 'LEAD_ASSIGNED',
+                title: 'Lead Assigned to You',
+                message: `You have been assigned the lead: ${currentLead.fullName}.`,
+                link: `/leads/${id}`,
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Lead updated successfully',
+            data: {
+                ...lead,
+                id: lead.id.toString(),
+            },
+        });
     } catch (error) {
         next(error);
     }
@@ -375,6 +570,33 @@ router.delete('/:id', async (req, res, next) => {
         res.json({
             success: true,
             message: 'Lead deleted successfully',
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Bulk delete leads
+router.post('/bulk-delete', async (req, res, next) => {
+    try {
+        const { ids } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No lead IDs provided for deletion',
+            });
+        }
+
+        const bigIntIds = ids.map(id => BigInt(id));
+
+        await prisma.lead.deleteMany({
+            where: { id: { in: bigIntIds } },
+        });
+
+        res.json({
+            success: true,
+            message: `${ids.length} leads deleted successfully`,
         });
     } catch (error) {
         next(error);

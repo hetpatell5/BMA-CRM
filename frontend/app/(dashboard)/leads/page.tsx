@@ -49,6 +49,7 @@ export default function LeadsPage() {
     const [search,   setSearch]   = useState('')
     const [page,     setPage]     = useState(1)
     const [stageFilter, setStageFilter] = useState('')
+    const [selectedLeads, setSelectedLeads] = useState<string[]>([])
 
     const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -123,8 +124,30 @@ export default function LeadsPage() {
         onError: () => toast({ title: 'Error', description: 'Failed to update assignment', variant: 'destructive' }),
     })
 
+    const bulkDeleteMutation = useMutation({
+        mutationFn: (ids: string[]) => leadsAPI.bulkDelete(ids),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['leads'] })
+            setSelectedLeads([])
+            toast({ title: 'Selected leads deleted', variant: 'success' })
+        },
+        onError: () => toast({ title: 'Error', description: 'Failed to delete leads', variant: 'destructive' }),
+    })
+
     const leads      = listData?.leads      || []
     const pagination = listData?.pagination || { page: 1, totalPages: 1, total: 0 }
+
+    const toggleLeadSelection = (id: string) => {
+        setSelectedLeads(prev => prev.includes(id) ? prev.filter(lId => lId !== id) : [...prev, id])
+    }
+
+    const toggleAllLeads = () => {
+        if (selectedLeads.length === leads.length) {
+            setSelectedLeads([])
+        } else {
+            setSelectedLeads(leads.map((l: any) => l.id))
+        }
+    }
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -148,6 +171,19 @@ export default function LeadsPage() {
                     >
                         <RefreshCw className="w-4 h-4" />
                     </Button>
+                    {selectedLeads.length > 0 && hasFullAccess && (
+                        <Button
+                            variant="destructive" size="sm"
+                            onClick={() => {
+                                if (window.confirm(`Are you sure you want to delete ${selectedLeads.length} selected leads?`)) {
+                                    bulkDeleteMutation.mutate(selectedLeads)
+                                }
+                            }}
+                            disabled={bulkDeleteMutation.isPending}
+                        >
+                            Delete Selected ({selectedLeads.length})
+                        </Button>
+                    )}
                     {hasFullAccess && (
                         <Link href="/leads/new">
                             <Button className="gap-2 gradient-primary text-white" size="sm">
@@ -222,6 +258,16 @@ export default function LeadsPage() {
                         <table className="w-full min-w-[860px]">
                             <thead>
                                 <tr className="border-b border-white/10 bg-white/5">
+                                    {hasFullAccess && (
+                                        <th className="p-4 text-left w-12">
+                                            <input
+                                                type="checkbox"
+                                                className="w-4 h-4 rounded border-white/20 bg-transparent text-primary focus:ring-primary focus:ring-offset-background"
+                                                checked={leads.length > 0 && selectedLeads.length === leads.length}
+                                                onChange={toggleAllLeads}
+                                            />
+                                        </th>
+                                    )}
                                     <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lead</th>
                                     <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contact</th>
                                     <th className="p-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Course</th>
@@ -244,7 +290,7 @@ export default function LeadsPage() {
                                     ))
                                 ) : leads.length === 0 ? (
                                     <tr>
-                                        <td colSpan={hasFullAccess ? 9 : 8} className="p-12 text-center">
+                                        <td colSpan={hasFullAccess ? 10 : 8} className="p-12 text-center">
                                             <Target className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
                                             <p className="text-lg font-medium mb-2">No leads found</p>
                                             <p className="text-muted-foreground mb-4">
@@ -257,7 +303,18 @@ export default function LeadsPage() {
                                     </tr>
                                 ) : (
                                     leads.map((lead: any) => (
-                                        <tr key={lead.id} className="border-b border-white/5 hover:bg-white/[0.04] transition-colors">
+                                        <tr key={lead.id} className={`border-b border-white/5 transition-colors ${selectedLeads.includes(lead.id) ? 'bg-primary/10' : 'hover:bg-white/[0.04]'}`}>
+                                            {/* Checkbox */}
+                                            {hasFullAccess && (
+                                                <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 rounded border-white/20 bg-transparent text-primary focus:ring-primary focus:ring-offset-background"
+                                                        checked={selectedLeads.includes(lead.id)}
+                                                        onChange={() => toggleLeadSelection(lead.id)}
+                                                    />
+                                                </td>
+                                            )}
 
                                             {/* Lead Name + Email */}
                                             <td className="p-4">
