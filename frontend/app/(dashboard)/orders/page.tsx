@@ -865,7 +865,19 @@ export default function StudentsPage() {
                     </td>
                 )
             case 'orderId':
-                return <td key={col.id} className="p-2 text-[14px] font-mono font-semibold border-r border-border whitespace-nowrap">{r.orderId || <span className="text-muted-foreground">—</span>}</td>
+                return (
+                    <td key={col.id} className="p-2 border-r border-border" style={{ maxWidth: 140 }}>
+                        {r.orderId
+                            ? <span
+                                title={r.orderId}
+                                className="block text-[13px] font-mono font-semibold truncate cursor-default"
+                                style={{ maxWidth: 130 }}
+                              >{r.orderId}</span>
+                            : <span className="text-muted-foreground">—</span>
+                        }
+                    </td>
+                )
+
             case 'phone':
                 return <td key={col.id} className="p-2 text-[14px] font-mono border-r border-border whitespace-nowrap">{r.phone || <span className="text-muted-foreground">—</span>}</td>
             case 'programme':
