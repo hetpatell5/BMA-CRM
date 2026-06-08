@@ -67,8 +67,18 @@ router.post('/public/:id/submit', async (req, res) => {
         const tcId = telecallerId ? parseInt(telecallerId) : null;
 
         // 1. Create Student record
-        const orderIdResult = await ensureOrderIdForCustomFields(prisma, responses || {}, null, null, readSettings());
-        
+        let orderIdResult = { customFields: responses || {}, orderId: null };
+        try {
+            const settings = readSettings();
+            console.log('[form-submit] rules:', JSON.stringify(settings.orderIdRules));
+            console.log('[form-submit] responses keys:', Object.keys(responses || {}));
+            console.log('[form-submit] responses:', JSON.stringify(responses));
+            orderIdResult = await ensureOrderIdForCustomFields(prisma, responses || {}, null, null, settings);
+            console.log('[form-submit] orderId generated:', orderIdResult.orderId);
+        } catch (orderIdErr) {
+            console.error('[form-submit] Order ID generation failed:', orderIdErr.message);
+        }
+
         const student = await prisma.student.create({
             data: {
                 fullName,
