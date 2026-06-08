@@ -56,6 +56,12 @@ router.post('/public/:id/submit', async (req, res) => {
         const programme = findVal(['programme', 'program', 'course', 'degree']);
         const city      = findVal(['city']);
         const state     = findVal(['state']);
+        
+        // Ensure "Requirement of" is mapped so Order ID generation works
+        const requirement = findVal(['requirement', 'service', 'product', 'type', 'category']);
+        if (requirement && !responses['Requirement of']) {
+            responses['Requirement of'] = requirement;
+        }
 
         // Validate telecallerId if provided
         const tcId = telecallerId ? parseInt(telecallerId) : null;
