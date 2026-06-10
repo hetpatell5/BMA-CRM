@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     try {
         const { search } = req.query;
 
-        const where = {};
+        const where = { createdById: req.user.id };
 
         // Optional search filter — search by name, number, or description
         if (search && search.trim()) {

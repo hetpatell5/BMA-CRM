@@ -250,6 +250,7 @@ export default function FollowUpsPage() {
                                 <th className="px-5 py-4">Number</th>
                                 <th className="px-5 py-4">Description</th>
                                 <th className="px-5 py-4">Requirement</th>
+                                <th className="px-5 py-4">Follow-up By</th>
                                 <th className="px-5 py-4">Deadline</th>
                                 <th className="px-5 py-4">Actions</th>
                             </tr>
@@ -257,14 +258,14 @@ export default function FollowUpsPage() {
                         <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                             {isLoading && followUps.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="p-16 text-center">
+                                    <td colSpan={8} className="p-16 text-center">
                                         <Loader2 className="w-8 h-8 mx-auto mb-4 text-primary animate-spin" />
                                         <p className="text-sm text-muted-foreground">Loading follow-ups...</p>
                                     </td>
                                 </tr>
                             ) : followUps.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="p-16 text-center">
+                                    <td colSpan={8} className="p-16 text-center">
                                         <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center mx-auto mb-4">
                                             <ClipboardList className="w-8 h-8 text-muted-foreground/40" />
                                         </div>
@@ -303,6 +304,9 @@ export default function FollowUpsPage() {
                                             </td>
                                             <td className="px-5 py-4 text-[13px] max-w-[200px] truncate text-slate-600 dark:text-slate-400">{f.description}</td>
                                             <td className="px-5 py-4 text-[13px] max-w-[200px] truncate text-slate-600 dark:text-slate-400">{f.requirement}</td>
+                                            <td className="px-5 py-4 text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                                                {f.createdBy?.fullName || '-'}
+                                            </td>
                                             <td className="px-5 py-4">
                                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border ${isUrgent ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10'}`}>
                                                     {format(new Date(f.followupDate), 'MMM dd, yyyy')}
