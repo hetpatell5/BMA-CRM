@@ -346,14 +346,7 @@ export default function ImportPage() {
             {/* Step 1: Upload */}
             {step === 'upload' && (
                 <div className="glass rounded-xl p-6 space-y-6">
-                    <div className="flex items-center gap-4 justify-center">
-                        <Button variant={importType === 'STUDENTS' ? 'default' : 'outline'} onClick={() => setImportType('STUDENTS')} className="gap-2">
-                            <FileSpreadsheet className="w-4 h-4" /> Import Orders
-                        </Button>
-                        <Button variant={importType === 'LEADS' ? 'default' : 'outline'} onClick={() => setImportType('LEADS')} className="gap-2">
-                            <FileSpreadsheet className="w-4 h-4" /> Import Leads
-                        </Button>
-                    </div>
+
 
                     <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${isDragActive ? 'border-primary bg-primary/10' : 'border-white/20 hover:border-primary/50 hover:bg-white/5'}`}>
                         <input {...getInputProps()} />

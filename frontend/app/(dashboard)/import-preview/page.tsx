@@ -76,6 +76,12 @@ export default function ImportPreviewPage() {
         importBatchId:  searchParams.get('importBatchId') || '',
         subject:        searchParams.get('subject') || '',
     })
+    const [filterSearch, setFilterSearch] = useState('')
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+        imports: true, status: true, programme: true, regional: true, subject: true
+    })
+
+    const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }))
 
     // ── Queries ────────────────────────────────────────────────────────────
     const { data, isLoading, refetch } = useQuery({
@@ -303,155 +309,7 @@ export default function ImportPreviewPage() {
                 </div>
             </div>
 
-            {/* ── Filter Panel ── */}
-            {showFilters && (
-                <div className="border border-border rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
-                    {/* Import Batch */}
-                    <div>
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Import Batch</label>
-                        <DropdownMenu.Root>
-                            <DropdownMenu.Trigger className="w-full outline-none">
-                                <div className="flex items-center justify-between gap-2 h-9 px-3 rounded-lg border border-border bg-background text-sm hover:bg-muted/50 cursor-pointer">
-                                    <span className="truncate text-left">
-                                        {filters.importBatchId
-                                            ? (filterOptions?.importBatches?.find((b: any) => b.id === filters.importBatchId)?.fileName || 'Selected batch')
-                                            : 'All batches'}
-                                    </span>
-                                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                </div>
-                            </DropdownMenu.Trigger>
-                            <DropdownMenu.Portal>
-                                <DropdownMenu.Content align="start" sideOffset={6} className="z-[100] w-64 overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in max-h-64 overflow-y-auto">
-                                    <DropdownMenu.Item onSelect={() => setFilters(f => ({ ...f, importBatchId: '' }))} className="outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px] text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground">
-                                        All batches
-                                    </DropdownMenu.Item>
-                                    {filterOptions?.importBatches?.map((b: any) => (
-                                        <DropdownMenu.Item
-                                            key={b.id}
-                                            onSelect={() => setFilters(f => ({ ...f, importBatchId: b.id }))}
-                                            className={cn(
-                                                'outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px]',
-                                                filters.importBatchId === b.id
-                                                    ? 'bg-muted text-foreground font-medium'
-                                                    : 'text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground'
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <FolderOpen className="w-3.5 h-3.5 shrink-0" />
-                                                <span className="truncate">{b.fileName}</span>
-                                            </div>
-                                        </DropdownMenu.Item>
-                                    ))}
-                                </DropdownMenu.Content>
-                            </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
-                    </div>
 
-                    {/* Status */}
-                    <div>
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Status</label>
-                        <DropdownMenu.Root>
-                            <DropdownMenu.Trigger className="w-full outline-none">
-                                <div className="flex items-center justify-between gap-2 h-9 px-3 rounded-lg border border-border bg-background text-sm hover:bg-muted/50 cursor-pointer">
-                                    <span className="truncate text-left">
-                                        {filters.status ? filters.status.replace(/_/g, ' ') : 'All statuses'}
-                                    </span>
-                                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                </div>
-                            </DropdownMenu.Trigger>
-                            <DropdownMenu.Portal>
-                                <DropdownMenu.Content align="start" sideOffset={6} className="z-[100] w-52 overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in">
-                                    {['', 'NEW_LEAD', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED', 'REPORT_IN_PROGRESS', 'SHIPPED', 'ALL_DONE'].map(st => (
-                                        <DropdownMenu.Item
-                                            key={st || 'all'}
-                                            onSelect={() => setFilters(f => ({ ...f, status: st }))}
-                                            className={cn(
-                                                'outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px]',
-                                                filters.status === st
-                                                    ? 'bg-muted text-foreground font-medium'
-                                                    : 'text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground'
-                                            )}
-                                        >
-                                            {st ? st.replace(/_/g, ' ') : 'All statuses'}
-                                        </DropdownMenu.Item>
-                                    ))}
-                                </DropdownMenu.Content>
-                            </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
-                    </div>
-
-                    {/* Programme */}
-                    <div>
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Programme</label>
-                        <DropdownMenu.Root>
-                            <DropdownMenu.Trigger className="w-full outline-none">
-                                <div className="flex items-center justify-between gap-2 h-9 px-3 rounded-lg border border-border bg-background text-sm hover:bg-muted/50 cursor-pointer">
-                                    <span className="truncate text-left">{filters.programme || 'All programmes'}</span>
-                                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                </div>
-                            </DropdownMenu.Trigger>
-                            <DropdownMenu.Portal>
-                                <DropdownMenu.Content align="start" sideOffset={6} className="z-[100] w-56 overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in max-h-64 overflow-y-auto">
-                                    <DropdownMenu.Item onSelect={() => setFilters(f => ({ ...f, programme: '' }))} className="outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px] text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground">
-                                        All programmes
-                                    </DropdownMenu.Item>
-                                    {filterOptions?.programmes?.map((p: string) => (
-                                        <DropdownMenu.Item
-                                            key={p}
-                                            onSelect={() => setFilters(f => ({ ...f, programme: p }))}
-                                            className={cn(
-                                                'outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px] flex items-center gap-2',
-                                                filters.programme === p
-                                                    ? 'bg-muted text-foreground font-medium'
-                                                    : 'text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground'
-                                            )}
-                                        >
-                                            <Tag className="w-3 h-3 shrink-0" />{p}
-                                        </DropdownMenu.Item>
-                                    ))}
-                                </DropdownMenu.Content>
-                            </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
-                    </div>
-                </div>
-            )}
-
-            {/* ── Active Filter Chips ── */}
-            {activeFilterCount > 0 && (
-                <div className="flex flex-wrap gap-2 -mt-2">
-                    {filters.importBatchId && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/25">
-                            <FolderOpen className="w-3 h-3" />
-                            {filterOptions?.importBatches?.find((b: any) => b.id === filters.importBatchId)?.fileName || 'Batch'}
-                            <button onClick={() => setFilters(f => ({ ...f, importBatchId: '' }))} className="ml-0.5 hover:text-blue-900 dark:hover:text-white"><X className="w-3 h-3" /></button>
-                        </span>
-                    )}
-                    {filters.status && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-500/25">
-                            {filters.status.replace(/_/g, ' ')}
-                            <button onClick={() => setFilters(f => ({ ...f, status: '' }))} className="ml-0.5 hover:text-slate-900 dark:hover:text-white"><X className="w-3 h-3" /></button>
-                        </span>
-                    )}
-                    {filters.programme && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/25">
-                            <Tag className="w-3 h-3" />{filters.programme}
-                            <button onClick={() => setFilters(f => ({ ...f, programme: '' }))} className="ml-0.5 hover:text-emerald-900 dark:hover:text-white"><X className="w-3 h-3" /></button>
-                        </span>
-                    )}
-                    {filters.regionalCenter && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/25">
-                            {filters.regionalCenter}
-                            <button onClick={() => setFilters(f => ({ ...f, regionalCenter: '' }))} className="ml-0.5 hover:text-amber-900 dark:hover:text-white"><X className="w-3 h-3" /></button>
-                        </span>
-                    )}
-                    <button
-                        onClick={() => setFilters({ status: '', programme: '', regionalCenter: '', importBatchId: '', subject: '' })}
-                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-                    >
-                        Clear all
-                    </button>
-                </div>
-            )}
 
             {/* ── Bulk action bar when rows selected ── */}
             {selectedIds.length > 0 && (
@@ -476,8 +334,13 @@ export default function ImportPreviewPage() {
                 </div>
             )}
 
-            {/* ── Data Table ── */}
-            <div className="bg-background rounded-xl overflow-hidden border border-border shadow-sm">
+            {/* ── Layout Wrapper for Table + Filter Panel ── */}
+            <div className={cn(
+                "grid gap-6 transition-all duration-300 items-start",
+                showFilters ? "grid-cols-1 xl:grid-cols-[1fr_280px]" : "grid-cols-1"
+            )}>
+                {/* ── Data Table ── */}
+                <div className="bg-background rounded-xl overflow-hidden min-w-0 border border-border shadow-sm flex flex-col">
                 <div className="overflow-auto scrollbar-thin max-h-[calc(100vh-320px)]">
                     <table className="w-full border-collapse text-sm">
                         <thead className="sticky top-0 z-10 shadow-sm">
@@ -491,12 +354,7 @@ export default function ImportPreviewPage() {
                                         className="w-4 h-4 rounded border-slate-300 dark:border-white/20"
                                     />
                                 </th>
-                                {/* Standard header columns */}
-                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Full Name</th>
-                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Phone</th>
-                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Email</th>
-                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Programme</th>
-                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Status</th>
+
                                 {/* Dynamic custom field columns */}
                                 {customFieldCols.map(key => (
                                     <th key={key} className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">
@@ -514,11 +372,6 @@ export default function ImportPreviewPage() {
                                 Array(8).fill(0).map((_, i) => (
                                     <tr key={i} className="border-b border-border">
                                         <td className="p-3"><Skeleton className="h-4 w-4" /></td>
-                                        <td className="p-3"><Skeleton className="h-4 w-32" /></td>
-                                        <td className="p-3"><Skeleton className="h-4 w-24" /></td>
-                                        <td className="p-3"><Skeleton className="h-4 w-36" /></td>
-                                        <td className="p-3"><Skeleton className="h-4 w-24" /></td>
-                                        <td className="p-3"><Skeleton className="h-4 w-20" /></td>
                                         {customFieldCols.map(k => (
                                             <td key={k} className="p-3"><Skeleton className="h-4 w-24" /></td>
                                         ))}
@@ -527,7 +380,7 @@ export default function ImportPreviewPage() {
                                 ))
                             ) : students.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6 + customFieldCols.length + 1} className="p-16 text-center">
+                                    <td colSpan={1 + customFieldCols.length + 1} className="p-16 text-center">
                                         <Users className="w-14 h-14 mx-auto mb-4 text-muted-foreground/40" />
                                         <p className="text-lg font-medium mb-1">No imported records found</p>
                                         <p className="text-muted-foreground text-sm mb-4">
@@ -569,34 +422,6 @@ export default function ImportPreviewPage() {
                                                 />
                                             </td>
 
-                                            {/* Full Name */}
-                                            <td className="p-2 border-r border-border whitespace-nowrap">
-                                                <span className="text-[14px] font-bold text-foreground">
-                                                    {student.fullName || <span className="text-muted-foreground">—</span>}
-                                                </span>
-                                            </td>
-
-                                            {/* Phone */}
-                                            <td className="p-2 border-r border-border whitespace-nowrap font-mono text-[13px]">
-                                                {student.phone || <span className="text-muted-foreground">—</span>}
-                                            </td>
-
-                                            {/* Email */}
-                                            <td className="p-2 border-r border-border whitespace-nowrap text-[13px]">
-                                                {student.email || <span className="text-muted-foreground">—</span>}
-                                            </td>
-
-                                            {/* Programme */}
-                                            <td className="p-2 border-r border-border whitespace-nowrap text-[13px]">
-                                                {student.programme || <span className="text-muted-foreground">—</span>}
-                                            </td>
-
-                                            {/* Status */}
-                                            <td className="p-2 border-r border-border whitespace-nowrap">
-                                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${getStatusColor(student.status)}`}>
-                                                    {student.status?.replace(/_/g, ' ') || '—'}
-                                                </span>
-                                            </td>
 
                                             {/* Dynamic custom field cells */}
                                             {customFieldCols.map(key => (
@@ -673,6 +498,205 @@ export default function ImportPreviewPage() {
                                 Next<ChevronRight className="w-4 h-4" />
                             </Button>
                         </div>
+                    </div>
+                )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Filter Sidebar ── */}
+                {showFilters && (
+                    <div className="sticky top-6 self-start rounded-xl border border-border bg-background shadow-lg overflow-hidden h-[calc(100vh-200px)] flex flex-col animate-fade-in">
+                        {/* Header */}
+                        <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+                            <h3 className="font-semibold text-sm flex items-center gap-2">
+                                <SlidersHorizontal className="w-4 h-4 text-primary" />
+                                Filter Records by
+                            </h3>
+                            <button onClick={() => setShowFilters(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Search inside filter panel */}
+                        <div className="px-4 py-3 border-b border-border shrink-0">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                                <input
+                                    placeholder="Search filters..."
+                                    value={filterSearch}
+                                    onChange={e => setFilterSearch(e.target.value)}
+                                    className="w-full h-8 pl-8 pr-3 rounded-lg text-sm bg-slate-100 dark:bg-white/5 border border-transparent focus:border-primary/40 focus:outline-none transition-colors"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
+                            {/* ── Data Sources (Import Batches) ── */}
+                            {filterOptions?.importBatches?.length > 0 && (
+                                <div>
+                                    <button
+                                        className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                                        onClick={() => toggleSection('imports')}
+                                    >
+                                        <span className="flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5" />Imported Files</span>
+                                        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", openSections.imports && "rotate-180")} />
+                                    </button>
+                                    {openSections.imports && (
+                                        <div className="space-y-0.5 mb-3">
+                                            {filterOptions.importBatches
+                                                .filter((b: any) => !filterSearch || b.fileName.toLowerCase().includes(filterSearch.toLowerCase()))
+                                                .map((batch: any) => (
+                                                    <label
+                                                        key={batch.id}
+                                                        className={cn(
+                                                            "flex items-start gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors group",
+                                                            filters.importBatchId === batch.id
+                                                                ? "bg-blue-50 dark:bg-blue-500/10"
+                                                                : "hover:bg-slate-100 dark:hover:bg-white/5"
+                                                        )}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={filters.importBatchId === batch.id}
+                                                            onChange={() => setFilters(f => ({ ...f, importBatchId: f.importBatchId === batch.id ? '' : batch.id }))}
+                                                            className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 accent-blue-500 cursor-pointer shrink-0"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <p className="text-[13px] font-medium leading-tight truncate text-foreground">{batch.fileName}</p>
+                                                            <p className="text-[11px] text-muted-foreground mt-0.5">{batch.importedCount} records</p>
+                                                        </div>
+                                                    </label>
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── Status ── */}
+                            <div>
+                                <button
+                                    className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                                    onClick={() => toggleSection('status')}
+                                >
+                                    <span>Status</span>
+                                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", openSections.status && "rotate-180")} />
+                                </button>
+                                {openSections.status && (
+                                    <div className="space-y-0.5 mb-3">
+                                        {['NEW_LEAD', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED', 'REPORT_IN_PROGRESS', 'SHIPPED', 'ALL_DONE']
+                                            .filter(opt => !filterSearch || opt.replace(/_/g, ' ').toLowerCase().includes(filterSearch.toLowerCase()))
+                                            .map(opt => (
+                                                <label
+                                                    key={opt}
+                                                    className={cn(
+                                                        "flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors",
+                                                        filters.status === opt
+                                                            ? "bg-violet-50 dark:bg-violet-500/10"
+                                                            : "hover:bg-slate-100 dark:hover:bg-white/5"
+                                                    )}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={filters.status === opt}
+                                                        onChange={() => setFilters(f => ({ ...f, status: f.status === opt ? '' : opt }))}
+                                                        className="w-3.5 h-3.5 rounded border-slate-300 accent-violet-500 cursor-pointer shrink-0"
+                                                    />
+                                                    <span className="text-[13px] font-medium text-foreground">{opt.replace(/_/g, ' ')}</span>
+                                                </label>
+                                            ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── Programme ── */}
+                            {filterOptions?.programmes?.length > 0 && (
+                                <div>
+                                    <button
+                                        className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                                        onClick={() => toggleSection('programme')}
+                                    >
+                                        <span>Programme</span>
+                                        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", openSections.programme && "rotate-180")} />
+                                    </button>
+                                    {openSections.programme && (
+                                        <div className="space-y-0.5 mb-3 max-h-48 overflow-y-auto">
+                                            {filterOptions.programmes
+                                                .filter((p: string) => !filterSearch || p.toLowerCase().includes(filterSearch.toLowerCase()))
+                                                .map((prog: string) => (
+                                                    <label
+                                                        key={prog}
+                                                        className={cn(
+                                                            "flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors",
+                                                            filters.programme === prog
+                                                                ? "bg-emerald-50 dark:bg-emerald-500/10"
+                                                                : "hover:bg-slate-100 dark:hover:bg-white/5"
+                                                        )}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={filters.programme === prog}
+                                                            onChange={() => setFilters(f => ({ ...f, programme: f.programme === prog ? '' : prog }))}
+                                                            className="w-3.5 h-3.5 rounded border-slate-300 accent-emerald-500 cursor-pointer shrink-0"
+                                                        />
+                                                        <span className="text-[13px] font-medium text-foreground truncate">{prog}</span>
+                                                    </label>
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── Regional Center ── */}
+                            {filterOptions?.regionalCenters?.length > 0 && (
+                                <div>
+                                    <button
+                                        className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                                        onClick={() => toggleSection('regional')}
+                                    >
+                                        <span>Regional Center</span>
+                                        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", openSections.regional && "rotate-180")} />
+                                    </button>
+                                    {openSections.regional && (
+                                        <div className="space-y-0.5 mb-3 max-h-48 overflow-y-auto">
+                                            {filterOptions.regionalCenters
+                                                .filter((c: string) => !filterSearch || c.toLowerCase().includes(filterSearch.toLowerCase()))
+                                                .map((center: string) => (
+                                                    <label
+                                                        key={center}
+                                                        className={cn(
+                                                            "flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors",
+                                                            filters.regionalCenter === center
+                                                                ? "bg-amber-50 dark:bg-amber-500/10"
+                                                                : "hover:bg-slate-100 dark:hover:bg-white/5"
+                                                        )}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={filters.regionalCenter === center}
+                                                            onChange={() => setFilters(f => ({ ...f, regionalCenter: f.regionalCenter === center ? '' : center }))}
+                                                            className="w-3.5 h-3.5 rounded border-slate-300 accent-amber-500 cursor-pointer shrink-0"
+                                                        />
+                                                        <span className="text-[13px] font-medium text-foreground truncate">{center}</span>
+                                                    </label>
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        {activeFilterCount > 0 && (
+                            <div className="p-3 border-t border-border shrink-0">
+                                <button
+                                    onClick={() => setFilters({ status: '', programme: '', regionalCenter: '', importBatchId: '', subject: '' })}
+                                    className="w-full h-8 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors border border-red-200 dark:border-red-500/20"
+                                >
+                                    Clear all {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

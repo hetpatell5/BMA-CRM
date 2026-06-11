@@ -258,6 +258,14 @@ router.post('/process/:importId', async (req, res, next) => {
                     const subjectsArray = []; // Collect all subject values
                     const importedCustomFields = {}; // Collect customField.* columns
 
+                    // Store all original columns as customFields to retain exact sheet layout
+                    headers.forEach((header, index) => {
+                        const value = row[index];
+                        if (value !== undefined && value !== null && value !== '' && header) {
+                            importedCustomFields[String(header).trim()] = value.toString().trim();
+                        }
+                    });
+
                     Object.entries(columnMapping).forEach(([colIndex, fieldName]) => {
                         const value = row[parseInt(colIndex)];
                         if (value !== undefined && value !== null && value !== '') {
