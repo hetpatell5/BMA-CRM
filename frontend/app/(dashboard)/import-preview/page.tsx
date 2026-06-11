@@ -1,0 +1,681 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
+import {
+    Search, ChevronLeft, ChevronRight, Users, RefreshCw,
+    ChevronDown, X, SlidersHorizontal, FolderOpen, Tag,
+    ArrowUpCircle, Download,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { studentsAPI } from '@/lib/api'
+import { formatNumber, getStatusColor, debounce } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
+import { useAuthStore } from '@/stores/authStore'
+import Link from 'next/link'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { cn } from '@/lib/utils'
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const INTERNAL_KEYS = new Set([
+    'requirementassignments', 'telecallerowners', 'orderidprefix',
+    'orderidrequirement', 'orderidgenerated', 'orderidsignature',
+])
+
+function normalizeKey(key: string) {
+    return key.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function isInternalKey(key: string) {
+    return normalizeKey(key).startsWith('_') || INTERNAL_KEYS.has(normalizeKey(key))
+}
+
+/** Collect all visible custom-field column keys from a list of student records. */
+function collectCustomFieldColumns(students: any[]): string[] {
+    const keySet = new Set<string>()
+    students.forEach(s => {
+        if (s.customFields && typeof s.customFields === 'object') {
+            Object.keys(s.customFields).forEach(k => {
+                if (k && k.trim() && !isInternalKey(k)) keySet.add(k.trim())
+            })
+        }
+    })
+    return Array.from(keySet).sort((a, b) => a.localeCompare(b))
+}
+
+function cellValue(val: any): string {
+    if (val === null || val === undefined) return ''
+    if (Array.isArray(val)) return val.map(cellValue).filter(Boolean).join(', ')
+    if (typeof val === 'object') return ''
+    return String(val).trim()
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export default function ImportPreviewPage() {
+    const searchParams = useSearchParams()
+    const queryClient = useQueryClient()
+    const { toast } = useToast()
+    const { user: currentUser } = useAuthStore()
+
+    const isAdminManager = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+
+    // ── State ──────────────────────────────────────────────────────────────
+    const [search, setSearch] = useState(searchParams.get('search') || '')
+    const [page, setPage] = useState(1)
+    const [pageInput, setPageInput] = useState('1')
+    const [selectedIds, setSelectedIds] = useState<string[]>([])
+    const [showFilters, setShowFilters] = useState(false)
+    const [filters, setFilters] = useState({
+        status:         searchParams.get('status') || '',
+        programme:      searchParams.get('programme') || '',
+        regionalCenter: searchParams.get('regionalCenter') || '',
+        importBatchId:  searchParams.get('importBatchId') || '',
+        subject:        searchParams.get('subject') || '',
+    })
+
+    // ── Queries ────────────────────────────────────────────────────────────
+    const { data, isLoading, refetch } = useQuery({
+        queryKey: ['import-preview', page, search, filters],
+        queryFn: async () => {
+            const params: Record<string, string> = {
+                page: String(page), limit: '50', search, source: 'excel_import',
+            }
+            Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v })
+            const res = await studentsAPI.getAll(params)
+            return res.data.data
+        },
+    })
+
+    const { data: filterOptions } = useQuery({
+        queryKey: ['student-filters'],
+        queryFn: async () => (await studentsAPI.getFilters()).data.data,
+    })
+
+    // ── Promote mutations ──────────────────────────────────────────────────
+    const promoteRowMutation = useMutation({
+        mutationFn: (id: string | number) => studentsAPI.promoteImportedRow(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['import-preview'] })
+            queryClient.invalidateQueries({ queryKey: ['students'] })
+            setSelectedIds(prev => prev.filter(sid => sid !== String(promoteRowMutation.variables)))
+            toast({ title: 'Promoted!', description: 'Record moved to active Orders.', variant: 'success' })
+        },
+        onError: (err: any) => toast({
+            title: 'Error', description: err?.response?.data?.message || 'Failed to promote record.', variant: 'destructive',
+        }),
+    })
+
+    const promoteSelectionMutation = useMutation({
+        mutationFn: async (ids: string[]) => {
+            for (const id of ids) {
+                await studentsAPI.promoteImportedRow(id)
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['import-preview'] })
+            queryClient.invalidateQueries({ queryKey: ['students'] })
+            setSelectedIds([])
+            toast({ title: 'Promoted!', description: 'Selected records moved to active Orders.', variant: 'success' })
+        },
+        onError: (err: any) => toast({
+            title: 'Error', description: err?.response?.data?.message || 'Failed to promote records.', variant: 'destructive',
+        }),
+    })
+
+    const promoteBatchMutation = useMutation({
+        mutationFn: (batchId: string) => studentsAPI.promoteImportBatch(batchId),
+        onSuccess: (res: any) => {
+            queryClient.invalidateQueries({ queryKey: ['import-preview'] })
+            queryClient.invalidateQueries({ queryKey: ['students'] })
+            toast({ title: 'Batch Promoted!', description: res?.data?.message || 'All records moved to active Orders.', variant: 'success' })
+        },
+        onError: (err: any) => toast({
+            title: 'Error', description: err?.response?.data?.message || 'Failed to promote batch.', variant: 'destructive',
+        }),
+    })
+
+    // ── Derived data ───────────────────────────────────────────────────────
+    const students: any[] = data?.students || []
+    const pagination = data?.pagination || { page: 1, totalPages: 1, total: 0 }
+    const activeFilterCount = Object.values(filters).filter(Boolean).length
+
+    // Dynamic columns: standard fixed columns + all custom field keys from data
+    const customFieldCols = collectCustomFieldColumns(students)
+
+    // Reset page on search change
+    useEffect(() => {
+        const d = debounce(() => setPage(1), 500)
+        d()
+    }, [search])
+
+    // ── Selection ──────────────────────────────────────────────────────────
+    const handleSelectAll = () => {
+        setSelectedIds(selectedIds.length === students.length ? [] : students.map((s: any) => String(s.id)))
+    }
+    const handleSelect = (id: string) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+    }
+
+    // ── Export ─────────────────────────────────────────────────────────────
+    const [isExporting, setIsExporting] = useState(false)
+    const handleExport = async () => {
+        setIsExporting(true)
+        try {
+            const response = await studentsAPI.exportExcel({ search, source: 'excel_import', ...filters })
+            const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `import_preview_${new Date().toISOString().split('T')[0]}.xlsx`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            window.URL.revokeObjectURL(url)
+            toast({ title: 'Export Successful', description: 'Your Excel file has been downloaded.' })
+        } catch {
+            toast({ title: 'Export Failed', variant: 'destructive' })
+        } finally {
+            setIsExporting(false)
+        }
+    }
+
+    // ── Access Gate ────────────────────────────────────────────────────────
+    if (currentUser && !isAdminManager) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-center">
+                <Users className="w-16 h-16 text-muted-foreground/40" />
+                <h2 className="text-xl font-semibold">Access Restricted</h2>
+                <p className="text-muted-foreground max-w-sm">
+                    Import Preview is only available to Admins and Managers.
+                </p>
+                <Link href="/orders"><Button variant="outline">Go to Orders</Button></Link>
+            </div>
+        )
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────────
+    return (
+        <div className="space-y-6 animate-fade-in">
+            {/* ── Page Header ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold">Import Preview</h1>
+                    <p className="text-muted-foreground text-sm mt-0.5">
+                        Review imported records. Promote individual rows or entire batches to active Orders.
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* Refresh */}
+                    <Button variant="outline" size="sm" onClick={() => refetch()}>
+                        <RefreshCw className="w-4 h-4" />
+                    </Button>
+
+                    {/* Export */}
+                    <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting} className="gap-2">
+                        {isExporting
+                            ? <><RefreshCw className="w-4 h-4 animate-spin" /><span className="hidden sm:inline">Exporting…</span></>
+                            : <><Download className="w-4 h-4" /><span className="hidden sm:inline">Export</span></>}
+                    </Button>
+
+                    {/* Promote Selection */}
+                    {selectedIds.length > 0 && (
+                        <Button
+                            size="sm"
+                            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                            onClick={() => {
+                                if (window.confirm(`Promote ${selectedIds.length} selected record(s) to Orders?`)) {
+                                    promoteSelectionMutation.mutate(selectedIds)
+                                }
+                            }}
+                            disabled={promoteSelectionMutation.isPending}
+                        >
+                            {promoteSelectionMutation.isPending
+                                ? <RefreshCw className="w-4 h-4 animate-spin" />
+                                : <ArrowUpCircle className="w-4 h-4" />}
+                            Promote Selection ({selectedIds.length})
+                        </Button>
+                    )}
+
+                    {/* Promote Entire Batch */}
+                    {filters.importBatchId && (
+                        <Button
+                            size="sm"
+                            className="gap-2 gradient-primary text-white"
+                            onClick={() => {
+                                if (window.confirm('Promote ALL un-promoted records in this batch to Orders?')) {
+                                    promoteBatchMutation.mutate(filters.importBatchId)
+                                }
+                            }}
+                            disabled={promoteBatchMutation.isPending}
+                        >
+                            {promoteBatchMutation.isPending
+                                ? <RefreshCw className="w-4 h-4 animate-spin" />
+                                : <ArrowUpCircle className="w-4 h-4" />}
+                            <span className="hidden sm:inline">Promote Entire Batch</span>
+                        </Button>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Search & Filter Bar ── */}
+            <div className="border border-border rounded-xl p-3 flex flex-col sm:flex-row gap-3">
+                <Button
+                    variant={showFilters ? 'secondary' : 'outline'}
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="gap-2 h-9 relative shrink-0"
+                    size="sm"
+                >
+                    <SlidersHorizontal className="w-4 h-4" />
+                    Filters
+                    {activeFilterCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-[10px] text-white font-bold flex items-center justify-center">
+                            {activeFilterCount}
+                        </span>
+                    )}
+                </Button>
+
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                        type="text"
+                        placeholder="Search by name, email, phone…"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="w-full h-9 pl-9 pr-4 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+                    />
+                    {search && (
+                        <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Record count */}
+                <div className="flex items-center shrink-0">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        {isLoading ? '…' : `${formatNumber(pagination.total)} record${pagination.total !== 1 ? 's' : ''}`}
+                    </span>
+                </div>
+            </div>
+
+            {/* ── Filter Panel ── */}
+            {showFilters && (
+                <div className="border border-border rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
+                    {/* Import Batch */}
+                    <div>
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Import Batch</label>
+                        <DropdownMenu.Root>
+                            <DropdownMenu.Trigger className="w-full outline-none">
+                                <div className="flex items-center justify-between gap-2 h-9 px-3 rounded-lg border border-border bg-background text-sm hover:bg-muted/50 cursor-pointer">
+                                    <span className="truncate text-left">
+                                        {filters.importBatchId
+                                            ? (filterOptions?.importBatches?.find((b: any) => b.id === filters.importBatchId)?.fileName || 'Selected batch')
+                                            : 'All batches'}
+                                    </span>
+                                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                </div>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Portal>
+                                <DropdownMenu.Content align="start" sideOffset={6} className="z-[100] w-64 overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in max-h-64 overflow-y-auto">
+                                    <DropdownMenu.Item onSelect={() => setFilters(f => ({ ...f, importBatchId: '' }))} className="outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px] text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground">
+                                        All batches
+                                    </DropdownMenu.Item>
+                                    {filterOptions?.importBatches?.map((b: any) => (
+                                        <DropdownMenu.Item
+                                            key={b.id}
+                                            onSelect={() => setFilters(f => ({ ...f, importBatchId: b.id }))}
+                                            className={cn(
+                                                'outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px]',
+                                                filters.importBatchId === b.id
+                                                    ? 'bg-muted text-foreground font-medium'
+                                                    : 'text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground'
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <FolderOpen className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="truncate">{b.fileName}</span>
+                                            </div>
+                                        </DropdownMenu.Item>
+                                    ))}
+                                </DropdownMenu.Content>
+                            </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                    </div>
+
+                    {/* Status */}
+                    <div>
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Status</label>
+                        <DropdownMenu.Root>
+                            <DropdownMenu.Trigger className="w-full outline-none">
+                                <div className="flex items-center justify-between gap-2 h-9 px-3 rounded-lg border border-border bg-background text-sm hover:bg-muted/50 cursor-pointer">
+                                    <span className="truncate text-left">
+                                        {filters.status ? filters.status.replace(/_/g, ' ') : 'All statuses'}
+                                    </span>
+                                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                </div>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Portal>
+                                <DropdownMenu.Content align="start" sideOffset={6} className="z-[100] w-52 overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in">
+                                    {['', 'NEW_LEAD', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED', 'REPORT_IN_PROGRESS', 'SHIPPED', 'ALL_DONE'].map(st => (
+                                        <DropdownMenu.Item
+                                            key={st || 'all'}
+                                            onSelect={() => setFilters(f => ({ ...f, status: st }))}
+                                            className={cn(
+                                                'outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px]',
+                                                filters.status === st
+                                                    ? 'bg-muted text-foreground font-medium'
+                                                    : 'text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground'
+                                            )}
+                                        >
+                                            {st ? st.replace(/_/g, ' ') : 'All statuses'}
+                                        </DropdownMenu.Item>
+                                    ))}
+                                </DropdownMenu.Content>
+                            </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                    </div>
+
+                    {/* Programme */}
+                    <div>
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Programme</label>
+                        <DropdownMenu.Root>
+                            <DropdownMenu.Trigger className="w-full outline-none">
+                                <div className="flex items-center justify-between gap-2 h-9 px-3 rounded-lg border border-border bg-background text-sm hover:bg-muted/50 cursor-pointer">
+                                    <span className="truncate text-left">{filters.programme || 'All programmes'}</span>
+                                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                </div>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Portal>
+                                <DropdownMenu.Content align="start" sideOffset={6} className="z-[100] w-56 overflow-hidden rounded-xl bg-popover border border-border p-1.5 shadow-2xl animate-fade-in max-h-64 overflow-y-auto">
+                                    <DropdownMenu.Item onSelect={() => setFilters(f => ({ ...f, programme: '' }))} className="outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px] text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground">
+                                        All programmes
+                                    </DropdownMenu.Item>
+                                    {filterOptions?.programmes?.map((p: string) => (
+                                        <DropdownMenu.Item
+                                            key={p}
+                                            onSelect={() => setFilters(f => ({ ...f, programme: p }))}
+                                            className={cn(
+                                                'outline-none cursor-pointer rounded-lg px-3 py-2.5 text-[13px] flex items-center gap-2',
+                                                filters.programme === p
+                                                    ? 'bg-muted text-foreground font-medium'
+                                                    : 'text-muted-foreground data-[highlighted]:bg-muted data-[highlighted]:text-foreground'
+                                            )}
+                                        >
+                                            <Tag className="w-3 h-3 shrink-0" />{p}
+                                        </DropdownMenu.Item>
+                                    ))}
+                                </DropdownMenu.Content>
+                            </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Active Filter Chips ── */}
+            {activeFilterCount > 0 && (
+                <div className="flex flex-wrap gap-2 -mt-2">
+                    {filters.importBatchId && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/25">
+                            <FolderOpen className="w-3 h-3" />
+                            {filterOptions?.importBatches?.find((b: any) => b.id === filters.importBatchId)?.fileName || 'Batch'}
+                            <button onClick={() => setFilters(f => ({ ...f, importBatchId: '' }))} className="ml-0.5 hover:text-blue-900 dark:hover:text-white"><X className="w-3 h-3" /></button>
+                        </span>
+                    )}
+                    {filters.status && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-500/25">
+                            {filters.status.replace(/_/g, ' ')}
+                            <button onClick={() => setFilters(f => ({ ...f, status: '' }))} className="ml-0.5 hover:text-slate-900 dark:hover:text-white"><X className="w-3 h-3" /></button>
+                        </span>
+                    )}
+                    {filters.programme && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/25">
+                            <Tag className="w-3 h-3" />{filters.programme}
+                            <button onClick={() => setFilters(f => ({ ...f, programme: '' }))} className="ml-0.5 hover:text-emerald-900 dark:hover:text-white"><X className="w-3 h-3" /></button>
+                        </span>
+                    )}
+                    {filters.regionalCenter && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/25">
+                            {filters.regionalCenter}
+                            <button onClick={() => setFilters(f => ({ ...f, regionalCenter: '' }))} className="ml-0.5 hover:text-amber-900 dark:hover:text-white"><X className="w-3 h-3" /></button>
+                        </span>
+                    )}
+                    <button
+                        onClick={() => setFilters({ status: '', programme: '', regionalCenter: '', importBatchId: '', subject: '' })}
+                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                    >
+                        Clear all
+                    </button>
+                </div>
+            )}
+
+            {/* ── Bulk action bar when rows selected ── */}
+            {selectedIds.length > 0 && (
+                <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20 animate-fade-in">
+                    <span className="text-sm font-medium text-primary">{selectedIds.length} selected</span>
+                    <Button
+                        size="sm"
+                        className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-8"
+                        onClick={() => {
+                            if (window.confirm(`Promote ${selectedIds.length} selected record(s) to Orders?`)) {
+                                promoteSelectionMutation.mutate(selectedIds)
+                            }
+                        }}
+                        disabled={promoteSelectionMutation.isPending}
+                    >
+                        {promoteSelectionMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
+                        Promote Selected
+                    </Button>
+                    <button onClick={() => setSelectedIds([])} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 ml-auto">
+                        Clear selection
+                    </button>
+                </div>
+            )}
+
+            {/* ── Data Table ── */}
+            <div className="bg-background rounded-xl overflow-hidden border border-border shadow-sm">
+                <div className="overflow-auto scrollbar-thin max-h-[calc(100vh-320px)]">
+                    <table className="w-full border-collapse text-sm">
+                        <thead className="sticky top-0 z-10 shadow-sm">
+                            <tr className="border-b border-border bg-slate-50 dark:bg-slate-800">
+                                {/* Checkbox */}
+                                <th className="p-2 text-left w-10 border-r border-border bg-slate-100 dark:bg-slate-800">
+                                    <input
+                                        type="checkbox"
+                                        checked={students.length > 0 && selectedIds.length === students.length}
+                                        onChange={handleSelectAll}
+                                        className="w-4 h-4 rounded border-slate-300 dark:border-white/20"
+                                    />
+                                </th>
+                                {/* Standard header columns */}
+                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Full Name</th>
+                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Phone</th>
+                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Email</th>
+                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Programme</th>
+                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">Status</th>
+                                {/* Dynamic custom field columns */}
+                                {customFieldCols.map(key => (
+                                    <th key={key} className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">
+                                        {key}
+                                    </th>
+                                ))}
+                                {/* Sticky Action column */}
+                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                                    Action
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {isLoading ? (
+                                Array(8).fill(0).map((_, i) => (
+                                    <tr key={i} className="border-b border-border">
+                                        <td className="p-3"><Skeleton className="h-4 w-4" /></td>
+                                        <td className="p-3"><Skeleton className="h-4 w-32" /></td>
+                                        <td className="p-3"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="p-3"><Skeleton className="h-4 w-36" /></td>
+                                        <td className="p-3"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="p-3"><Skeleton className="h-4 w-20" /></td>
+                                        {customFieldCols.map(k => (
+                                            <td key={k} className="p-3"><Skeleton className="h-4 w-24" /></td>
+                                        ))}
+                                        <td className="p-3 sticky right-0 bg-background"><Skeleton className="h-7 w-28" /></td>
+                                    </tr>
+                                ))
+                            ) : students.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6 + customFieldCols.length + 1} className="p-16 text-center">
+                                        <Users className="w-14 h-14 mx-auto mb-4 text-muted-foreground/40" />
+                                        <p className="text-lg font-medium mb-1">No imported records found</p>
+                                        <p className="text-muted-foreground text-sm mb-4">
+                                            {search || activeFilterCount > 0
+                                                ? 'Try adjusting your search or filters'
+                                                : 'Import an Excel file to see records here'}
+                                        </p>
+                                        {!search && activeFilterCount === 0 && (
+                                            <Link href="/import">
+                                                <Button variant="outline">Import Data</Button>
+                                            </Link>
+                                        )}
+                                    </td>
+                                </tr>
+                            ) : (
+                                students.map((student: any) => {
+                                    const cf = student.customFields || {}
+                                    const id = String(student.id)
+                                    const isSelected = selectedIds.includes(id)
+                                    const isPromoting = promoteRowMutation.isPending && promoteRowMutation.variables === student.id
+
+                                    return (
+                                        <tr
+                                            key={id}
+                                            className={cn(
+                                                'border-b border-border transition-colors group/row',
+                                                isSelected
+                                                    ? 'bg-primary/5'
+                                                    : 'hover:bg-slate-50/50 dark:hover:bg-white/[0.02]'
+                                            )}
+                                        >
+                                            {/* Checkbox */}
+                                            <td className="p-2 border-r border-border">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => handleSelect(id)}
+                                                    className="w-4 h-4 rounded border-slate-300 dark:border-white/20 cursor-pointer"
+                                                />
+                                            </td>
+
+                                            {/* Full Name */}
+                                            <td className="p-2 border-r border-border whitespace-nowrap">
+                                                <span className="text-[14px] font-bold text-foreground">
+                                                    {student.fullName || <span className="text-muted-foreground">—</span>}
+                                                </span>
+                                            </td>
+
+                                            {/* Phone */}
+                                            <td className="p-2 border-r border-border whitespace-nowrap font-mono text-[13px]">
+                                                {student.phone || <span className="text-muted-foreground">—</span>}
+                                            </td>
+
+                                            {/* Email */}
+                                            <td className="p-2 border-r border-border whitespace-nowrap text-[13px]">
+                                                {student.email || <span className="text-muted-foreground">—</span>}
+                                            </td>
+
+                                            {/* Programme */}
+                                            <td className="p-2 border-r border-border whitespace-nowrap text-[13px]">
+                                                {student.programme || <span className="text-muted-foreground">—</span>}
+                                            </td>
+
+                                            {/* Status */}
+                                            <td className="p-2 border-r border-border whitespace-nowrap">
+                                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${getStatusColor(student.status)}`}>
+                                                    {student.status?.replace(/_/g, ' ') || '—'}
+                                                </span>
+                                            </td>
+
+                                            {/* Dynamic custom field cells */}
+                                            {customFieldCols.map(key => (
+                                                <td key={key} className="p-2 border-r border-border text-[13px] max-w-[200px]">
+                                                    <span className="block truncate" title={cellValue(cf[key])}>
+                                                        {cellValue(cf[key]) || <span className="text-muted-foreground">—</span>}
+                                                    </span>
+                                                </td>
+                                            ))}
+
+                                            {/* Sticky Action */}
+                                            <td
+                                                className="p-2 border-l border-border sticky right-0 bg-background group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900/80 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]"
+                                                onClick={e => e.stopPropagation()}
+                                            >
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 text-[11px] font-bold uppercase tracking-wider text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 whitespace-nowrap gap-1.5"
+                                                    onClick={() => {
+                                                        if (window.confirm('Promote this record to active Orders?')) {
+                                                            promoteRowMutation.mutate(student.id)
+                                                        }
+                                                    }}
+                                                    disabled={isPromoting || promoteSelectionMutation.isPending}
+                                                >
+                                                    {isPromoting
+                                                        ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                                        : <ArrowUpCircle className="w-3 h-3" />}
+                                                    Promote
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    )
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* ── Pagination ── */}
+                {pagination.totalPages > 1 && (
+                    <div className="p-4 border-t border-border flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground hidden sm:block">
+                            Showing {((page - 1) * 50) + 1}–{Math.min(page * 50, pagination.total)} of {formatNumber(pagination.total)}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => { const n = page - 1; setPage(n); setPageInput(String(n)) }}>
+                                <ChevronLeft className="w-4 h-4" />Prev
+                            </Button>
+                            <div className="flex items-center gap-2 px-2">
+                                <span className="text-sm text-muted-foreground hidden sm:inline">Page</span>
+                                <input
+                                    type="text"
+                                    value={pageInput}
+                                    onChange={e => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
+                                    onBlur={() => {
+                                        const v = parseInt(pageInput)
+                                        if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) }
+                                        else setPageInput(String(page))
+                                    }}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            const v = parseInt(pageInput)
+                                            if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) }
+                                            else setPageInput(String(page))
+                                        }
+                                    }}
+                                    className="w-12 px-2 py-1 text-sm text-center bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                                <span className="text-sm text-muted-foreground">of {pagination.totalPages}</span>
+                            </div>
+                            <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => { const n = page + 1; setPage(n); setPageInput(String(n)) }}>
+                                Next<ChevronRight className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
