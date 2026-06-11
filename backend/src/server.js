@@ -106,6 +106,9 @@ app.use(cors({
     credentials: true,
 }));
 
+// Trust proxy (nginx sits in front — must be set before rate limiter)
+app.set('trust proxy', 1);
+
 // Rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
