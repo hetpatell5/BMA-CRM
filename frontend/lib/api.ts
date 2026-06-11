@@ -111,6 +111,8 @@ export const studentsAPI = {
         api.post(`/students/assign/${studentId}`, { guideId, commission, forceDuplicate }),
     coHandle: (studentId: string | number, coHandlerId?: number | null) =>
         api.post(`/students/co-handle/${studentId}`, coHandlerId ? { coHandlerId } : {}),
+    promoteImportedRow: (id: string | number) => api.post(`/students/promote-import/${id}`),
+    promoteImportBatch: (importBatchId: string) => api.post(`/students/promote-import-batch/${importBatchId}`),
 }
 
 // Leads API

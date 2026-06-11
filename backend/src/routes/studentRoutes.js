@@ -1144,6 +1144,30 @@ router.delete('/:id', async (req, res, next) => {
             });
         } else {
             await prisma.student.update({
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Delete student
+router.delete('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { permanent = false } = req.query;
+
+        if (permanent === 'true') {
+            if (req.user.role !== 'ADMIN' && req.user.role !== 'MANAGER') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only admins and leaders can permanently delete records',
+                });
+            }
+
+            await prisma.student.delete({
+                where: { id: BigInt(id) },
+            });
+        } else {
+            await prisma.student.update({
                 where: { id: BigInt(id) },
                 data: { status: 'INACTIVE' },
             });
@@ -1154,6 +1178,81 @@ router.delete('/:id', async (req, res, next) => {
             message: permanent === 'true'
                 ? 'Student permanently deleted'
                 : 'Student archived successfully',
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Promote a single imported student row to the main orders page
+router.post('/promote-import/:id', async (req, res, next) => {
+    try {
+        const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
+        if (!isAdmin) {
+            return res.status(403).json({ success: false, message: 'Insufficient permissions' });
+        }
+
+        const studentId = BigInt(req.params.id);
+        const student = await prisma.student.findUnique({
+            where: { id: studentId }
+        });
+
+        if (!student) {
+            return res.status(404).json({ success: false, message: 'Record not found' });
+        }
+
+        if (student.source !== 'excel_import') {
+            return res.status(400).json({ success: false, message: 'Record is not an imported record' });
+        }
+
+        const updated = await prisma.student.update({
+            where: { id: studentId },
+            data: {
+                source: 'manual',
+                importBatchId: null
+            }
+        });
+
+        res.json({
+            success: true,
+            message: 'Record promoted to orders',
+            data: {
+                ...updated,
+                id: updated.id.toString(),
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Promote all imported rows from a specific batch to the main orders page
+router.post('/promote-import-batch/:importBatchId', async (req, res, next) => {
+    try {
+        const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
+        if (!isAdmin) {
+            return res.status(403).json({ success: false, message: 'Insufficient permissions' });
+        }
+
+        const batchId = BigInt(req.params.importBatchId);
+
+        const result = await prisma.student.updateMany({
+            where: { 
+                importBatchId: batchId,
+                source: 'excel_import'
+            },
+            data: {
+                source: 'manual',
+                importBatchId: null
+            }
+        });
+
+        res.json({
+            success: true,
+            message: `Successfully promoted ${result.count} records to orders`,
+            data: {
+                count: result.count
+            }
         });
     } catch (error) {
         next(error);
