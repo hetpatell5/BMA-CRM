@@ -500,8 +500,6 @@ export default function ImportPreviewPage() {
                         </div>
                     </div>
                 )}
-                        </div>
-                    </div>
                 </div>
 
                 {/* ── Filter Sidebar ── */}
