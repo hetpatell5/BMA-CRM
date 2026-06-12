@@ -33,7 +33,8 @@ function isInternalKey(key: string) {
     return normalizeKey(key).startsWith('_') || INTERNAL_KEYS.has(normalizeKey(key))
 }
 
-/** Collect all visible custom-field column keys from a list of student records. */
+/** Collect all visible custom-field column keys from a list of student records,
+ *  preserving the original sheet column order (insertion order of keys). */
 function collectCustomFieldColumns(students: any[]): string[] {
     const keySet = new Set<string>()
     students.forEach(s => {
@@ -43,7 +44,8 @@ function collectCustomFieldColumns(students: any[]): string[] {
             })
         }
     })
-    return Array.from(keySet).sort((a, b) => a.localeCompare(b))
+    // Return in insertion order (matches original Excel column order)
+    return Array.from(keySet)
 }
 
 function cellValue(val: any): string {

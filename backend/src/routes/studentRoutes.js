@@ -774,7 +774,16 @@ router.get('/', async (req, res, next) => {
             where.subjects = { array_contains: [subject] };
         }
         if (importBatchId) where.importBatchId = BigInt(importBatchId);
-        if (source) where.source = source;
+        if (source) {
+            if (source === '!excel_import') {
+                where.source = { not: 'excel_import' };
+            } else {
+                where.source = source;
+            }
+        } else {
+            // By default exclude excel_import records — they live only in import-preview
+            where.source = { not: 'excel_import' };
+        }
 
         // STAFF (guides/experts) only see students assigned to them
         // Use raw numeric filter — no Prisma relation needed
