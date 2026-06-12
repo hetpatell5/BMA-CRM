@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 const INTERNAL_KEYS = new Set([
     'requirementassignments', 'telecallerowners', 'orderidprefix',
     'orderidrequirement', 'orderidgenerated', 'orderidsignature',
+    'columnorder', // _columnOrder is a meta field storing the original sheet header order
 ])
 
 function normalizeKey(key: string) {
@@ -34,18 +35,47 @@ function isInternalKey(key: string) {
 }
 
 /** Collect all visible custom-field column keys from a list of student records,
- *  preserving the original sheet column order (insertion order of keys). */
+ *  using the stored _columnOrder to preserve the exact original Excel sheet order.
+ *  Falls back to insertion order for any extra keys not listed in _columnOrder. */
 function collectCustomFieldColumns(students: any[]): string[] {
-    const keySet = new Set<string>()
+    // Try to get the original column order from the first record that has it
+    let columnOrder: string[] | null = null
+    for (const s of students) {
+        const order = s.customFields?._columnOrder
+        if (Array.isArray(order) && order.length > 0) {
+            columnOrder = order as string[]
+            break
+        }
+    }
+
+    // Collect all unique visible keys across all records
+    const allKeys = new Set<string>()
     students.forEach(s => {
         if (s.customFields && typeof s.customFields === 'object') {
             Object.keys(s.customFields).forEach(k => {
-                if (k && k.trim() && !isInternalKey(k)) keySet.add(k.trim())
+                if (k && k.trim() && !isInternalKey(k)) allKeys.add(k.trim())
             })
         }
     })
-    // Return in insertion order (matches original Excel column order)
-    return Array.from(keySet)
+
+    if (columnOrder) {
+        // Build result: first the keys in original sheet order, then any extras
+        const ordered: string[] = []
+        const remaining = new Set(allKeys)
+        for (const header of columnOrder) {
+            const trimmed = header.trim()
+            if (allKeys.has(trimmed)) {
+                ordered.push(trimmed)
+                remaining.delete(trimmed)
+            }
+        }
+        // Append any keys that exist in the data but weren't in _columnOrder
+        remaining.forEach(k => ordered.push(k))
+        return ordered
+    }
+
+    // Fallback: return in whatever order JavaScript gives us
+    return Array.from(allKeys)
 }
 
 function cellValue(val: any): string {

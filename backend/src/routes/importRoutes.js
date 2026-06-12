@@ -266,6 +266,13 @@ router.post('/process/:importId', async (req, res, next) => {
                         }
                     });
 
+                    // Preserve the original column order as an array so the UI can
+                    // reconstruct the exact sheet order even after MySQL JSON key reordering
+                    const validHeaders = headers.filter(h => h && String(h).trim());
+                    if (validHeaders.length > 0) {
+                        importedCustomFields['_columnOrder'] = validHeaders.map(h => String(h).trim());
+                    }
+
                     Object.entries(columnMapping).forEach(([colIndex, fieldName]) => {
                         const value = row[parseInt(colIndex)];
                         if (value !== undefined && value !== null && value !== '') {
