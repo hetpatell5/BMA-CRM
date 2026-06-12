@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import {
     Search, ChevronLeft, ChevronRight, Users, RefreshCw,
-    ChevronDown, X, SlidersHorizontal, FolderOpen, Tag,
-    ArrowUpCircle, Download,
+    ChevronDown, X, SlidersHorizontal, FolderOpen,
+    ArrowUpCircle, Download, Tag,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -15,7 +15,6 @@ import { formatNumber, getStatusColor, debounce } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import Link from 'next/link'
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { cn } from '@/lib/utils'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -31,14 +30,12 @@ function normalizeKey(key: string) {
 }
 
 function isInternalKey(key: string) {
-    return normalizeKey(key).startsWith('_') || INTERNAL_KEYS.has(normalizeKey(key))
+    return key.startsWith('_') || INTERNAL_KEYS.has(normalizeKey(key))
 }
 
 /** Collect all visible custom-field column keys from a list of student records,
- *  using the stored _columnOrder to preserve the exact original Excel sheet order.
- *  Falls back to insertion order for any extra keys not listed in _columnOrder. */
+ *  using the stored _columnOrder to preserve the exact original Excel sheet order. */
 function collectCustomFieldColumns(students: any[]): string[] {
-    // Try to get the original column order from the first record that has it
     let columnOrder: string[] | null = null
     for (const s of students) {
         const order = s.customFields?._columnOrder
@@ -48,7 +45,6 @@ function collectCustomFieldColumns(students: any[]): string[] {
         }
     }
 
-    // Collect all unique visible keys across all records
     const allKeys = new Set<string>()
     students.forEach(s => {
         if (s.customFields && typeof s.customFields === 'object') {
@@ -59,7 +55,6 @@ function collectCustomFieldColumns(students: any[]): string[] {
     })
 
     if (columnOrder) {
-        // Build result: first the keys in original sheet order, then any extras
         const ordered: string[] = []
         const remaining = new Set(allKeys)
         for (const header of columnOrder) {
@@ -69,12 +64,10 @@ function collectCustomFieldColumns(students: any[]): string[] {
                 remaining.delete(trimmed)
             }
         }
-        // Append any keys that exist in the data but weren't in _columnOrder
         remaining.forEach(k => ordered.push(k))
         return ordered
     }
 
-    // Fallback: return in whatever order JavaScript gives us
     return Array.from(allKeys)
 }
 
@@ -83,6 +76,29 @@ function cellValue(val: any): string {
     if (Array.isArray(val)) return val.map(cellValue).filter(Boolean).join(', ')
     if (typeof val === 'object') return ''
     return String(val).trim()
+}
+
+/**
+ * For each column in the data, detect if it's "filterable" (low cardinality — ≤ 50 unique values,
+ * more than 1 unique value). Skip columns where every row has a unique value (like IDs or names).
+ */
+function detectFilterableColumns(
+    students: any[],
+    columns: string[]
+): { key: string; values: string[] }[] {
+    const MAX_UNIQUE = 50
+
+    return columns
+        .map(key => {
+            const seen = new Set<string>()
+            for (const s of students) {
+                const v = cellValue(s.customFields?.[key])
+                if (v) seen.add(v)
+                if (seen.size > MAX_UNIQUE) break
+            }
+            return { key, values: Array.from(seen).sort((a, b) => a.localeCompare(b)) }
+        })
+        .filter(f => f.values.length >= 2 && f.values.length <= MAX_UNIQUE)
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -101,28 +117,27 @@ export default function ImportPreviewPage() {
     const [pageInput, setPageInput] = useState('1')
     const [selectedIds, setSelectedIds] = useState<string[]>([])
     const [showFilters, setShowFilters] = useState(false)
-    const [filters, setFilters] = useState({
-        status:         searchParams.get('status') || '',
-        programme:      searchParams.get('programme') || '',
-        regionalCenter: searchParams.get('regionalCenter') || '',
-        importBatchId:  searchParams.get('importBatchId') || '',
-        subject:        searchParams.get('subject') || '',
-    })
+
+    // importBatchId is the only server-side filter (all other filters are client-side)
+    const [importBatchId, setImportBatchId] = useState(searchParams.get('importBatchId') || '')
+
+    // Client-side multi-select adaptive filters: { "Regional Center": ["Mumbai", "Delhi"], ... }
+    const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({})
+
     const [filterSearch, setFilterSearch] = useState('')
-    const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-        imports: true, status: true, programme: true, regional: true, subject: true
-    })
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({ imports: true })
 
     const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }))
 
     // ── Queries ────────────────────────────────────────────────────────────
-    const { data, isLoading, refetch } = useQuery({
-        queryKey: ['import-preview', page, search, filters],
+    // Fetch ALL records for current batch (up to 500) to enable client-side filtering
+    const { data: allData, isLoading, refetch } = useQuery({
+        queryKey: ['import-preview-all', importBatchId],
         queryFn: async () => {
             const params: Record<string, string> = {
-                page: String(page), limit: '50', search, source: 'excel_import',
+                page: '1', limit: '500', source: 'excel_import',
             }
-            Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v })
+            if (importBatchId) params.importBatchId = importBatchId
             const res = await studentsAPI.getAll(params)
             return res.data.data
         },
@@ -133,11 +148,86 @@ export default function ImportPreviewPage() {
         queryFn: async () => (await studentsAPI.getFilters()).data.data,
     })
 
+    // ── All raw students ───────────────────────────────────────────────────
+    const allStudents: any[] = allData?.students || []
+
+    // Dynamic column list from the full data set
+    const customFieldCols = useMemo(() => collectCustomFieldColumns(allStudents), [allStudents])
+
+    // Filterable columns: low-cardinality columns discovered from data
+    const filterableCols = useMemo(
+        () => detectFilterableColumns(allStudents, customFieldCols),
+        [allStudents, customFieldCols]
+    )
+
+    // ── Client-side search + multi-select filter ───────────────────────────
+    const filteredStudents = useMemo(() => {
+        let rows = allStudents
+
+        // 1. Text search: match against any column value
+        const q = search.trim().toLowerCase()
+        if (q) {
+            rows = rows.filter(s => {
+                const cf = s.customFields || {}
+                // Search standard fields
+                const standard = [s.fullName, s.email, s.phone, s.programme, s.regionalCenter, s.enrollmentNo]
+                    .filter(Boolean).map(v => String(v).toLowerCase())
+                if (standard.some(v => v.includes(q))) return true
+                // Search all custom field values
+                return Object.values(cf).some(v => {
+                    const str = cellValue(v).toLowerCase()
+                    return str.includes(q)
+                })
+            })
+        }
+
+        // 2. Multi-select adaptive filters
+        for (const [colKey, selected] of Object.entries(activeFilters)) {
+            if (!selected || selected.size === 0) continue
+            rows = rows.filter(s => {
+                const v = cellValue(s.customFields?.[colKey])
+                return selected.has(v)
+            })
+        }
+
+        return rows
+    }, [allStudents, search, activeFilters])
+
+    // ── Pagination (client-side) ───────────────────────────────────────────
+    const PAGE_SIZE = 50
+    const totalFiltered = filteredStudents.length
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE))
+    const students = filteredStudents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+    // Reset page on search/filter change
+    useEffect(() => { setPage(1); setPageInput('1') }, [search, activeFilters, importBatchId])
+
+    // Total active filter count (for badge)
+    const activeFilterCount = (importBatchId ? 1 : 0) + Object.values(activeFilters).reduce((n, s) => n + s.size, 0)
+
+    // Toggle a single value in a multi-select filter column
+    const toggleFilterValue = (colKey: string, value: string) => {
+        setActiveFilters(prev => {
+            const next = { ...prev }
+            const current = new Set(next[colKey] || [])
+            if (current.has(value)) current.delete(value)
+            else current.add(value)
+            if (current.size === 0) delete next[colKey]
+            else next[colKey] = current
+            return next
+        })
+    }
+
+    const clearAllFilters = () => {
+        setImportBatchId('')
+        setActiveFilters({})
+    }
+
     // ── Promote mutations ──────────────────────────────────────────────────
     const promoteRowMutation = useMutation({
         mutationFn: (id: string | number) => studentsAPI.promoteImportedRow(id),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['import-preview'] })
+            queryClient.invalidateQueries({ queryKey: ['import-preview-all'] })
             queryClient.invalidateQueries({ queryKey: ['students'] })
             setSelectedIds(prev => prev.filter(sid => sid !== String(promoteRowMutation.variables)))
             toast({ title: 'Promoted!', description: 'Record moved to active Orders.', variant: 'success' })
@@ -149,12 +239,10 @@ export default function ImportPreviewPage() {
 
     const promoteSelectionMutation = useMutation({
         mutationFn: async (ids: string[]) => {
-            for (const id of ids) {
-                await studentsAPI.promoteImportedRow(id)
-            }
+            for (const id of ids) await studentsAPI.promoteImportedRow(id)
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['import-preview'] })
+            queryClient.invalidateQueries({ queryKey: ['import-preview-all'] })
             queryClient.invalidateQueries({ queryKey: ['students'] })
             setSelectedIds([])
             toast({ title: 'Promoted!', description: 'Selected records moved to active Orders.', variant: 'success' })
@@ -167,7 +255,7 @@ export default function ImportPreviewPage() {
     const promoteBatchMutation = useMutation({
         mutationFn: (batchId: string) => studentsAPI.promoteImportBatch(batchId),
         onSuccess: (res: any) => {
-            queryClient.invalidateQueries({ queryKey: ['import-preview'] })
+            queryClient.invalidateQueries({ queryKey: ['import-preview-all'] })
             queryClient.invalidateQueries({ queryKey: ['students'] })
             toast({ title: 'Batch Promoted!', description: res?.data?.message || 'All records moved to active Orders.', variant: 'success' })
         },
@@ -176,34 +264,14 @@ export default function ImportPreviewPage() {
         }),
     })
 
-    // ── Derived data ───────────────────────────────────────────────────────
-    const students: any[] = data?.students || []
-    const pagination = data?.pagination || { page: 1, totalPages: 1, total: 0 }
-    const activeFilterCount = Object.values(filters).filter(Boolean).length
-
-    // Dynamic columns: standard fixed columns + all custom field keys from data
-    const customFieldCols = collectCustomFieldColumns(students)
-
-    // Reset page on search change
-    useEffect(() => {
-        const d = debounce(() => setPage(1), 500)
-        d()
-    }, [search])
-
-    // ── Selection ──────────────────────────────────────────────────────────
-    const handleSelectAll = () => {
-        setSelectedIds(selectedIds.length === students.length ? [] : students.map((s: any) => String(s.id)))
-    }
-    const handleSelect = (id: string) => {
-        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
-    }
-
     // ── Export ─────────────────────────────────────────────────────────────
     const [isExporting, setIsExporting] = useState(false)
     const handleExport = async () => {
         setIsExporting(true)
         try {
-            const response = await studentsAPI.exportExcel({ search, source: 'excel_import', ...filters })
+            const exportParams: Record<string, string> = { source: 'excel_import' }
+            if (importBatchId) exportParams.importBatchId = importBatchId
+            const response = await studentsAPI.exportExcel(exportParams)
             const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
             const url = window.URL.createObjectURL(blob)
             const link = document.createElement('a')
@@ -219,6 +287,14 @@ export default function ImportPreviewPage() {
         } finally {
             setIsExporting(false)
         }
+    }
+
+    // ── Selection ──────────────────────────────────────────────────────────
+    const handleSelectAll = () => {
+        setSelectedIds(selectedIds.length === students.length ? [] : students.map((s: any) => String(s.id)))
+    }
+    const handleSelect = (id: string) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
     }
 
     // ── Access Gate ────────────────────────────────────────────────────────
@@ -248,19 +324,16 @@ export default function ImportPreviewPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                    {/* Refresh */}
                     <Button variant="outline" size="sm" onClick={() => refetch()}>
                         <RefreshCw className="w-4 h-4" />
                     </Button>
 
-                    {/* Export */}
                     <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting} className="gap-2">
                         {isExporting
                             ? <><RefreshCw className="w-4 h-4 animate-spin" /><span className="hidden sm:inline">Exporting…</span></>
                             : <><Download className="w-4 h-4" /><span className="hidden sm:inline">Export</span></>}
                     </Button>
 
-                    {/* Promote Selection */}
                     {selectedIds.length > 0 && (
                         <Button
                             size="sm"
@@ -279,14 +352,13 @@ export default function ImportPreviewPage() {
                         </Button>
                     )}
 
-                    {/* Promote Entire Batch */}
-                    {filters.importBatchId && (
+                    {importBatchId && (
                         <Button
                             size="sm"
                             className="gap-2 gradient-primary text-white"
                             onClick={() => {
                                 if (window.confirm('Promote ALL un-promoted records in this batch to Orders?')) {
-                                    promoteBatchMutation.mutate(filters.importBatchId)
+                                    promoteBatchMutation.mutate(importBatchId)
                                 }
                             }}
                             disabled={promoteBatchMutation.isPending}
@@ -321,7 +393,7 @@ export default function ImportPreviewPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
                         type="text"
-                        placeholder="Search by name, email, phone…"
+                        placeholder="Search any column value…"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         className="w-full h-9 pl-9 pr-4 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
@@ -333,15 +405,27 @@ export default function ImportPreviewPage() {
                     )}
                 </div>
 
-                {/* Record count */}
+                {/* Active filter chips */}
+                {Object.entries(activeFilters).map(([col, vals]) =>
+                    Array.from(vals).map(val => (
+                        <span
+                            key={`${col}:${val}`}
+                            className="inline-flex items-center gap-1 px-2 h-9 rounded-lg bg-primary/10 text-primary text-xs font-medium border border-primary/20 shrink-0 max-w-[180px]"
+                        >
+                            <span className="truncate">{col}: {val}</span>
+                            <button onClick={() => toggleFilterValue(col, val)} className="shrink-0 hover:opacity-70">
+                                <X className="w-3 h-3" />
+                            </button>
+                        </span>
+                    ))
+                )}
+
                 <div className="flex items-center shrink-0">
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
-                        {isLoading ? '…' : `${formatNumber(pagination.total)} record${pagination.total !== 1 ? 's' : ''}`}
+                        {isLoading ? '…' : `${formatNumber(totalFiltered)} / ${formatNumber(allStudents.length)} record${allStudents.length !== 1 ? 's' : ''}`}
                     </span>
                 </div>
             </div>
-
-
 
             {/* ── Bulk action bar when rows selected ── */}
             {selectedIds.length > 0 && (
@@ -369,169 +453,161 @@ export default function ImportPreviewPage() {
             {/* ── Layout Wrapper for Table + Filter Panel ── */}
             <div className={cn(
                 "grid gap-6 transition-all duration-300 items-start",
-                showFilters ? "grid-cols-1 xl:grid-cols-[1fr_280px]" : "grid-cols-1"
+                showFilters ? "grid-cols-1 xl:grid-cols-[1fr_290px]" : "grid-cols-1"
             )}>
                 {/* ── Data Table ── */}
                 <div className="bg-background rounded-xl overflow-hidden min-w-0 border border-border shadow-sm flex flex-col">
-                <div className="overflow-auto scrollbar-thin max-h-[calc(100vh-320px)]">
-                    <table className="w-full border-collapse text-sm">
-                        <thead className="sticky top-0 z-10 shadow-sm">
-                            <tr className="border-b border-border bg-slate-50 dark:bg-slate-800">
-                                {/* Checkbox */}
-                                <th className="p-2 text-left w-10 border-r border-border bg-slate-100 dark:bg-slate-800">
-                                    <input
-                                        type="checkbox"
-                                        checked={students.length > 0 && selectedIds.length === students.length}
-                                        onChange={handleSelectAll}
-                                        className="w-4 h-4 rounded border-slate-300 dark:border-white/20"
-                                    />
-                                </th>
-
-                                {/* Dynamic custom field columns */}
-                                {customFieldCols.map(key => (
-                                    <th key={key} className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">
-                                        {key}
+                    <div className="overflow-auto scrollbar-thin max-h-[calc(100vh-320px)]">
+                        <table className="w-full border-collapse text-sm">
+                            <thead className="sticky top-0 z-10 shadow-sm">
+                                <tr className="border-b border-border bg-slate-50 dark:bg-slate-800">
+                                    <th className="p-2 text-left w-10 border-r border-border bg-slate-100 dark:bg-slate-800">
+                                        <input
+                                            type="checkbox"
+                                            checked={students.length > 0 && selectedIds.length === students.length}
+                                            onChange={handleSelectAll}
+                                            className="w-4 h-4 rounded border-slate-300 dark:border-white/20"
+                                        />
                                     </th>
-                                ))}
-                                {/* Sticky Action column */}
-                                <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
-                                    Action
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {isLoading ? (
-                                Array(8).fill(0).map((_, i) => (
-                                    <tr key={i} className="border-b border-border">
-                                        <td className="p-3"><Skeleton className="h-4 w-4" /></td>
-                                        {customFieldCols.map(k => (
-                                            <td key={k} className="p-3"><Skeleton className="h-4 w-24" /></td>
-                                        ))}
-                                        <td className="p-3 sticky right-0 bg-background"><Skeleton className="h-7 w-28" /></td>
-                                    </tr>
-                                ))
-                            ) : students.length === 0 ? (
-                                <tr>
-                                    <td colSpan={1 + customFieldCols.length + 1} className="p-16 text-center">
-                                        <Users className="w-14 h-14 mx-auto mb-4 text-muted-foreground/40" />
-                                        <p className="text-lg font-medium mb-1">No imported records found</p>
-                                        <p className="text-muted-foreground text-sm mb-4">
-                                            {search || activeFilterCount > 0
-                                                ? 'Try adjusting your search or filters'
-                                                : 'Import an Excel file to see records here'}
-                                        </p>
-                                        {!search && activeFilterCount === 0 && (
-                                            <Link href="/import">
-                                                <Button variant="outline">Import Data</Button>
-                                            </Link>
-                                        )}
-                                    </td>
+                                    {customFieldCols.map(key => (
+                                        <th key={key} className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">
+                                            {key}
+                                        </th>
+                                    ))}
+                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                                        Action
+                                    </th>
                                 </tr>
-                            ) : (
-                                students.map((student: any) => {
-                                    const cf = student.customFields || {}
-                                    const id = String(student.id)
-                                    const isSelected = selectedIds.includes(id)
-                                    const isPromoting = promoteRowMutation.isPending && promoteRowMutation.variables === student.id
-
-                                    return (
-                                        <tr
-                                            key={id}
-                                            className={cn(
-                                                'border-b border-border transition-colors group/row',
-                                                isSelected
-                                                    ? 'bg-primary/5'
-                                                    : 'hover:bg-slate-50/50 dark:hover:bg-white/[0.02]'
-                                            )}
-                                        >
-                                            {/* Checkbox */}
-                                            <td className="p-2 border-r border-border">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => handleSelect(id)}
-                                                    className="w-4 h-4 rounded border-slate-300 dark:border-white/20 cursor-pointer"
-                                                />
-                                            </td>
-
-
-                                            {/* Dynamic custom field cells */}
-                                            {customFieldCols.map(key => (
-                                                <td key={key} className="p-2 border-r border-border text-[13px] max-w-[200px]">
-                                                    <span className="block truncate" title={cellValue(cf[key])}>
-                                                        {cellValue(cf[key]) || <span className="text-muted-foreground">—</span>}
-                                                    </span>
-                                                </td>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {isLoading ? (
+                                    Array(8).fill(0).map((_, i) => (
+                                        <tr key={i} className="border-b border-border">
+                                            <td className="p-3"><Skeleton className="h-4 w-4" /></td>
+                                            {customFieldCols.map(k => (
+                                                <td key={k} className="p-3"><Skeleton className="h-4 w-24" /></td>
                                             ))}
-
-                                            {/* Sticky Action */}
-                                            <td
-                                                className="p-2 border-l border-border sticky right-0 bg-background group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900/80 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]"
-                                                onClick={e => e.stopPropagation()}
-                                            >
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-8 text-[11px] font-bold uppercase tracking-wider text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 whitespace-nowrap gap-1.5"
-                                                    onClick={() => {
-                                                        if (window.confirm('Promote this record to active Orders?')) {
-                                                            promoteRowMutation.mutate(student.id)
-                                                        }
-                                                    }}
-                                                    disabled={isPromoting || promoteSelectionMutation.isPending}
-                                                >
-                                                    {isPromoting
-                                                        ? <RefreshCw className="w-3 h-3 animate-spin" />
-                                                        : <ArrowUpCircle className="w-3 h-3" />}
-                                                    Promote
-                                                </Button>
-                                            </td>
+                                            <td className="p-3 sticky right-0 bg-background"><Skeleton className="h-7 w-28" /></td>
                                         </tr>
-                                    )
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                    ))
+                                ) : students.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={1 + customFieldCols.length + 1} className="p-16 text-center">
+                                            <Users className="w-14 h-14 mx-auto mb-4 text-muted-foreground/40" />
+                                            <p className="text-lg font-medium mb-1">No imported records found</p>
+                                            <p className="text-muted-foreground text-sm mb-4">
+                                                {search || activeFilterCount > 0
+                                                    ? 'Try adjusting your search or filters'
+                                                    : 'Import an Excel file to see records here'}
+                                            </p>
+                                            {!search && activeFilterCount === 0 && (
+                                                <Link href="/import">
+                                                    <Button variant="outline">Import Data</Button>
+                                                </Link>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    students.map((student: any) => {
+                                        const cf = student.customFields || {}
+                                        const id = String(student.id)
+                                        const isSelected = selectedIds.includes(id)
+                                        const isPromoting = promoteRowMutation.isPending && promoteRowMutation.variables === student.id
 
-                {/* ── Pagination ── */}
-                {pagination.totalPages > 1 && (
-                    <div className="p-4 border-t border-border flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground hidden sm:block">
-                            Showing {((page - 1) * 50) + 1}–{Math.min(page * 50, pagination.total)} of {formatNumber(pagination.total)}
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => { const n = page - 1; setPage(n); setPageInput(String(n)) }}>
-                                <ChevronLeft className="w-4 h-4" />Prev
-                            </Button>
-                            <div className="flex items-center gap-2 px-2">
-                                <span className="text-sm text-muted-foreground hidden sm:inline">Page</span>
-                                <input
-                                    type="text"
-                                    value={pageInput}
-                                    onChange={e => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
-                                    onBlur={() => {
-                                        const v = parseInt(pageInput)
-                                        if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) }
-                                        else setPageInput(String(page))
-                                    }}
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter') {
-                                            const v = parseInt(pageInput)
-                                            if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) }
-                                            else setPageInput(String(page))
-                                        }
-                                    }}
-                                    className="w-12 px-2 py-1 text-sm text-center bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                />
-                                <span className="text-sm text-muted-foreground">of {pagination.totalPages}</span>
-                            </div>
-                            <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => { const n = page + 1; setPage(n); setPageInput(String(n)) }}>
-                                Next<ChevronRight className="w-4 h-4" />
-                            </Button>
-                        </div>
+                                        return (
+                                            <tr
+                                                key={id}
+                                                className={cn(
+                                                    'border-b border-border transition-colors group/row',
+                                                    isSelected
+                                                        ? 'bg-primary/5'
+                                                        : 'hover:bg-slate-50/50 dark:hover:bg-white/[0.02]'
+                                                )}
+                                            >
+                                                <td className="p-2 border-r border-border">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => handleSelect(id)}
+                                                        className="w-4 h-4 rounded border-slate-300 dark:border-white/20 cursor-pointer"
+                                                    />
+                                                </td>
+
+                                                {customFieldCols.map(key => (
+                                                    <td key={key} className="p-2 border-r border-border text-[13px] max-w-[200px]">
+                                                        <span className="block truncate" title={cellValue(cf[key])}>
+                                                            {cellValue(cf[key]) || <span className="text-muted-foreground">—</span>}
+                                                        </span>
+                                                    </td>
+                                                ))}
+
+                                                <td
+                                                    className="p-2 border-l border-border sticky right-0 bg-background group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900/80 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]"
+                                                    onClick={e => e.stopPropagation()}
+                                                >
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 text-[11px] font-bold uppercase tracking-wider text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 whitespace-nowrap gap-1.5"
+                                                        onClick={() => {
+                                                            if (window.confirm('Promote this record to active Orders?')) {
+                                                                promoteRowMutation.mutate(student.id)
+                                                            }
+                                                        }}
+                                                        disabled={isPromoting || promoteSelectionMutation.isPending}
+                                                    >
+                                                        {isPromoting
+                                                            ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                                            : <ArrowUpCircle className="w-3 h-3" />}
+                                                        Promote
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })
+                                )}
+                            </tbody>
+                        </table>
                     </div>
-                )}
+
+                    {/* ── Pagination ── */}
+                    {totalPages > 1 && (
+                        <div className="p-4 border-t border-border flex items-center justify-between">
+                            <p className="text-sm text-muted-foreground hidden sm:block">
+                                Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalFiltered)} of {formatNumber(totalFiltered)}
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => { const n = page - 1; setPage(n); setPageInput(String(n)) }}>
+                                    <ChevronLeft className="w-4 h-4" />Prev
+                                </Button>
+                                <div className="flex items-center gap-2 px-2">
+                                    <span className="text-sm text-muted-foreground hidden sm:inline">Page</span>
+                                    <input
+                                        type="text"
+                                        value={pageInput}
+                                        onChange={e => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
+                                        onBlur={() => {
+                                            const v = parseInt(pageInput)
+                                            if (v >= 1 && v <= totalPages) { setPage(v); setPageInput(String(v)) }
+                                            else setPageInput(String(page))
+                                        }}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                const v = parseInt(pageInput)
+                                                if (v >= 1 && v <= totalPages) { setPage(v); setPageInput(String(v)) }
+                                                else setPageInput(String(page))
+                                            }
+                                        }}
+                                        className="w-12 px-2 py-1 text-sm text-center bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    />
+                                    <span className="text-sm text-muted-foreground">of {totalPages}</span>
+                                </div>
+                                <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => { const n = page + 1; setPage(n); setPageInput(String(n)) }}>
+                                    Next<ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* ── Filter Sidebar ── */}
@@ -541,7 +617,7 @@ export default function ImportPreviewPage() {
                         <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
                             <h3 className="font-semibold text-sm flex items-center gap-2">
                                 <SlidersHorizontal className="w-4 h-4 text-primary" />
-                                Filter Records by
+                                Filter Records
                             </h3>
                             <button onClick={() => setShowFilters(false)} className="text-muted-foreground hover:text-foreground transition-colors">
                                 <X className="w-4 h-4" />
@@ -553,7 +629,7 @@ export default function ImportPreviewPage() {
                             <div className="relative">
                                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                                 <input
-                                    placeholder="Search filters..."
+                                    placeholder="Search filter values..."
                                     value={filterSearch}
                                     onChange={e => setFilterSearch(e.target.value)}
                                     className="w-full h-8 pl-8 pr-3 rounded-lg text-sm bg-slate-100 dark:bg-white/5 border border-transparent focus:border-primary/40 focus:outline-none transition-colors"
@@ -562,7 +638,8 @@ export default function ImportPreviewPage() {
                         </div>
 
                         <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
-                            {/* ── Data Sources (Import Batches) ── */}
+
+                            {/* ── Import Batch ── */}
                             {filterOptions?.importBatches?.length > 0 && (
                                 <div>
                                     <button
@@ -581,15 +658,15 @@ export default function ImportPreviewPage() {
                                                         key={batch.id}
                                                         className={cn(
                                                             "flex items-start gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors group",
-                                                            filters.importBatchId === batch.id
+                                                            importBatchId === batch.id
                                                                 ? "bg-blue-50 dark:bg-blue-500/10"
                                                                 : "hover:bg-slate-100 dark:hover:bg-white/5"
                                                         )}
                                                     >
                                                         <input
                                                             type="checkbox"
-                                                            checked={filters.importBatchId === batch.id}
-                                                            onChange={() => setFilters(f => ({ ...f, importBatchId: f.importBatchId === batch.id ? '' : batch.id }))}
+                                                            checked={importBatchId === batch.id}
+                                                            onChange={() => setImportBatchId(prev => prev === batch.id ? '' : batch.id)}
                                                             className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 accent-blue-500 cursor-pointer shrink-0"
                                                         />
                                                         <div className="min-w-0">
@@ -603,127 +680,89 @@ export default function ImportPreviewPage() {
                                 </div>
                             )}
 
-                            {/* ── Status ── */}
-                            <div>
-                                <button
-                                    className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-                                    onClick={() => toggleSection('status')}
-                                >
-                                    <span>Status</span>
-                                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", openSections.status && "rotate-180")} />
-                                </button>
-                                {openSections.status && (
-                                    <div className="space-y-0.5 mb-3">
-                                        {['NEW_LEAD', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED', 'REPORT_IN_PROGRESS', 'SHIPPED', 'ALL_DONE']
-                                            .filter(opt => !filterSearch || opt.replace(/_/g, ' ').toLowerCase().includes(filterSearch.toLowerCase()))
-                                            .map(opt => (
-                                                <label
-                                                    key={opt}
-                                                    className={cn(
-                                                        "flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors",
-                                                        filters.status === opt
-                                                            ? "bg-violet-50 dark:bg-violet-500/10"
-                                                            : "hover:bg-slate-100 dark:hover:bg-white/5"
-                                                    )}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={filters.status === opt}
-                                                        onChange={() => setFilters(f => ({ ...f, status: f.status === opt ? '' : opt }))}
-                                                        className="w-3.5 h-3.5 rounded border-slate-300 accent-violet-500 cursor-pointer shrink-0"
-                                                    />
-                                                    <span className="text-[13px] font-medium text-foreground">{opt.replace(/_/g, ' ')}</span>
-                                                </label>
-                                            ))}
+                            {/* ── Adaptive Column Filters ── */}
+                            {filterableCols.length === 0 && !isLoading && allStudents.length > 0 && (
+                                <p className="text-xs text-muted-foreground text-center py-6 px-3">
+                                    No filterable columns detected in the current data.
+                                </p>
+                            )}
+
+                            {filterableCols.map((col, idx) => {
+                                const sectionKey = `col_${col.key}`
+                                const selectedVals = activeFilters[col.key] || new Set<string>()
+                                const filteredVals = col.values.filter(v =>
+                                    !filterSearch || v.toLowerCase().includes(filterSearch.toLowerCase()) ||
+                                    col.key.toLowerCase().includes(filterSearch.toLowerCase())
+                                )
+                                if (filteredVals.length === 0) return null
+
+                                // Cycle through accent colours for visual variety
+                                const accents = [
+                                    'accent-emerald-500 bg-emerald-50 dark:bg-emerald-500/10',
+                                    'accent-amber-500 bg-amber-50 dark:bg-amber-500/10',
+                                    'accent-violet-500 bg-violet-50 dark:bg-violet-500/10',
+                                    'accent-cyan-500 bg-cyan-50 dark:bg-cyan-500/10',
+                                    'accent-rose-500 bg-rose-50 dark:bg-rose-500/10',
+                                    'accent-indigo-500 bg-indigo-50 dark:bg-indigo-500/10',
+                                ]
+                                const [accentCls, activeBg] = accents[idx % accents.length].split(' ').reduce<[string, string]>((acc, c) => {
+                                    if (c.startsWith('accent-')) return [c, acc[1]]
+                                    return [acc[0], c + ' ' + (acc[1] || '')]
+                                }, ['', ''])
+
+                                return (
+                                    <div key={col.key}>
+                                        <button
+                                            className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                                            onClick={() => toggleSection(sectionKey)}
+                                        >
+                                            <span className="flex items-center gap-1.5 truncate">
+                                                <Tag className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="truncate">{col.key}</span>
+                                                {selectedVals.size > 0 && (
+                                                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold shrink-0">
+                                                        {selectedVals.size}
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform shrink-0", openSections[sectionKey] && "rotate-180")} />
+                                        </button>
+                                        {openSections[sectionKey] && (
+                                            <div className="space-y-0.5 mb-3 max-h-48 overflow-y-auto">
+                                                {filteredVals.map(val => (
+                                                    <label
+                                                        key={val}
+                                                        className={cn(
+                                                            "flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors",
+                                                            selectedVals.has(val)
+                                                                ? activeBg.trim()
+                                                                : "hover:bg-slate-100 dark:hover:bg-white/5"
+                                                        )}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedVals.has(val)}
+                                                            onChange={() => toggleFilterValue(col.key, val)}
+                                                            className={cn("w-3.5 h-3.5 rounded border-slate-300 cursor-pointer shrink-0", accentCls)}
+                                                        />
+                                                        <span className="text-[13px] font-medium text-foreground truncate" title={val}>{val}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-
-                            {/* ── Programme ── */}
-                            {filterOptions?.programmes?.length > 0 && (
-                                <div>
-                                    <button
-                                        className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-                                        onClick={() => toggleSection('programme')}
-                                    >
-                                        <span>Programme</span>
-                                        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", openSections.programme && "rotate-180")} />
-                                    </button>
-                                    {openSections.programme && (
-                                        <div className="space-y-0.5 mb-3 max-h-48 overflow-y-auto">
-                                            {filterOptions.programmes
-                                                .filter((p: string) => !filterSearch || p.toLowerCase().includes(filterSearch.toLowerCase()))
-                                                .map((prog: string) => (
-                                                    <label
-                                                        key={prog}
-                                                        className={cn(
-                                                            "flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors",
-                                                            filters.programme === prog
-                                                                ? "bg-emerald-50 dark:bg-emerald-500/10"
-                                                                : "hover:bg-slate-100 dark:hover:bg-white/5"
-                                                        )}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={filters.programme === prog}
-                                                            onChange={() => setFilters(f => ({ ...f, programme: f.programme === prog ? '' : prog }))}
-                                                            className="w-3.5 h-3.5 rounded border-slate-300 accent-emerald-500 cursor-pointer shrink-0"
-                                                        />
-                                                        <span className="text-[13px] font-medium text-foreground truncate">{prog}</span>
-                                                    </label>
-                                                ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* ── Regional Center ── */}
-                            {filterOptions?.regionalCenters?.length > 0 && (
-                                <div>
-                                    <button
-                                        className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-                                        onClick={() => toggleSection('regional')}
-                                    >
-                                        <span>Regional Center</span>
-                                        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", openSections.regional && "rotate-180")} />
-                                    </button>
-                                    {openSections.regional && (
-                                        <div className="space-y-0.5 mb-3 max-h-48 overflow-y-auto">
-                                            {filterOptions.regionalCenters
-                                                .filter((c: string) => !filterSearch || c.toLowerCase().includes(filterSearch.toLowerCase()))
-                                                .map((center: string) => (
-                                                    <label
-                                                        key={center}
-                                                        className={cn(
-                                                            "flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors",
-                                                            filters.regionalCenter === center
-                                                                ? "bg-amber-50 dark:bg-amber-500/10"
-                                                                : "hover:bg-slate-100 dark:hover:bg-white/5"
-                                                        )}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={filters.regionalCenter === center}
-                                                            onChange={() => setFilters(f => ({ ...f, regionalCenter: f.regionalCenter === center ? '' : center }))}
-                                                            className="w-3.5 h-3.5 rounded border-slate-300 accent-amber-500 cursor-pointer shrink-0"
-                                                        />
-                                                        <span className="text-[13px] font-medium text-foreground truncate">{center}</span>
-                                                    </label>
-                                                ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                                )
+                            })}
                         </div>
 
                         {/* Footer */}
                         {activeFilterCount > 0 && (
                             <div className="p-3 border-t border-border shrink-0">
                                 <button
-                                    onClick={() => setFilters({ status: '', programme: '', regionalCenter: '', importBatchId: '', subject: '' })}
+                                    onClick={clearAllFilters}
                                     className="w-full h-8 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors border border-red-200 dark:border-red-500/20"
                                 >
-                                    Clear all {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
+                                    Clear all {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''}
                                 </button>
                             </div>
                         )}
