@@ -113,6 +113,8 @@ export const studentsAPI = {
         api.post(`/students/co-handle/${studentId}`, coHandlerId ? { coHandlerId } : {}),
     promoteImportedRow: (id: string | number) => api.post(`/students/promote-import/${id}`),
     promoteImportBatch: (importBatchId: string) => api.post(`/students/promote-import-batch/${importBatchId}`),
+    getImportFieldValues: (field: string, batchId?: string) =>
+        api.get('/students/meta/import-field-values', { params: { field, ...(batchId ? { batchId } : {}) } }),
 }
 
 // Leads API

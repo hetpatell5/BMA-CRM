@@ -193,6 +193,44 @@ async function backfillOrderIdsForAllStudents() {
     return { scanned, updated, rulesCount: rules.length };
 }
 
+// Get distinct values of a specific customField key for imported records
+// GET /students/meta/import-field-values?field=Regional+Center&batchId=123
+router.get('/meta/import-field-values', async (req, res, next) => {
+    try {
+        const { field, batchId } = req.query;
+        if (!field) return res.json({ success: true, data: [] });
+
+        const escapedField = String(field).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        let rows;
+        if (batchId) {
+            rows = await prisma.$queryRawUnsafe(
+                `SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) AS val
+                 FROM students
+                 WHERE source = 'excel_import'
+                   AND import_batch_id = ?
+                   AND JSON_EXTRACT(custom_fields, '$."${escapedField}"') IS NOT NULL
+                   AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) NOT IN ('null','')
+                 ORDER BY val ASC LIMIT 300`,
+                BigInt(batchId)
+            );
+        } else {
+            rows = await prisma.$queryRawUnsafe(
+                `SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) AS val
+                 FROM students
+                 WHERE source = 'excel_import'
+                   AND JSON_EXTRACT(custom_fields, '$."${escapedField}"') IS NOT NULL
+                   AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) NOT IN ('null','')
+                 ORDER BY val ASC LIMIT 300`
+            );
+        }
+
+        const values = rows.map(r => r.val).filter(Boolean);
+        res.json({ success: true, data: values });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Get filter options (for dropdowns) - MUST be before /:id route
 router.get('/meta/filters', async (req, res, next) => {
     try {
@@ -785,7 +823,30 @@ router.get('/', async (req, res, next) => {
             where.source = { not: 'excel_import' };
         }
 
+        // Support customField[FieldName]=value1,value2 for adaptive import-preview filters
+        // e.g. ?customField[Regional Center]=Mumbai,Delhi&customField[Study Center]=SC001
+        const customFieldFilters = req.query.customField;
+        if (customFieldFilters && typeof customFieldFilters === 'object') {
+            const cfConditions = [];
+            for (const [k, v] of Object.entries(customFieldFilters)) {
+                if (!k || !v) continue;
+                const values = String(v).split(',').map(s => s.trim()).filter(Boolean);
+                if (values.length === 1) {
+                    cfConditions.push({ customFields: { path: [k], equals: values[0] } });
+                } else if (values.length > 1) {
+                    // OR across selected values for that column
+                    cfConditions.push({
+                        OR: values.map(val => ({ customFields: { path: [k], equals: val } })),
+                    });
+                }
+            }
+            if (cfConditions.length > 0) {
+                where.AND = [...(where.AND || []), ...cfConditions];
+            }
+        }
+
         // STAFF (guides/experts) only see students assigned to them
+
         // Use raw numeric filter — no Prisma relation needed
         const isTelecaller = req.user.role === 'STAFF' && req.user.staffRole === 'TELECALLER';
         if (req.user.role === 'STAFF' && !isTelecaller) {
