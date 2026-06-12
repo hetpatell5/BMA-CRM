@@ -824,33 +824,46 @@ router.get('/', async (req, res, next) => {
         }
 
         // Support customField[FieldName]=value1,value2 for adaptive import-preview filters
-        // e.g. ?customField[Regional Center]=Mumbai,Delhi&customField[Study Center]=SC001
         const customFieldFilters = req.query.customField;
+        const cfFilterEntries = [];
         if (customFieldFilters && typeof customFieldFilters === 'object') {
-            const cfConditions = [];
             for (const [k, v] of Object.entries(customFieldFilters)) {
                 if (!k || !v) continue;
                 const values = String(v).split(',').map(s => s.trim()).filter(Boolean);
-                if (values.length === 1) {
-                    cfConditions.push({ customFields: { path: [k], equals: values[0] } });
-                } else if (values.length > 1) {
-                    // OR across selected values for that column
-                    cfConditions.push({
-                        OR: values.map(val => ({ customFields: { path: [k], equals: val } })),
-                    });
-                }
-            }
-            if (cfConditions.length > 0) {
-                where.AND = [...(where.AND || []), ...cfConditions];
+                if (values.length === 0) continue;
+                cfFilterEntries.push({ key: k, values });
             }
         }
 
         // STAFF (guides/experts) only see students assigned to them
-
         // Use raw numeric filter — no Prisma relation needed
         const isTelecaller = req.user.role === 'STAFF' && req.user.staffRole === 'TELECALLER';
         if (req.user.role === 'STAFF' && !isTelecaller) {
             where.assignedGuideId = req.user.id;
+        }
+
+        // If custom field filters are present, get matching IDs via raw SQL first
+        if (cfFilterEntries.length > 0) {
+            // Build WHERE clauses for each cf filter using JSON_EXTRACT
+            const cfWhereParts = cfFilterEntries.map(({ key, values }) => {
+                const escapedKey = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                const placeholders = values.map(() => '?').join(', ');
+                return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedKey}"')) IN (${placeholders})`;
+            });
+            const cfParams = cfFilterEntries.flatMap(({ values }) => values);
+
+            const cfRows = await prisma.$queryRawUnsafe(
+                `SELECT id FROM students WHERE ${cfWhereParts.join(' AND ')}`,
+                ...cfParams
+            );
+            const cfMatchingIds = cfRows.map(r => Number(r.id));
+
+            // Intersect with any existing id filter
+            if (where.id && where.id.in) {
+                where.id.in = where.id.in.filter(id => cfMatchingIds.includes(Number(id)));
+            } else {
+                where.id = { in: cfMatchingIds.map(id => BigInt(id)) };
+            }
         }
 
         const total = await prisma.student.count({ where });

@@ -200,10 +200,16 @@ export default function ImportPreviewPage() {
         if (debouncedSearch) p.search = debouncedSearch
         if (importBatchId)   p.importBatchId = importBatchId
 
-        // Encode active custom field filters as customField[key]=val1,val2
+        // Pass as a NESTED object so axios serializes correctly:
+        // { customField: { 'Regional Center': 'Mumbai,Delhi' } }
+        // → ?customField[Regional%20Center]=Mumbai%2CDelhi
+        // Express/qs then parses req.query.customField = { 'Regional Center': 'Mumbai,Delhi' }
+        const cfParams: Record<string, string> = {}
         for (const [k, vals] of Object.entries(activeFilters)) {
-            if (vals.size > 0) p[`customField[${k}]`] = Array.from(vals).join(',')
+            if (vals.size > 0) cfParams[k] = Array.from(vals).join(',')
         }
+        if (Object.keys(cfParams).length > 0) p.customField = cfParams
+
         return p
     }, [page, debouncedSearch, importBatchId, activeFilters])
 
