@@ -1731,42 +1731,44 @@ export default function StudentsPage() {
                         </table>
                     </div>
 
-                    {/* Pagination */}
-                    {pagination.totalPages > 1 && (
+                    {/* Pagination — always visible so count shows even on a single page */}
+                    {pagination.total > 0 && (
                         <div className="p-4 border-t border-white/10 flex items-center justify-between mt-auto">
                             <p className="text-sm text-muted-foreground hidden sm:block">
-                                Showing {((page - 1) * 50) + 1} to {Math.min(page * 50, pagination.total)} of {formatNumber(pagination.total)}
+                                Showing {((page - 1) * 50) + 1}–{Math.min(page * 50, pagination.total)} of {formatNumber(pagination.total)}
                             </p>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => { const n = page - 1; setPage(n); setPageInput(String(n)) }}>
-                                    <ChevronLeft className="w-4 h-4" />Prev
-                                </Button>
-                                <div className="flex items-center gap-2 px-2">
-                                    <span className="text-sm text-muted-foreground hidden sm:inline">Page</span>
-                                    <input
-                                        type="text"
-                                        value={pageInput}
-                                        onChange={e => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
-                                        onBlur={() => {
-                                            const v = parseInt(pageInput)
-                                            if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) }
-                                            else setPageInput(String(page))
-                                        }}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') {
+                            {pagination.totalPages > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" size="sm" disabled={page === 1} onClick={() => { const n = page - 1; setPage(n); setPageInput(String(n)) }}>
+                                        <ChevronLeft className="w-4 h-4" />Prev
+                                    </Button>
+                                    <div className="flex items-center gap-2 px-2">
+                                        <span className="text-sm text-muted-foreground hidden sm:inline">Page</span>
+                                        <input
+                                            type="text"
+                                            value={pageInput}
+                                            onChange={e => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
+                                            onBlur={() => {
                                                 const v = parseInt(pageInput)
                                                 if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) }
                                                 else setPageInput(String(page))
-                                            }
-                                        }}
-                                        className="w-12 px-2 py-1 text-sm text-center bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                    />
-                                    <span className="text-sm text-muted-foreground">of {pagination.totalPages}</span>
+                                            }}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    const v = parseInt(pageInput)
+                                                    if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) }
+                                                    else setPageInput(String(page))
+                                                }
+                                            }}
+                                            className="w-12 px-2 py-1 text-sm text-center bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                        />
+                                        <span className="text-sm text-muted-foreground">of {pagination.totalPages}</span>
+                                    </div>
+                                    <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => { const n = page + 1; setPage(n); setPageInput(String(n)) }}>
+                                        Next<ChevronRight className="w-4 h-4" />
+                                    </Button>
                                 </div>
-                                <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => { const n = page + 1; setPage(n); setPageInput(String(n)) }}>
-                                    Next<ChevronRight className="w-4 h-4" />
-                                </Button>
-                            </div>
+                            )}
                         </div>
                     )}
                 </div>

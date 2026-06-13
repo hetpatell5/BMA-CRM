@@ -457,8 +457,8 @@ export default function ImportPreviewPage() {
                 </div>
             )}
 
-            {/* ── Layout: Table + Filter Sidebar ── */}
-            <div className={cn('grid gap-6 transition-all duration-300 items-start', showFilters ? 'grid-cols-1 xl:grid-cols-[1fr_290px]' : 'grid-cols-1')}>
+            {/* ── Layout: Filter Sidebar LEFT + Table ── */}
+            <div className={cn('grid gap-6 transition-all duration-300 items-start', showFilters ? 'grid-cols-1 xl:grid-cols-[280px_1fr]' : 'grid-cols-1')}>
 
                 {/* ── Data Table ── */}
                 <div className="bg-background rounded-xl overflow-hidden min-w-0 border border-border shadow-sm flex flex-col">
@@ -545,38 +545,40 @@ export default function ImportPreviewPage() {
                         </table>
                     </div>
 
-                    {/* ── Pagination ── */}
-                    {pagination.totalPages > 1 && (
+                    {/* ── Pagination — always visible so count shows even on single page ── */}
+                    {pagination.total > 0 && (
                         <div className="p-4 border-t border-border flex items-center justify-between">
                             <p className="text-sm text-muted-foreground hidden sm:block">
                                 Showing {((page - 1) * 50) + 1}–{Math.min(page * 50, pagination.total)} of {formatNumber(pagination.total)}
                             </p>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => { const n = page - 1; setPage(n); setPageInput(String(n)) }}>
-                                    <ChevronLeft className="w-4 h-4" />Prev
-                                </Button>
-                                <div className="flex items-center gap-2 px-2">
-                                    <span className="text-sm text-muted-foreground hidden sm:inline">Page</span>
-                                    <input
-                                        type="text" value={pageInput}
-                                        onChange={e => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
-                                        onBlur={() => { const v = parseInt(pageInput); if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) } else setPageInput(String(page)) }}
-                                        onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(pageInput); if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) } else setPageInput(String(page)) } }}
-                                        className="w-12 px-2 py-1 text-sm text-center bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                    />
-                                    <span className="text-sm text-muted-foreground">of {pagination.totalPages}</span>
+                            {pagination.totalPages > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" size="sm" disabled={page === 1} onClick={() => { const n = page - 1; setPage(n); setPageInput(String(n)) }}>
+                                        <ChevronLeft className="w-4 h-4" />Prev
+                                    </Button>
+                                    <div className="flex items-center gap-2 px-2">
+                                        <span className="text-sm text-muted-foreground hidden sm:inline">Page</span>
+                                        <input
+                                            type="text" value={pageInput}
+                                            onChange={e => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
+                                            onBlur={() => { const v = parseInt(pageInput); if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) } else setPageInput(String(page)) }}
+                                            onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(pageInput); if (v >= 1 && v <= pagination.totalPages) { setPage(v); setPageInput(String(v)) } else setPageInput(String(page)) } }}
+                                            className="w-12 px-2 py-1 text-sm text-center bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                        />
+                                        <span className="text-sm text-muted-foreground">of {pagination.totalPages}</span>
+                                    </div>
+                                    <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => { const n = page + 1; setPage(n); setPageInput(String(n)) }}>
+                                        Next<ChevronRight className="w-4 h-4" />
+                                    </Button>
                                 </div>
-                                <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => { const n = page + 1; setPage(n); setPageInput(String(n)) }}>
-                                    Next<ChevronRight className="w-4 h-4" />
-                                </Button>
-                            </div>
+                            )}
                         </div>
                     )}
                 </div>
 
-                {/* ── Filter Sidebar ── */}
+                {/* ── Filter Sidebar — LEFT side ── */}
                 {showFilters && (
-                    <div className="sticky top-6 self-start rounded-xl border border-border bg-background shadow-lg overflow-hidden h-[calc(100vh-200px)] flex flex-col animate-fade-in">
+                    <div className="sticky top-6 self-start rounded-xl border border-border bg-background shadow-lg overflow-hidden h-[calc(100vh-200px)] flex flex-col animate-fade-in order-first xl:order-none">
                         <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
                             <h3 className="font-semibold text-sm flex items-center gap-2">
                                 <SlidersHorizontal className="w-4 h-4 text-primary" />
@@ -598,6 +600,40 @@ export default function ImportPreviewPage() {
                                 />
                             </div>
                         </div>
+
+                        {/* ── Active Filters Summary — always pinned at top so you can see what's applied ── */}
+                        {activeFilterCount > 0 && (
+                            <div className="px-3 py-2.5 border-b border-border bg-primary/5 shrink-0">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1.5">
+                                    Active ({activeFilterCount})
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                    {importBatchId && (
+                                        <span className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] font-medium border border-blue-200 dark:border-blue-500/30">
+                                            <FolderOpen className="w-2.5 h-2.5 shrink-0" />
+                                            <span className="truncate max-w-[130px]">
+                                                {filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0] || 'Batch'}
+                                            </span>
+                                            <button onClick={() => setImportBatchId('')} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
+                                        </span>
+                                    )}
+                                    {Object.entries(activeFilters).flatMap(([col, vals]) =>
+                                        Array.from(vals).map(val => (
+                                            <span key={`${col}:${val}`} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium border border-primary/20">
+                                                <span className="truncate max-w-[120px]" title={`${col}: ${val}`}>{val}</span>
+                                                <button onClick={() => toggleFilterValue(col, val)} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
+                                            </span>
+                                        ))
+                                    )}
+                                    <button
+                                        onClick={clearAllFilters}
+                                        className="text-[10px] text-red-500 hover:text-red-600 font-medium underline underline-offset-1 ml-0.5"
+                                    >
+                                        Clear all
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
                             {/* Import Batches */}
@@ -648,17 +684,6 @@ export default function ImportPreviewPage() {
                                 />
                             ))}
                         </div>
-
-                        {activeFilterCount > 0 && (
-                            <div className="p-3 border-t border-border shrink-0">
-                                <button
-                                    onClick={clearAllFilters}
-                                    className="w-full h-8 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors border border-red-200 dark:border-red-500/20"
-                                >
-                                    Clear all {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''}
-                                </button>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>
