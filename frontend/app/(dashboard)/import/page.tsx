@@ -318,6 +318,7 @@ export default function ImportPage() {
     }
 
     return (
+        <>
         <div className="space-y-6 animate-fade-in">
             <div>
                 <h1 className="text-xl md:text-2xl font-bold">Import Data</h1>
@@ -736,5 +737,6 @@ export default function ImportPage() {
                     )}
                 </div>
             )}
+        </>
     )
 }
