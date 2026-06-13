@@ -18,7 +18,20 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+// Columns that are unique per-row — never useful as filters
+const NON_FILTERABLE_COLS = new Set([
+    'control number', 'control no',
+    'enrolment number', 'enrollment number', 'enrolment no', 'enrollment no',
+    'name', 'full name', 'first name', 'last name', 'student name',
+    'email', 'e-mail', 'email address', 'email id',
+    'alternate email', 'alternate e-mail', 'alternate email address',
+    'mobile', 'mobile number', 'mobile no', 'phone', 'phone number',
+    'contact', 'contact number', 'contact no',
+])
 
+function isNonFilterableCol(key: string) {
+    return NON_FILTERABLE_COLS.has(key.trim().toLowerCase())
+}
 const INTERNAL_KEYS = new Set([
     'requirementassignments', 'telecallerowners', 'orderidprefix',
     'orderidrequirement', 'orderidgenerated', 'orderidsignature',
@@ -109,7 +122,10 @@ function FilterColumn({
         return vals.filter(v => v.toLowerCase().includes(q) || colKey.toLowerCase().includes(q))
     }, [vals, filterSearch, colKey])
 
-    if (displayed.length === 0 && !isLoading && isOpen) return null
+    // Never fetched yet (section not opened) → show the header but no content
+    // Fetched and got values → show list
+    // Fetched and got 0 values → keep header visible, show a hint (DON'T hide)
+    const hasBeenFetched = vals !== undefined
 
     return (
         <div>
@@ -133,8 +149,10 @@ function FilterColumn({
                 <div className="space-y-0.5 mb-3 max-h-48 overflow-y-auto">
                     {isLoading ? (
                         <div className="px-2 py-3 text-xs text-muted-foreground text-center">Loading…</div>
-                    ) : displayed.length === 0 ? (
-                        <div className="px-2 py-3 text-xs text-muted-foreground text-center">No values match</div>
+                    ) : displayed.length === 0 && hasBeenFetched ? (
+                        <div className="px-2 py-3 text-xs text-muted-foreground text-center italic">
+                            Use Search above to find specific values
+                        </div>
                     ) : (
                         displayed.map(val => (
                             <label
@@ -233,13 +251,15 @@ export default function ImportPreviewPage() {
     const pagination        = data?.pagination || { page: 1, totalPages: 1, total: 0 }
     const customFieldCols   = collectCustomFieldColumns(students)
 
-    // Columns eligible for adaptive filtering: discovered from _columnOrder of first record
+    // Columns eligible for adaptive filtering: from _columnOrder, minus known unique-per-row identity columns
     const filterableCols = useMemo(() => {
+        let cols: string[] = customFieldCols
         for (const s of students) {
             const order = s.customFields?._columnOrder
-            if (Array.isArray(order) && order.length > 0) return order as string[]
+            if (Array.isArray(order) && order.length > 0) { cols = order as string[]; break }
         }
-        return customFieldCols
+        // Strip out identity columns that are useless as filters (always unique per row)
+        return cols.filter(col => !isNonFilterableCol(col))
     }, [students, customFieldCols])
 
     const activeFilterCount =
