@@ -42,6 +42,10 @@ export default function ImportPage() {
     const [progress, setProgress] = useState({ progress: 0, imported: 0, failed: 0 })
     const [result, setResult] = useState<any>(null)
 
+    // Upload progress popup state
+    const [uploadingFile, setUploadingFile] = useState<{ name: string; size: number } | null>(null)
+    const [uploadPct, setUploadPct] = useState(0)       // 0-100 = uploading, -1 = analysing
+
     // Fetch import history
     const { data: historyData, isLoading: historyLoading, refetch: refetchHistory } = useQuery({
         queryKey: ['import-history'],
@@ -107,10 +111,16 @@ export default function ImportPage() {
     // Upload mutation
     const uploadMutation = useMutation({
         mutationFn: async (file: File) => {
-            const response = await importAPI.upload(file, importType)
+            setUploadingFile({ name: file.name, size: file.size })
+            setUploadPct(0)
+            const response = await importAPI.upload(file, importType, (pct) => setUploadPct(pct))
+            // Upload done — server is now reading/parsing the Excel
+            setUploadPct(-1)
             return response.data.data
         },
         onSuccess: (data) => {
+            setUploadingFile(null)
+            setUploadPct(0)
             setUploadData(data)
             setColumnMapping(data.suggestedMappings || {})
             setStep('mapping')
@@ -121,6 +131,8 @@ export default function ImportPage() {
             })
         },
         onError: (error: any) => {
+            setUploadingFile(null)
+            setUploadPct(0)
             toast({
                 title: 'Upload failed',
                 description: error.response?.data?.message || 'Failed to upload file',
@@ -674,6 +686,55 @@ export default function ImportPage() {
                 </div>
             </div>
         </div>
+
+            {/* ── Google Drive-style Upload Progress Popup ─────────────────── */}
+            {uploadingFile && (
+                <div className="fixed bottom-6 right-6 z-50 w-80 rounded-2xl shadow-2xl border border-white/10 bg-[#1e2130]/95 backdrop-blur-xl overflow-hidden animate-fade-in">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                        <span className="text-sm font-semibold text-white">
+                            {uploadPct === -1 ? 'Analysing file…' : 'Uploading file…'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            {uploadPct === -1 ? '' : `${uploadPct}%`}
+                        </span>
+                    </div>
+
+                    {/* File row */}
+                    <div className="flex items-center gap-3 px-4 py-3">
+                        {/* File icon */}
+                        <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+                            <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{uploadingFile.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {(uploadingFile.size / (1024 * 1024)).toFixed(1)} MB
+                            </p>
+                        </div>
+                        {/* Spinner or check */}
+                        {uploadPct === -1 ? (
+                            <Loader2 className="w-5 h-5 text-emerald-400 animate-spin shrink-0" />
+                        ) : (
+                            <span className="text-xs font-bold text-emerald-400 shrink-0">{uploadPct}%</span>
+                        )}
+                    </div>
+
+                    {/* Progress bar */}
+                    {uploadPct !== -1 && (
+                        <div className="h-1 bg-white/5 mx-4 mb-3 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300 ease-out"
+                                style={{ width: `${uploadPct}%` }}
+                            />
+                        </div>
+                    )}
+                    {uploadPct === -1 && (
+                        <div className="h-1 bg-white/5 mx-4 mb-3 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full animate-pulse" style={{ width: '100%' }} />
+                        </div>
+                    )}
+                </div>
+            )}
     )
 }
-

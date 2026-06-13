@@ -138,12 +138,17 @@ export const importAPI = {
     }),
     execute: (data: any) => api.post('/import/execute', data),
     getHistory: (params?: any) => api.get('/import/history', { params }),
-    upload: (file: File, importType?: string) => {
+    upload: (file: File, importType?: string, onUploadProgress?: (pct: number) => void) => {
         const formData = new FormData()
         formData.append('file', file)
         if (importType) formData.append('importType', importType)
         return api.post('/import/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
+            headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: (e) => {
+                if (onUploadProgress && e.total) {
+                    onUploadProgress(Math.round((e.loaded / e.total) * 100))
+                }
+            },
         })
     },
     process: (importId: string, data?: any) => api.post(`/import/process/${importId}`, data),

@@ -347,8 +347,14 @@ export default function ImportPreviewPage() {
             document.body.removeChild(link)
             window.URL.revokeObjectURL(url)
             toast({ title: 'Export Successful', description: 'Your Excel file has been downloaded.' })
-        } catch {
-            toast({ title: 'Export Failed', variant: 'destructive' })
+        } catch (err: any) {
+            // Try to parse backend error message (e.g. 413 Too Many Rows)
+            let message = 'Export failed. Please try again.'
+            try {
+                const data = err?.response?.data
+                if (data?.message) message = data.message
+            } catch { /* ignore */ }
+            toast({ title: 'Export Failed', description: message, variant: 'destructive' })
         } finally {
             setIsExporting(false)
         }

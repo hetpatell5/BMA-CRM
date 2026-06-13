@@ -327,7 +327,11 @@ router.get('/export/excel', async (req, res, next) => {
             subject,
         } = req.query;
 
-        // ── Build where clause (mirrors the main GET route) ──────────────────
+        // ── Hard row cap: exporting the full 380k table in one go locks Node.js ─
+        // Always require at least one meaningful filter before allowing export.
+        const MAX_EXPORT_ROWS = 100_000;
+
+        // ── Build where clause (mirrors the main GET route) ─────────────────────
         const where = {};
 
         if (source) {
@@ -358,8 +362,9 @@ router.get('/export/excel', async (req, res, next) => {
         if (regionalCenter) where.regionalCenter = { equals: regionalCenter };
         if (subject)        where.subjects = { array_contains: [subject] };
 
-        // ── Custom field filters (same raw-SQL approach as main GET) ─────────
+        // ── Custom field filters (same raw-SQL approach as main GET) ─────────────
         const customFieldFilters = req.query.customField;
+        let cfMatchingIds = null;
         if (customFieldFilters && typeof customFieldFilters === 'object') {
             const cfFilterEntries = [];
             for (const [k, v] of Object.entries(customFieldFilters)) {
@@ -373,7 +378,7 @@ router.get('/export/excel', async (req, res, next) => {
                 const cfWhereParts = cfFilterEntries.map(({ key, values }) => {
                     const escapedKey = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
                     const placeholders = values.map(() => '?').join(', ');
-                    return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedKey}"')) IN (${placeholders})`;
+                    return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"${escapedKey}\"')) IN (${placeholders})`;
                 });
                 const cfParams = cfFilterEntries.flatMap(({ values }) => values);
 
@@ -381,7 +386,7 @@ router.get('/export/excel', async (req, res, next) => {
                     `SELECT id FROM students WHERE ${cfWhereParts.join(' AND ')}`,
                     ...cfParams
                 );
-                const cfMatchingIds = cfRows.map(r => BigInt(r.id));
+                cfMatchingIds = cfRows.map(r => BigInt(r.id));
 
                 if (where.id && where.id.in) {
                     where.id.in = where.id.in.filter(id => cfMatchingIds.includes(id));
@@ -391,19 +396,28 @@ router.get('/export/excel', async (req, res, next) => {
             }
         }
 
-        // ── Fetch all matching records (no pagination for export) ─────────────
+        // ── Count first — refuse if too many rows ─────────────────────────────
+        const totalCount = await prisma.student.count({ where });
+
+        if (totalCount === 0) {
+            return res.status(404).json({ success: false, message: 'No records match the current filters.' });
+        }
+
+        if (totalCount > MAX_EXPORT_ROWS) {
+            return res.status(413).json({
+                success: false,
+                message: `Too many records to export (${totalCount.toLocaleString()}). Apply more filters to reduce below ${MAX_EXPORT_ROWS.toLocaleString()} rows and try again.`,
+            });
+        }
+
+        // ── Fetch matching records ─────────────────────────────────────────────
         const students = await prisma.student.findMany({
             where,
             orderBy: { createdAt: 'desc' },
             select: { id: true, customFields: true },
         });
 
-        if (students.length === 0) {
-            return res.status(404).json({ success: false, message: 'No records match the current filters.' });
-        }
-
-        // ── Determine column order from the first record's _columnOrder ───────
-        // Import stores the original sheet column order in customFields._columnOrder
+        // ── Determine column order from the first record's _columnOrder ──────────
         const INTERNAL_KEYS = new Set(['_columnOrder']);
         let columnOrder = null;
         for (const s of students) {
@@ -413,40 +427,31 @@ router.get('/export/excel', async (req, res, next) => {
                 break;
             }
         }
-        // Fallback: collect all keys from first record
         if (!columnOrder) {
             const sample = students[0]?.customFields || {};
             columnOrder = Object.keys(sample).filter(k => !INTERNAL_KEYS.has(k));
         }
 
-        // ── Build rows preserving original column order ───────────────────────
+        // ── Build rows preserving original column order ─────────────────────────
+        const visibleCols = columnOrder.filter(k => !INTERNAL_KEYS.has(k));
         const excelData = students.map(student => {
             const cf = student.customFields || {};
             const row = {};
-            for (const col of columnOrder) {
-                if (INTERNAL_KEYS.has(col)) continue;
+            for (const col of visibleCols) {
                 const val = cf[col];
-                if (Array.isArray(val)) {
-                    row[col] = val.join(', ');
-                } else if (val === null || val === undefined) {
-                    row[col] = '';
-                } else {
-                    row[col] = String(val);
-                }
+                if (Array.isArray(val))                    row[col] = val.join(', ');
+                else if (val === null || val === undefined) row[col] = '';
+                else                                       row[col] = String(val);
             }
             return row;
         });
 
-        // ── Generate compressed workbook ─────────────────────────────────────
-        const worksheet = XLSX.utils.json_to_sheet(excelData, { header: columnOrder.filter(k => !INTERNAL_KEYS.has(k)) });
+        // ── Generate compressed workbook ──────────────────────────────────────
+        const worksheet = XLSX.utils.json_to_sheet(excelData, { header: visibleCols });
         const workbook  = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Import Preview');
-
-        // Reasonable column widths without per-cell scanning (too slow for 380k rows)
-        const visibleCols = columnOrder.filter(k => !INTERNAL_KEYS.has(k));
         worksheet['!cols'] = visibleCols.map(key => ({ wch: Math.min(Math.max(key.length + 2, 12), 40) }));
 
-        // compression: true shrinks xlsx significantly (same as how modern Excel saves)
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', compression: true });
 
         const filename = `import_preview_${new Date().toISOString().split('T')[0]}.xlsx`;
