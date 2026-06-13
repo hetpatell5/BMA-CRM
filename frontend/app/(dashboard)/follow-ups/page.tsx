@@ -207,7 +207,7 @@ export default function FollowUpsPage() {
                             <BellRing className="w-5 h-5 text-amber-500 dark:text-amber-400 animate-pulse" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="font-bold text-amber-700 dark:text-amber-400 text-base mb-3">
+                            <h3 class Name="font-bold text-amber-700 dark:text-amber-400 text-base mb-3">
                                 Attention Needed — {upcomingFollowUps.length} follow-up{upcomingFollowUps.length > 1 ? 's' : ''} due
                             </h3>
                             <div className="grid gap-2">
