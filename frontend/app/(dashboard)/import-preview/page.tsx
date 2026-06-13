@@ -306,9 +306,17 @@ export default function ImportPreviewPage() {
     const handleExport = async () => {
         setIsExporting(true)
         try {
-            const p: Record<string, string> = { source: 'excel_import' }
-            if (importBatchId) p.importBatchId = importBatchId
+            const p: Record<string, any> = { source: 'excel_import' }
+            if (importBatchId)   p.importBatchId = importBatchId
             if (debouncedSearch) p.search = debouncedSearch
+
+            // Pass customField filters as nested object (same as serverParams)
+            const cfParams: Record<string, string> = {}
+            for (const [k, vals] of Object.entries(activeFilters)) {
+                if (vals.size > 0) cfParams[k] = Array.from(vals).join(',')
+            }
+            if (Object.keys(cfParams).length > 0) p.customField = cfParams
+
             const response = await studentsAPI.exportExcel(p)
             const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
             const url = window.URL.createObjectURL(blob)
