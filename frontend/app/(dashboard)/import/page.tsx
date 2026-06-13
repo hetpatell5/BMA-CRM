@@ -578,8 +578,8 @@ export default function ImportPage() {
                      <Button variant="outline" onClick={handleReset} className="gap-2 px-6">
                          <Upload className="w-4 h-4" /> Import Another File
                      </Button>
-                     <Button onClick={() => window.location.href = importType === 'STUDENTS' ? '/orders' : '/leads'} className="gap-2 gradient-primary text-white px-8">
-                         View {importType === 'STUDENTS' ? 'Orders' : 'Leads'} <ArrowRight className="w-4 h-4" />
+                     <Button onClick={() => window.location.href = importType === 'STUDENTS' ? `/import-preview?batchId=${uploadData?.importId || ''}` : '/leads'} className="gap-2 gradient-primary text-white px-8">
+                         View {importType === 'STUDENTS' ? 'Import Preview' : 'Leads'} <ArrowRight className="w-4 h-4" />
                      </Button>
                  </div>
              </div>

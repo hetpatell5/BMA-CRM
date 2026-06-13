@@ -438,13 +438,9 @@ router.post('/process/:importId', async (req, res, next) => {
                             studentData.customFields = mappedData.customFields;
                         }
 
-                        const orderIdResult = await ensureOrderIdForCustomFields(prisma, studentData.customFields || {}, null, null, readSettings());
-                        if (orderIdResult.orderId) {
-                            studentData.controlNumber = studentData.controlNumber || orderIdResult.orderId;
-                        }
-                        if (Object.keys(orderIdResult.customFields).length > 0) {
-                            studentData.customFields = orderIdResult.customFields;
-                        }
+                        // For excel imports the Control Number comes from the sheet — skip the
+                        // per-row order-ID generator (it's a major speed bottleneck at 380k rows).
+                        // The orderIdService is still called for manual/form_submission records.
 
                         studentsToCreate.push(studentData);
                     } else {
@@ -707,44 +703,51 @@ router.get('/history', async (req, res, next) => {
 router.delete('/history/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { deleteRecords = false } = req.query; // If true, also delete imported students
+        const { deleteRecords = false } = req.query;
 
         const importRecord = await prisma.importHistory.findUnique({
             where: { id: BigInt(id) },
         });
 
         if (!importRecord) {
-            return res.status(404).json({
-                success: false,
-                message: 'Import record not found',
-            });
+            return res.status(404).json({ success: false, message: 'Import record not found' });
         }
 
         let deletedOrdersCount = 0;
 
-        // If deleteRecords is true and import was completed, delete the imported records
         if (deleteRecords === 'true' && importRecord.status === 'COMPLETED') {
-            // Delete all records that were imported with this batch
-            const result = await prisma.student.deleteMany({
-                where: { importBatchId: BigInt(id) },
-            });
-            deletedOrdersCount = result.count;
+            // Count first so we can report
+            const countResult = await prisma.$queryRawUnsafe(
+                `SELECT COUNT(*) AS cnt FROM students WHERE import_batch_id = ?`,
+                BigInt(id)
+            );
+            const totalToDelete = Number(countResult[0]?.cnt || 0);
+
+            // Delete in chunks of 10,000 to avoid long table locks
+            const CHUNK = 10000;
+            let deleted = 0;
+            while (deleted < totalToDelete) {
+                const result = await prisma.$queryRawUnsafe(
+                    `DELETE FROM students WHERE import_batch_id = ? LIMIT ${CHUNK}`,
+                    BigInt(id)
+                );
+                const count = Number(result?.affectedRows ?? 0);
+                if (count === 0) break; // nothing left
+                deleted += count;
+            }
+            deletedOrdersCount = deleted;
         }
 
-        // Delete the import record (for PENDING/FAILED/PROCESSING) or with records for COMPLETED
         if (['PENDING', 'FAILED', 'PROCESSING'].includes(importRecord.status) || deleteRecords === 'true') {
-            // First, unlink any remaining records from this batch (in case deleteRecords wasn't set)
-            await prisma.student.updateMany({
-                where: { importBatchId: BigInt(id) },
-                data: { importBatchId: null },
-            });
+            // Null-out any remaining batch references (e.g. records not deleted)
+            await prisma.$queryRawUnsafe(
+                `UPDATE students SET import_batch_id = NULL WHERE import_batch_id = ?`,
+                BigInt(id)
+            );
 
-            // Then delete the import record
-            await prisma.importHistory.delete({
-                where: { id: BigInt(id) },
-            });
+            await prisma.importHistory.delete({ where: { id: BigInt(id) } });
 
-            res.json({
+            return res.json({
                 success: true,
                 message: deleteRecords === 'true'
                     ? `Import and ${deletedOrdersCount} records deleted successfully`
@@ -752,7 +755,6 @@ router.delete('/history/:id', async (req, res, next) => {
                 data: { deletedOrdersCount },
             });
         } else {
-            // For completed imports without deleteRecords, don't allow deletion
             return res.status(400).json({
                 success: false,
                 message: 'To delete a completed import, set deleteRecords=true to also remove imported data',

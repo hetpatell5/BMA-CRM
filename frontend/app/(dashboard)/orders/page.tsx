@@ -79,14 +79,23 @@ function customFieldValueToText(value: any): string {
 // ─── Helper: read a value from customFields by matching label keywords ────────
 function cfGet(customFields: Record<string, any> | null | undefined, ...keywords: string[]): string {
     if (!customFields || typeof customFields !== 'object') return ''
-    const entries = Object.entries(customFields)
-        .filter(([key, val]) => !INTERNAL_CUSTOM_FIELD_KEYS.has(normalizeFieldKey(key)) && customFieldValueToText(val))
 
     for (const keyword of keywords) {
+        // 1. Direct key lookup first (fastest, most accurate — even if value is numeric 0)
+        if (Object.prototype.hasOwnProperty.call(customFields, keyword)) {
+            const direct = customFieldValueToText(customFields[keyword])
+            if (direct) return direct
+        }
+
+        // 2. Normalised exact match across all non-internal keys
         const normalizedKeyword = normalizeFieldKey(keyword)
+        const entries = Object.entries(customFields)
+            .filter(([key, val]) => !INTERNAL_CUSTOM_FIELD_KEYS.has(normalizeFieldKey(key)) && customFieldValueToText(val))
+
         const exact = entries.find(([key]) => normalizeFieldKey(key) === normalizedKeyword)
         if (exact) return customFieldValueToText(exact[1])
 
+        // 3. Partial match fallback
         const partial = entries.find(([key]) => key.toLowerCase().includes(keyword.toLowerCase()))
         if (partial) return customFieldValueToText(partial[1])
     }
