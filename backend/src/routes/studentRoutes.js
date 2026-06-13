@@ -345,7 +345,6 @@ router.get('/export/excel', async (req, res, next) => {
                 { programme: { contains: search } },
                 { course: { contains: search } },
                 { regionalCenter: { contains: search } },
-                { customFields: { string_contains: search } },
             ];
         }
 
@@ -827,7 +826,6 @@ router.get('/', async (req, res, next) => {
                 { city: { contains: search } },
                 { state: { contains: search } },
                 { regionalCenter: { contains: search } },
-                { customFields: { string_contains: search } },
             ];
         }
 
