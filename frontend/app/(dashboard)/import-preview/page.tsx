@@ -457,10 +457,118 @@ export default function ImportPreviewPage() {
                 </div>
             )}
 
-            {/* ── Layout: Filter Sidebar LEFT + Table ── */}
+
+            {/* ── Layout: Filter Sidebar LEFT + Table RIGHT ── */}
             <div className={cn('grid gap-6 transition-all duration-300 items-start', showFilters ? 'grid-cols-1 xl:grid-cols-[280px_1fr]' : 'grid-cols-1')}>
 
-                {/* ── Data Table ── */}
+                {/* ── Filter Sidebar — FIRST in DOM = LEFT column ── */}
+                {showFilters && (
+                    <div className="sticky top-6 self-start rounded-xl border border-border bg-background shadow-lg overflow-hidden h-[calc(100vh-200px)] flex flex-col animate-fade-in">
+                        <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+                            <h3 className="font-semibold text-sm flex items-center gap-2">
+                                <SlidersHorizontal className="w-4 h-4 text-primary" />
+                                Filter Records
+                            </h3>
+                            <button onClick={() => setShowFilters(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="px-4 py-3 border-b border-border shrink-0">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                                <input
+                                    placeholder="Search filter values..."
+                                    value={filterSearch}
+                                    onChange={e => setFilterSearch(e.target.value)}
+                                    className="w-full h-8 pl-8 pr-3 rounded-lg text-sm bg-slate-100 dark:bg-white/5 border border-transparent focus:border-primary/40 focus:outline-none transition-colors"
+                                />
+                            </div>
+                        </div>
+
+                        {/* ── Active Filters Summary — pinned at top ── */}
+                        {activeFilterCount > 0 && (
+                            <div className="px-3 py-2.5 border-b border-border bg-primary/5 shrink-0">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1.5">
+                                    Active ({activeFilterCount})
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                    {importBatchId && (
+                                        <span className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] font-medium border border-blue-200 dark:border-blue-500/30">
+                                            <FolderOpen className="w-2.5 h-2.5 shrink-0" />
+                                            <span className="truncate max-w-[130px]">
+                                                {filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0] || 'Batch'}
+                                            </span>
+                                            <button onClick={() => setImportBatchId('')} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
+                                        </span>
+                                    )}
+                                    {Object.entries(activeFilters).flatMap(([col, vals]) =>
+                                        Array.from(vals).map(val => (
+                                            <span key={`${col}:${val}`} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium border border-primary/20">
+                                                <span className="truncate max-w-[120px]" title={`${col}: ${val}`}>{val}</span>
+                                                <button onClick={() => toggleFilterValue(col, val)} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
+                                            </span>
+                                        ))
+                                    )}
+                                    <button onClick={clearAllFilters} className="text-[10px] text-red-500 hover:text-red-600 font-medium underline underline-offset-1 ml-0.5">
+                                        Clear all
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
+                            {/* Import Batches */}
+                            {filterOptions?.importBatches?.length > 0 && (
+                                <div>
+                                    <button
+                                        className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                                        onClick={() => toggleSection('imports')}
+                                    >
+                                        <span className="flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5" />Imported Files</span>
+                                        <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', openSections.imports && 'rotate-180')} />
+                                    </button>
+                                    {openSections.imports && (
+                                        <div className="space-y-0.5 mb-3">
+                                            {filterOptions.importBatches
+                                                .filter((b: any) => !filterSearch || b.fileName.toLowerCase().includes(filterSearch.toLowerCase()))
+                                                .map((batch: any) => (
+                                                    <label key={batch.id} className={cn('flex items-start gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors', importBatchId === batch.id ? 'bg-blue-50 dark:bg-blue-500/10' : 'hover:bg-slate-100 dark:hover:bg-white/5')}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={importBatchId === batch.id}
+                                                            onChange={() => setImportBatchId(prev => prev === batch.id ? '' : batch.id)}
+                                                            className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 accent-blue-500 cursor-pointer shrink-0"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <p className="text-[13px] font-medium leading-tight truncate text-foreground">{batch.fileName}</p>
+                                                            <p className="text-[11px] text-muted-foreground mt-0.5">{batch.importedCount} records</p>
+                                                        </div>
+                                                    </label>
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Adaptive column filters — lazy loaded */}
+                            {filterableCols.map((colKey, idx) => (
+                                <FilterColumn
+                                    key={colKey}
+                                    colKey={colKey}
+                                    accentIdx={idx}
+                                    batchId={importBatchId}
+                                    selectedVals={activeFilters[colKey] || new Set()}
+                                    filterSearch={filterSearch}
+                                    onToggle={toggleFilterValue}
+                                    openSections={openSections}
+                                    toggleSection={toggleSection}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <div className="bg-background rounded-xl overflow-hidden min-w-0 border border-border shadow-sm flex flex-col">
                     <div className="overflow-auto scrollbar-thin max-h-[calc(100vh-320px)]">
                         <table className="w-full border-collapse text-sm">
@@ -575,117 +683,6 @@ export default function ImportPreviewPage() {
                         </div>
                     )}
                 </div>
-
-                {/* ── Filter Sidebar — LEFT side ── */}
-                {showFilters && (
-                    <div className="sticky top-6 self-start rounded-xl border border-border bg-background shadow-lg overflow-hidden h-[calc(100vh-200px)] flex flex-col animate-fade-in order-first xl:order-none">
-                        <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
-                            <h3 className="font-semibold text-sm flex items-center gap-2">
-                                <SlidersHorizontal className="w-4 h-4 text-primary" />
-                                Filter Records
-                            </h3>
-                            <button onClick={() => setShowFilters(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        <div className="px-4 py-3 border-b border-border shrink-0">
-                            <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                                <input
-                                    placeholder="Search filter values..."
-                                    value={filterSearch}
-                                    onChange={e => setFilterSearch(e.target.value)}
-                                    className="w-full h-8 pl-8 pr-3 rounded-lg text-sm bg-slate-100 dark:bg-white/5 border border-transparent focus:border-primary/40 focus:outline-none transition-colors"
-                                />
-                            </div>
-                        </div>
-
-                        {/* ── Active Filters Summary — always pinned at top so you can see what's applied ── */}
-                        {activeFilterCount > 0 && (
-                            <div className="px-3 py-2.5 border-b border-border bg-primary/5 shrink-0">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1.5">
-                                    Active ({activeFilterCount})
-                                </p>
-                                <div className="flex flex-wrap gap-1">
-                                    {importBatchId && (
-                                        <span className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] font-medium border border-blue-200 dark:border-blue-500/30">
-                                            <FolderOpen className="w-2.5 h-2.5 shrink-0" />
-                                            <span className="truncate max-w-[130px]">
-                                                {filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0] || 'Batch'}
-                                            </span>
-                                            <button onClick={() => setImportBatchId('')} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
-                                        </span>
-                                    )}
-                                    {Object.entries(activeFilters).flatMap(([col, vals]) =>
-                                        Array.from(vals).map(val => (
-                                            <span key={`${col}:${val}`} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium border border-primary/20">
-                                                <span className="truncate max-w-[120px]" title={`${col}: ${val}`}>{val}</span>
-                                                <button onClick={() => toggleFilterValue(col, val)} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
-                                            </span>
-                                        ))
-                                    )}
-                                    <button
-                                        onClick={clearAllFilters}
-                                        className="text-[10px] text-red-500 hover:text-red-600 font-medium underline underline-offset-1 ml-0.5"
-                                    >
-                                        Clear all
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
-                            {/* Import Batches */}
-                            {filterOptions?.importBatches?.length > 0 && (
-                                <div>
-                                    <button
-                                        className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-                                        onClick={() => toggleSection('imports')}
-                                    >
-                                        <span className="flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5" />Imported Files</span>
-                                        <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', openSections.imports && 'rotate-180')} />
-                                    </button>
-                                    {openSections.imports && (
-                                        <div className="space-y-0.5 mb-3">
-                                            {filterOptions.importBatches
-                                                .filter((b: any) => !filterSearch || b.fileName.toLowerCase().includes(filterSearch.toLowerCase()))
-                                                .map((batch: any) => (
-                                                    <label key={batch.id} className={cn('flex items-start gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors', importBatchId === batch.id ? 'bg-blue-50 dark:bg-blue-500/10' : 'hover:bg-slate-100 dark:hover:bg-white/5')}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={importBatchId === batch.id}
-                                                            onChange={() => setImportBatchId(prev => prev === batch.id ? '' : batch.id)}
-                                                            className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 accent-blue-500 cursor-pointer shrink-0"
-                                                        />
-                                                        <div className="min-w-0">
-                                                            <p className="text-[13px] font-medium leading-tight truncate text-foreground">{batch.fileName}</p>
-                                                            <p className="text-[11px] text-muted-foreground mt-0.5">{batch.importedCount} records</p>
-                                                        </div>
-                                                    </label>
-                                                ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Adaptive column filters — lazy loaded */}
-                            {filterableCols.map((colKey, idx) => (
-                                <FilterColumn
-                                    key={colKey}
-                                    colKey={colKey}
-                                    accentIdx={idx}
-                                    batchId={importBatchId}
-                                    selectedVals={activeFilters[colKey] || new Set()}
-                                    filterSearch={filterSearch}
-                                    onToggle={toggleFilterValue}
-                                    openSections={openSections}
-                                    toggleSection={toggleSection}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     )
