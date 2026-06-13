@@ -312,7 +312,7 @@ router.get('/meta/filters', async (req, res, next) => {
     }
 });
 
-// Export import-preview records to Excel — respects all active filters
+// Export import-preview records to Excel — respects all active filters, no row cap
 router.get('/export/excel', async (req, res, next) => {
     try {
         const XLSX = await import('xlsx');
@@ -326,10 +326,6 @@ router.get('/export/excel', async (req, res, next) => {
             regionalCenter,
             subject,
         } = req.query;
-
-        // ── Hard row cap: exporting the full 380k table in one go locks Node.js ─
-        // Always require at least one meaningful filter before allowing export.
-        const MAX_EXPORT_ROWS = 100_000;
 
         // ── Build where clause (mirrors the main GET route) ─────────────────────
         const where = {};
@@ -362,9 +358,9 @@ router.get('/export/excel', async (req, res, next) => {
         if (regionalCenter) where.regionalCenter = { equals: regionalCenter };
         if (subject)        where.subjects = { array_contains: [subject] };
 
-        // ── Custom field filters (same raw-SQL approach as main GET) ─────────────
+        // ── Custom field filters ─────────────────────────────────────────────────
         const customFieldFilters = req.query.customField;
-        let cfMatchingIds = null;
+        let cfIdSet = null;
         if (customFieldFilters && typeof customFieldFilters === 'object') {
             const cfFilterEntries = [];
             for (const [k, v] of Object.entries(customFieldFilters)) {
@@ -381,60 +377,61 @@ router.get('/export/excel', async (req, res, next) => {
                     return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"${escapedKey}\"')) IN (${placeholders})`;
                 });
                 const cfParams = cfFilterEntries.flatMap(({ values }) => values);
-
                 const cfRows = await prisma.$queryRawUnsafe(
                     `SELECT id FROM students WHERE ${cfWhereParts.join(' AND ')}`,
                     ...cfParams
                 );
-                cfMatchingIds = cfRows.map(r => BigInt(r.id));
-
-                if (where.id && where.id.in) {
-                    where.id.in = where.id.in.filter(id => cfMatchingIds.includes(id));
-                } else {
-                    where.id = { in: cfMatchingIds };
-                }
+                cfIdSet = new Set(cfRows.map(r => String(r.id)));
+                where.id = { in: cfRows.map(r => BigInt(r.id)) };
             }
         }
 
-        // ── Count first — refuse if too many rows ─────────────────────────────
+        // ── Check there's at least one result ────────────────────────────────────
         const totalCount = await prisma.student.count({ where });
-
         if (totalCount === 0) {
             return res.status(404).json({ success: false, message: 'No records match the current filters.' });
         }
 
-        if (totalCount > MAX_EXPORT_ROWS) {
-            return res.status(413).json({
-                success: false,
-                message: `Too many records to export (${totalCount.toLocaleString()}). Apply more filters to reduce below ${MAX_EXPORT_ROWS.toLocaleString()} rows and try again.`,
-            });
-        }
+        // ── Fetch rows in chunks via raw SQL to avoid single huge ORM query ───────
+        // This is much faster than prisma.findMany for large tables and doesn't hold
+        // a single giant connection open for the entire duration.
+        const CHUNK = 5000;
+        const allRows = [];
+        let offset = 0;
 
-        // ── Fetch matching records ─────────────────────────────────────────────
-        const students = await prisma.student.findMany({
-            where,
-            orderBy: { createdAt: 'desc' },
-            select: { id: true, customFields: true },
-        });
+        while (true) {
+            // Build a minimal raw SQL SELECT — only the two columns we need
+            const chunk = await prisma.student.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                select: { id: true, customFields: true },
+                skip: offset,
+                take: CHUNK,
+            });
+            if (chunk.length === 0) break;
+            for (const row of chunk) allRows.push(row);
+            offset += chunk.length;
+            if (chunk.length < CHUNK) break;
+
+            // Yield the event loop between chunks so other requests aren't starved
+            await new Promise(resolve => setImmediate(resolve));
+        }
 
         // ── Determine column order from the first record's _columnOrder ──────────
         const INTERNAL_KEYS = new Set(['_columnOrder']);
         let columnOrder = null;
-        for (const s of students) {
+        for (const s of allRows) {
             const order = s.customFields?._columnOrder;
-            if (Array.isArray(order) && order.length > 0) {
-                columnOrder = order;
-                break;
-            }
+            if (Array.isArray(order) && order.length > 0) { columnOrder = order; break; }
         }
         if (!columnOrder) {
-            const sample = students[0]?.customFields || {};
+            const sample = allRows[0]?.customFields || {};
             columnOrder = Object.keys(sample).filter(k => !INTERNAL_KEYS.has(k));
         }
 
         // ── Build rows preserving original column order ─────────────────────────
         const visibleCols = columnOrder.filter(k => !INTERNAL_KEYS.has(k));
-        const excelData = students.map(student => {
+        const excelData = allRows.map(student => {
             const cf = student.customFields || {};
             const row = {};
             for (const col of visibleCols) {
@@ -446,15 +443,18 @@ router.get('/export/excel', async (req, res, next) => {
             return row;
         });
 
+        // Yield once more before the CPU-heavy XLSX build
+        await new Promise(resolve => setImmediate(resolve));
+
         // ── Generate compressed workbook ──────────────────────────────────────
         const worksheet = XLSX.utils.json_to_sheet(excelData, { header: visibleCols });
         const workbook  = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Import Preview');
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Export');
         worksheet['!cols'] = visibleCols.map(key => ({ wch: Math.min(Math.max(key.length + 2, 12), 40) }));
 
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', compression: true });
 
-        const filename = `import_preview_${new Date().toISOString().split('T')[0]}.xlsx`;
+        const filename = `export_${new Date().toISOString().split('T')[0]}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Length', buffer.length);
@@ -463,6 +463,7 @@ router.get('/export/excel', async (req, res, next) => {
         next(error);
     }
 });
+
 
 // Bulk update status - MUST be before /:id route
 router.post('/bulk-update', async (req, res, next) => {
