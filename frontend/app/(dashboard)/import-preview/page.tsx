@@ -352,7 +352,13 @@ export default function ImportPreviewPage() {
             let message = 'Export failed. Please try again.'
             try {
                 const data = err?.response?.data
-                if (data?.message) message = data.message
+                if (data instanceof Blob) {
+                    const text = await data.text()
+                    const json = JSON.parse(text)
+                    if (json?.message) message = json.message
+                } else if (data?.message) {
+                    message = data.message
+                }
             } catch { /* ignore */ }
             toast({ title: 'Export Failed', description: message, variant: 'destructive' })
         } finally {
