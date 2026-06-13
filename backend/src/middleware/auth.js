@@ -3,7 +3,10 @@ import prisma from '../config/database.js';
 
 export const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    // For GET requests, also accept token as a query param so the browser can
+    // open download URLs directly (avoids axios buffering the whole response).
+    const token = (authHeader && authHeader.split(' ')[1])
+        || (req.method === 'GET' ? req.query.token : null);
 
     if (!token) {
         return res.status(401).json({

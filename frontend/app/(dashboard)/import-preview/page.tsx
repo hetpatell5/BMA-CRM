@@ -323,40 +323,31 @@ export default function ImportPreviewPage() {
 
     // ── Export ─────────────────────────────────────────────────────────────
     const [isExporting, setIsExporting] = useState(false)
-    const handleExport = async () => {
-        setIsExporting(true)
+    const handleExport = () => {
         try {
             const p: Record<string, any> = { source: 'excel_import' }
             if (importBatchId)   p.importBatchId = importBatchId
             if (debouncedSearch) p.search = debouncedSearch
 
-            // Pass customField filters as nested object (same as serverParams)
+            // Pass customField filters
             const cfParams: Record<string, string> = {}
             for (const [k, vals] of Object.entries(activeFilters)) {
                 if (vals.size > 0) cfParams[k] = Array.from(vals).join(',')
             }
             if (Object.keys(cfParams).length > 0) p.customField = cfParams
 
-            const response = await studentsAPI.exportExcel(p)
-            const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' })
-            const url = window.URL.createObjectURL(blob)
+            // Build a direct URL with auth token and open in a hidden <a>
+            // The browser handles streaming download natively — no axios buffering, no timeout
+            const url = studentsAPI.getExportUrl(p)
             const link = document.createElement('a')
             link.href = url
             link.download = `export_${new Date().toISOString().split('T')[0]}.csv`
-            document.body.appendChild(link); link.click()
+            document.body.appendChild(link)
+            link.click()
             document.body.removeChild(link)
-            window.URL.revokeObjectURL(url)
-            toast({ title: 'Export Successful', description: 'Your Excel file has been downloaded.' })
-        } catch (err: any) {
-            // Try to parse backend error message (e.g. 413 Too Many Rows)
-            let message = 'Export failed. Please try again.'
-            try {
-                const data = err?.response?.data
-                if (data?.message) message = data.message
-            } catch { /* ignore */ }
-            toast({ title: 'Export Failed', description: message, variant: 'destructive' })
-        } finally {
-            setIsExporting(false)
+            toast({ title: 'Export Started', description: 'Your file will download shortly.' })
+        } catch {
+            toast({ title: 'Export Failed', description: 'Could not start export.', variant: 'destructive' })
         }
     }
 

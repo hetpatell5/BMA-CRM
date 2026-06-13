@@ -107,6 +107,29 @@ export const studentsAPI = {
     bulkDelete: (ids: string[]) => api.post('/students/bulk-delete', { ids }),
     backfillOrderIds: () => api.post('/students/backfill-order-ids'),
     exportExcel: (params?: any) => api.get('/students/export/excel', { params, responseType: 'blob' }),
+    // Build a direct download URL — pass to window.open or <a href> for true streaming download
+    getExportUrl: (params?: Record<string, any>): string => {
+        const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+        const authStorage = typeof window !== 'undefined' ? localStorage.getItem('auth-storage') : null
+        let token = ''
+        try { token = JSON.parse(authStorage || '{}')?.state?.token || '' } catch { /* ignore */ }
+        const qs = new URLSearchParams()
+        if (token) qs.set('token', token)
+        if (params) {
+            for (const [k, v] of Object.entries(params)) {
+                if (v === undefined || v === null || v === '') continue
+                if (typeof v === 'object' && !Array.isArray(v)) {
+                    // customField[key]=value
+                    for (const [ck, cv] of Object.entries(v)) {
+                        if (cv) qs.set(`${k}[${ck}]`, String(cv))
+                    }
+                } else {
+                    qs.set(k, String(v))
+                }
+            }
+        }
+        return `${base}/students/export/excel?${qs.toString()}`
+    },
     assignToGuide: (studentId: string, guideId: number | null, commission?: string | null, forceDuplicate?: boolean) =>
         api.post(`/students/assign/${studentId}`, { guideId, commission, forceDuplicate }),
     coHandle: (studentId: string | number, coHandlerId?: number | null) =>

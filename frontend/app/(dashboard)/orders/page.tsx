@@ -706,25 +706,21 @@ export default function StudentsPage() {
     }
 
     // Export
-    const [isExporting, setIsExporting] = useState(false)
-    const handleExport = async () => {
-        setIsExporting(true)
+    const isExporting = false  // download is instant (browser handles it natively)
+    const handleExport = () => {
         try {
-            const response = await studentsAPI.exportExcel({ search, ...filters })
-            const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' })
-            const url  = window.URL.createObjectURL(blob)
+            // Build a direct URL with auth token and let the browser handle it natively
+            // No axios buffering, no timeout — browser streams straight to disk
+            const url = studentsAPI.getExportUrl({ search, ...filters })
             const link = document.createElement('a')
             link.href = url
             link.download = `export_${new Date().toISOString().split('T')[0]}.csv`
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
-            window.URL.revokeObjectURL(url)
-            toast({ title: 'Export Successful', description: 'Your file has been downloaded.' })
+            toast({ title: 'Export Started', description: 'Your file will download shortly.' })
         } catch {
             toast({ title: 'Export Failed', variant: 'destructive' })
-        } finally {
-            setIsExporting(false)
         }
     }
 
