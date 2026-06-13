@@ -338,11 +338,11 @@ export default function ImportPreviewPage() {
             if (Object.keys(cfParams).length > 0) p.customField = cfParams
 
             const response = await studentsAPI.exportExcel(p)
-            const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+            const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' })
             const url = window.URL.createObjectURL(blob)
             const link = document.createElement('a')
             link.href = url
-            link.download = `import_preview_${new Date().toISOString().split('T')[0]}.xlsx`
+            link.download = `export_${new Date().toISOString().split('T')[0]}.csv`
             document.body.appendChild(link); link.click()
             document.body.removeChild(link)
             window.URL.revokeObjectURL(url)
@@ -352,13 +352,7 @@ export default function ImportPreviewPage() {
             let message = 'Export failed. Please try again.'
             try {
                 const data = err?.response?.data
-                if (data instanceof Blob) {
-                    const text = await data.text()
-                    const json = JSON.parse(text)
-                    if (json?.message) message = json.message
-                } else if (data?.message) {
-                    message = data.message
-                }
+                if (data?.message) message = data.message
             } catch { /* ignore */ }
             toast({ title: 'Export Failed', description: message, variant: 'destructive' })
         } finally {

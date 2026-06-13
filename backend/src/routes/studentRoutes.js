@@ -312,11 +312,9 @@ router.get('/meta/filters', async (req, res, next) => {
     }
 });
 
-// Export import-preview records to Excel — respects all active filters, no row cap
+// Export records to CSV — true streaming, no in-memory build, handles any row count
 router.get('/export/excel', async (req, res, next) => {
     try {
-        const XLSX = await import('xlsx');
-
         const {
             search = '',
             source,
@@ -327,7 +325,7 @@ router.get('/export/excel', async (req, res, next) => {
             subject,
         } = req.query;
 
-        // ── Build where clause (mirrors the main GET route) ─────────────────────
+        // ── Build where clause ───────────────────────────────────────────────────
         const where = {};
 
         if (source) {
@@ -336,9 +334,7 @@ router.get('/export/excel', async (req, res, next) => {
             where.source = { not: 'excel_import' };
         }
 
-        if (importBatchId) {
-            where.importBatchId = BigInt(importBatchId);
-        }
+        if (importBatchId) where.importBatchId = BigInt(importBatchId);
 
         if (search) {
             where.OR = [
@@ -360,7 +356,6 @@ router.get('/export/excel', async (req, res, next) => {
 
         // ── Custom field filters ─────────────────────────────────────────────────
         const customFieldFilters = req.query.customField;
-        let cfIdSet = null;
         if (customFieldFilters && typeof customFieldFilters === 'object') {
             const cfFilterEntries = [];
             for (const [k, v] of Object.entries(customFieldFilters)) {
@@ -369,98 +364,94 @@ router.get('/export/excel', async (req, res, next) => {
                 if (values.length === 0) continue;
                 cfFilterEntries.push({ key: k, values });
             }
-
             if (cfFilterEntries.length > 0) {
                 const cfWhereParts = cfFilterEntries.map(({ key, values }) => {
-                    const escapedKey = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-                    const placeholders = values.map(() => '?').join(', ');
-                    return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"${escapedKey}\"')) IN (${placeholders})`;
+                    const ek = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"${ek}\"')) IN (${values.map(() => '?').join(', ')})`;
                 });
                 const cfParams = cfFilterEntries.flatMap(({ values }) => values);
                 const cfRows = await prisma.$queryRawUnsafe(
                     `SELECT id FROM students WHERE ${cfWhereParts.join(' AND ')}`,
                     ...cfParams
                 );
-                cfIdSet = new Set(cfRows.map(r => String(r.id)));
                 where.id = { in: cfRows.map(r => BigInt(r.id)) };
             }
         }
 
-        // ── Check there's at least one result ────────────────────────────────────
-        const totalCount = await prisma.student.count({ where });
-        if (totalCount === 0) {
+        // ── Grab first record to determine column order ──────────────────────────
+        const firstRow = await prisma.student.findFirst({
+            where,
+            orderBy: { createdAt: 'desc' },
+            select: { customFields: true },
+        });
+
+        if (!firstRow) {
             return res.status(404).json({ success: false, message: 'No records match the current filters.' });
         }
 
-        // ── Fetch rows in chunks via raw SQL to avoid single huge ORM query ───────
-        // This is much faster than prisma.findMany for large tables and doesn't hold
-        // a single giant connection open for the entire duration.
-        const CHUNK = 5000;
-        const allRows = [];
+        const INTERNAL_KEYS = new Set(['_columnOrder']);
+        const cfFirst = firstRow.customFields || {};
+        const columnOrder = (Array.isArray(cfFirst._columnOrder) && cfFirst._columnOrder.length > 0)
+            ? cfFirst._columnOrder
+            : Object.keys(cfFirst);
+        const visibleCols = columnOrder.filter(k => !INTERNAL_KEYS.has(k));
+
+        // Helper: escape a single CSV cell value
+        const csvCell = (val) => {
+            if (val === null || val === undefined) return '';
+            const s = Array.isArray(val) ? val.join(', ') : String(val);
+            // Wrap in quotes if contains comma, quote, or newline
+            if (s.includes('"') || s.includes(',') || s.includes('\n')) {
+                return '"' + s.replace(/"/g, '""') + '"';
+            }
+            return s;
+        };
+
+        const filename = `export_${new Date().toISOString().split('T')[0]}.csv`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        // Write UTF-8 BOM so Excel auto-detects encoding
+        res.write('\uFEFF');
+
+        // Write header row
+        res.write(visibleCols.map(csvCell).join(',') + '\r\n');
+
+        // ── Stream rows in batches of 1000 ───────────────────────────────────────
+        const CHUNK = 1000;
         let offset = 0;
 
         while (true) {
-            // Build a minimal raw SQL SELECT — only the two columns we need
-            const chunk = await prisma.student.findMany({
+            const rows = await prisma.student.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
-                select: { id: true, customFields: true },
+                select: { customFields: true },
                 skip: offset,
                 take: CHUNK,
             });
-            if (chunk.length === 0) break;
-            for (const row of chunk) allRows.push(row);
-            offset += chunk.length;
-            if (chunk.length < CHUNK) break;
 
-            // Yield the event loop between chunks so other requests aren't starved
+            if (rows.length === 0) break;
+
+            let csvChunk = '';
+            for (const row of rows) {
+                const cf = row.customFields || {};
+                csvChunk += visibleCols.map(col => csvCell(cf[col])).join(',') + '\r\n';
+            }
+            res.write(csvChunk);
+
+            offset += rows.length;
+            if (rows.length < CHUNK) break;
+
+            // Yield event loop so other requests stay responsive
             await new Promise(resolve => setImmediate(resolve));
         }
 
-        // ── Determine column order from the first record's _columnOrder ──────────
-        const INTERNAL_KEYS = new Set(['_columnOrder']);
-        let columnOrder = null;
-        for (const s of allRows) {
-            const order = s.customFields?._columnOrder;
-            if (Array.isArray(order) && order.length > 0) { columnOrder = order; break; }
-        }
-        if (!columnOrder) {
-            const sample = allRows[0]?.customFields || {};
-            columnOrder = Object.keys(sample).filter(k => !INTERNAL_KEYS.has(k));
-        }
-
-        // ── Build rows preserving original column order ─────────────────────────
-        const visibleCols = columnOrder.filter(k => !INTERNAL_KEYS.has(k));
-        const excelData = allRows.map(student => {
-            const cf = student.customFields || {};
-            const row = {};
-            for (const col of visibleCols) {
-                const val = cf[col];
-                if (Array.isArray(val))                    row[col] = val.join(', ');
-                else if (val === null || val === undefined) row[col] = '';
-                else                                       row[col] = String(val);
-            }
-            return row;
-        });
-
-        // Yield once more before the CPU-heavy XLSX build
-        await new Promise(resolve => setImmediate(resolve));
-
-        // ── Generate compressed workbook ──────────────────────────────────────
-        const worksheet = XLSX.utils.json_to_sheet(excelData, { header: visibleCols });
-        const workbook  = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Export');
-        worksheet['!cols'] = visibleCols.map(key => ({ wch: Math.min(Math.max(key.length + 2, 12), 40) }));
-
-        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', compression: true });
-
-        const filename = `export_${new Date().toISOString().split('T')[0]}.xlsx`;
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.setHeader('Content-Length', buffer.length);
-        res.send(buffer);
+        res.end();
     } catch (error) {
-        next(error);
+        // If headers already sent (streaming started), just close connection
+        if (!res.headersSent) next(error);
+        else res.end();
     }
 });
 

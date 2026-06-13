@@ -711,18 +711,16 @@ export default function StudentsPage() {
         setIsExporting(true)
         try {
             const response = await studentsAPI.exportExcel({ search, ...filters })
-            const blob = new Blob([response.data], {
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            })
+            const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' })
             const url  = window.URL.createObjectURL(blob)
             const link = document.createElement('a')
             link.href = url
-            link.download = `students_export_${new Date().toISOString().split('T')[0]}.xlsx`
+            link.download = `export_${new Date().toISOString().split('T')[0]}.csv`
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
             window.URL.revokeObjectURL(url)
-            toast({ title: 'Export Successful', description: 'Your Excel file has been downloaded.' })
+            toast({ title: 'Export Successful', description: 'Your file has been downloaded.' })
         } catch {
             toast({ title: 'Export Failed', variant: 'destructive' })
         } finally {
