@@ -201,6 +201,11 @@ router.get('/meta/import-field-values', async (req, res, next) => {
         if (!field) return res.json({ success: true, data: [] });
 
         const escapedField = String(field).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+        // Fetch up to MAX_FILTER_VALUES + 1 distinct values.
+        // If we get more than MAX_FILTER_VALUES it means the column is unique-per-row
+        // (e.g. Control Number, Name, Email) — useless as a filter, so return empty.
+        const MAX_FILTER_VALUES = 200;
         let rows;
         if (batchId) {
             rows = await prisma.$queryRawUnsafe(
@@ -210,7 +215,7 @@ router.get('/meta/import-field-values', async (req, res, next) => {
                    AND import_batch_id = ?
                    AND JSON_EXTRACT(custom_fields, '$."${escapedField}"') IS NOT NULL
                    AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) NOT IN ('null','')
-                 ORDER BY val ASC LIMIT 300`,
+                 ORDER BY val ASC LIMIT ${MAX_FILTER_VALUES + 1}`,
                 BigInt(batchId)
             );
         } else {
@@ -220,8 +225,13 @@ router.get('/meta/import-field-values', async (req, res, next) => {
                  WHERE source = 'excel_import'
                    AND JSON_EXTRACT(custom_fields, '$."${escapedField}"') IS NOT NULL
                    AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) NOT IN ('null','')
-                 ORDER BY val ASC LIMIT 300`
+                 ORDER BY val ASC LIMIT ${MAX_FILTER_VALUES + 1}`
             );
+        }
+
+        // Too many distinct values → useless as a filter (unique-per-row column)
+        if (rows.length > MAX_FILTER_VALUES) {
+            return res.json({ success: true, data: [] });
         }
 
         const values = rows.map(r => r.val).filter(Boolean);
