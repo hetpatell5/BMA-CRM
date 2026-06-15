@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import readline from 'readline';
 import XLSX from 'xlsx';
 import prisma from '../config/database.js';
 import { mapHeaders, learnMappings, resultsToSuggestedMappings } from '../services/smartMapper.js';
@@ -47,26 +48,78 @@ const upload = multer({
 router.post('/upload', upload.single('file'), async (req, res, next) => {
     try {
         if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'No file uploaded',
-            });
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
         }
 
         const { importType = 'STUDENTS' } = req.body;
+        const isCSV = /\.csv$/i.test(req.file.originalname) || req.file.mimetype === 'text/csv';
 
-        // Read Excel file
-        const workbook = XLSX.readFile(req.file.path);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
+        let headers = [];
+        let totalRows = 0;
+        let previewData = [];   // first 10 rows as [{col: val}]
+        let previewRows = [];   // first 5 rows as arrays (for smart mapper)
 
-        // Get headers
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        const headers = jsonData[0] || [];
-        const totalRows = jsonData.length - 1; // Exclude header row
+        if (isCSV) {
+            // ── Streaming CSV parse — O(1) memory regardless of file size ──────────
+            // Parse a single RFC-4180 CSV line into an array of strings
+            const parseCSVLine = (line) => {
+                const result = [];
+                let cur = '';
+                let inQ = false;
+                for (let i = 0; i < line.length; i++) {
+                    const ch = line[i];
+                    if (inQ) {
+                        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+                        else if (ch === '"') { inQ = false; }
+                        else { cur += ch; }
+                    } else {
+                        if (ch === '"') { inQ = true; }
+                        else if (ch === ',') { result.push(cur); cur = ''; }
+                        else { cur += ch; }
+                    }
+                }
+                result.push(cur);
+                return result;
+            };
 
-        // Get preview data (first 10 rows)
-        const previewData = XLSX.utils.sheet_to_json(worksheet).slice(0, 10);
+            const rl = readline.createInterface({
+                input: fs.createReadStream(req.file.path, { encoding: 'utf8' }),
+                crlfDelay: Infinity,
+            });
+
+            let headerParsed = false;
+            for await (const line of rl) {
+                // Strip UTF-8 BOM if present on first line
+                const cleanLine = headerParsed ? line : line.replace(/^\uFEFF/, '');
+                if (!cleanLine.trim()) continue;
+
+                if (!headerParsed) {
+                    headers = parseCSVLine(cleanLine);
+                    headerParsed = true;
+                } else {
+                    totalRows++;
+                    if (totalRows <= 10) {
+                        const vals = parseCSVLine(line);
+                        const obj = {};
+                        headers.forEach((h, i) => { obj[h] = vals[i] !== undefined ? vals[i] : ''; });
+                        previewData.push(obj);
+                    }
+                    if (totalRows <= 5) {
+                        previewRows.push(parseCSVLine(line));
+                    }
+                }
+            }
+        } else {
+            // ── Standard XLSX/XLS path (unchanged) ───────────────────────────────
+            const workbook = XLSX.readFile(req.file.path);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            headers   = jsonData[0] || [];
+            totalRows = jsonData.length - 1;
+            previewData = XLSX.utils.sheet_to_json(worksheet).slice(0, 10);
+            previewRows = jsonData.slice(1, 6);
+        }
 
         // Create import history record
         const importHistory = await prisma.importHistory.create({
@@ -81,9 +134,7 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
             },
         });
 
-        // ── Smart auto-mapping ──────────────────────────────────────────────
-        // Use first 5 data rows for type sniffing
-        const previewRows = jsonData.slice(1, 6);
+        // ── Smart auto-mapping ────────────────────────────────────────────────────
         const mappingResults = mapHeaders(headers, previewRows, importType);
         const suggestedMappings = resultsToSuggestedMappings(mappingResults);
 
@@ -98,7 +149,6 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
                 headers,
                 previewData,
                 suggestedMappings,
-                // Enriched mapping results for the smart UI
                 mappingResults,
                 availableFields: importType === 'STUDENTS'
                     ? ['controlNumber', 'enrollmentNo', 'fullName', 'email', 'alternateEmail', 'phone', 'alternatePhone', 'programme', 'course', 'specialization', 'regionalCenter', 'batchYear', 'semester', 'subjects', 'address', 'city', 'state', 'pincode', 'gender', 'dateOfBirth', 'admissionDate']
@@ -224,13 +274,57 @@ router.post('/process/:importId', async (req, res, next) => {
             },
         });
 
-        // Read file
-        const workbook = XLSX.readFile(filePath);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        const headers = jsonData[0];
-        const dataRows = jsonData.slice(1);
+        // Read file — use streaming CSV parser for .csv files to avoid OOM
+        const filePath2 = filePath;
+        const isCSVFile = /\.csv$/i.test(filePath2);
+        let headers;
+        let dataRows;
+
+        if (isCSVFile) {
+            const parseCSVLine = (line) => {
+                const result = [];
+                let cur = '';
+                let inQ = false;
+                for (let i = 0; i < line.length; i++) {
+                    const ch = line[i];
+                    if (inQ) {
+                        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+                        else if (ch === '"') { inQ = false; }
+                        else { cur += ch; }
+                    } else {
+                        if (ch === '"') { inQ = true; }
+                        else if (ch === ',') { result.push(cur); cur = ''; }
+                        else { cur += ch; }
+                    }
+                }
+                result.push(cur);
+                return result;
+            };
+
+            const rl = readline.createInterface({
+                input: fs.createReadStream(filePath2, { encoding: 'utf8' }),
+                crlfDelay: Infinity,
+            });
+
+            headers = null;
+            dataRows = [];
+            for await (const line of rl) {
+                const cleanLine = headers ? line : line.replace(/^\uFEFF/, '');
+                if (!cleanLine.trim()) continue;
+                if (!headers) {
+                    headers = parseCSVLine(cleanLine);
+                } else {
+                    dataRows.push(parseCSVLine(line));
+                }
+            }
+        } else {
+            const workbook = XLSX.readFile(filePath2);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            headers  = jsonData[0];
+            dataRows = jsonData.slice(1);
+        }
 
         // Get Socket.IO instance
         const io = req.app.get('io');
