@@ -312,8 +312,10 @@ router.get('/meta/filters', async (req, res, next) => {
     }
 });
 
-// Export records to CSV — true streaming, no in-memory build, handles any row count
+// Export records to CSV — gzip-compressed, cursor-based pagination, handles any row count
 router.get('/export/excel', async (req, res, next) => {
+    const { createGzip } = await import('zlib');
+    const gzip = createGzip({ level: 6 });
     try {
         const {
             search = '',
@@ -380,8 +382,8 @@ router.get('/export/excel', async (req, res, next) => {
         // ── Grab first record to determine column order ──────────────────────────
         const firstRow = await prisma.student.findFirst({
             where,
-            orderBy: { createdAt: 'desc' },
-            select: { customFields: true },
+            orderBy: { id: 'desc' },
+            select: { id: true, customFields: true },
         });
 
         if (!firstRow) {
@@ -408,47 +410,55 @@ router.get('/export/excel', async (req, res, next) => {
 
         const filename = `export_${new Date().toISOString().split('T')[0]}.csv`;
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Encoding', 'gzip');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Transfer-Encoding', 'chunked');
+        gzip.pipe(res);
 
-        // Write UTF-8 BOM so Excel auto-detects encoding
-        res.write('\uFEFF');
+        // UTF-8 BOM + header row
+        gzip.write('\uFEFF' + visibleCols.map(csvCell).join(',') + '\r\n');
 
-        // Write header row
-        res.write(visibleCols.map(csvCell).join(',') + '\r\n');
-
-        // ── Stream rows in batches of 1000 ───────────────────────────────────────
-        const CHUNK = 1000;
-        let offset = 0;
+        // ── Cursor-based pagination — NO OFFSET, O(1) per chunk regardless of size ─
+        // Uses id DESC as cursor: each chunk picks up exactly where the last left off
+        // using the primary key index. MySQL never scans skipped rows.
+        const CHUNK = 2000;
+        let lastId = firstRow.id;  // BigInt — highest ID in result set
+        let isFirst = true;
 
         while (true) {
+            const chunkWhere = isFirst
+                ? { ...where, id: { lte: lastId } }
+                : { ...where, id: { lt:  lastId } };
+
             const rows = await prisma.student.findMany({
-                where,
-                orderBy: { createdAt: 'desc' },
-                select: { customFields: true },
-                skip: offset,
+                where: chunkWhere,
+                orderBy: { id: 'desc' },
+                select: { id: true, customFields: true },
                 take: CHUNK,
             });
 
             if (rows.length === 0) break;
 
-            let csvChunk = '';
+            let buf = '';
             for (const row of rows) {
                 const cf = row.customFields || {};
-                csvChunk += visibleCols.map(col => csvCell(cf[col])).join(',') + '\r\n';
+                buf += visibleCols.map(col => csvCell(cf[col])).join(',') + '\r\n';
             }
-            res.write(csvChunk);
+            gzip.write(buf);
 
-            offset += rows.length;
+            lastId = rows[rows.length - 1].id;
+            isFirst = false;
             if (rows.length < CHUNK) break;
 
-            // Yield event loop so other requests stay responsive
+            // Yield event loop between chunks so other API calls stay responsive
             await new Promise(resolve => setImmediate(resolve));
         }
 
-        res.end();
+        gzip.end();  // flush + close the gzip stream → tells browser download is complete
+
     } catch (error) {
-        // If headers already sent (streaming started), just close connection
+        // Destroy gzip first so the pipe doesn't hold the response open
+        try { gzip.destroy(); } catch (_) {}
         if (!res.headersSent) next(error);
         else res.end();
     }
