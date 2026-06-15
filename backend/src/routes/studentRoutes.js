@@ -312,10 +312,8 @@ router.get('/meta/filters', async (req, res, next) => {
     }
 });
 
-// Export records to CSV — gzip-compressed, cursor-based pagination, handles any row count
+// Export records to CSV — streaming, cursor-based pagination (no OFFSET), re-importable
 router.get('/export/excel', async (req, res, next) => {
-    const { createGzip } = await import('zlib');
-    const gzip = createGzip({ level: 6 });
     try {
         const {
             search = '',
@@ -379,7 +377,7 @@ router.get('/export/excel', async (req, res, next) => {
             }
         }
 
-        // ── Grab first record to determine column order ──────────────────────────
+        // ── Grab first record to determine column order + starting cursor ─────────
         const firstRow = await prisma.student.findFirst({
             where,
             orderBy: { id: 'desc' },
@@ -397,32 +395,30 @@ router.get('/export/excel', async (req, res, next) => {
             : Object.keys(cfFirst);
         const visibleCols = columnOrder.filter(k => !INTERNAL_KEYS.has(k));
 
-        // Helper: escape a single CSV cell value
+        // Helper: escape a single CSV cell value (RFC 4180 compliant)
         const csvCell = (val) => {
             if (val === null || val === undefined) return '';
             const s = Array.isArray(val) ? val.join(', ') : String(val);
-            // Wrap in quotes if contains comma, quote, or newline
-            if (s.includes('"') || s.includes(',') || s.includes('\n')) {
+            if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
                 return '"' + s.replace(/"/g, '""') + '"';
             }
             return s;
         };
 
+        // ── Plain streaming CSV response (no gzip — nginx proxies strip Content-Encoding) ─
         const filename = `export_${new Date().toISOString().split('T')[0]}.csv`;
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Encoding', 'gzip');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Transfer-Encoding', 'chunked');
-        gzip.pipe(res);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
 
-        // UTF-8 BOM + header row
-        gzip.write('\uFEFF' + visibleCols.map(csvCell).join(',') + '\r\n');
+        // Write header row (no BOM — BOM breaks SheetJS re-import)
+        res.write(visibleCols.map(csvCell).join(',') + '\r\n');
 
-        // ── Cursor-based pagination — NO OFFSET, O(1) per chunk regardless of size ─
-        // Uses id DESC as cursor: each chunk picks up exactly where the last left off
-        // using the primary key index. MySQL never scans skipped rows.
+        // ── Cursor-based pagination — O(1) per chunk, always as fast as the first ──
+        // Walk backwards through IDs using primary key index. No OFFSET scanning.
         const CHUNK = 2000;
-        let lastId = firstRow.id;  // BigInt — highest ID in result set
+        let lastId = firstRow.id;
         let isFirst = true;
 
         while (true) {
@@ -444,21 +440,18 @@ router.get('/export/excel', async (req, res, next) => {
                 const cf = row.customFields || {};
                 buf += visibleCols.map(col => csvCell(cf[col])).join(',') + '\r\n';
             }
-            gzip.write(buf);
+            res.write(buf);
 
             lastId = rows[rows.length - 1].id;
             isFirst = false;
             if (rows.length < CHUNK) break;
 
-            // Yield event loop between chunks so other API calls stay responsive
+            // Yield event loop between chunks so other requests stay responsive
             await new Promise(resolve => setImmediate(resolve));
         }
 
-        gzip.end();  // flush + close the gzip stream → tells browser download is complete
-
+        res.end();
     } catch (error) {
-        // Destroy gzip first so the pipe doesn't hold the response open
-        try { gzip.destroy(); } catch (_) {}
         if (!res.headersSent) next(error);
         else res.end();
     }
