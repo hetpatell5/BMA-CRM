@@ -113,9 +113,15 @@ export default function ImportPage() {
         mutationFn: async (file: File) => {
             setUploadingFile({ name: file.name, size: file.size })
             setUploadPct(0)
-            const response = await importAPI.upload(file, importType, (pct) => setUploadPct(pct))
-            // Upload done — server is now reading/parsing the Excel
-            setUploadPct(-1)
+            const response = await importAPI.upload(file, importType, (pct) => {
+                // If upload is done (100%), immediately switch to analyzing/processing state
+                // since the server is now reading and parsing the file (which takes time)
+                if (pct >= 100) {
+                    setUploadPct(-1)
+                } else {
+                    setUploadPct(pct)
+                }
+            })
             return response.data.data
         },
         onSuccess: (data) => {
