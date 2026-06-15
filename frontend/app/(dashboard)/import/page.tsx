@@ -113,15 +113,37 @@ export default function ImportPage() {
         mutationFn: async (file: File) => {
             setUploadingFile({ name: file.name, size: file.size })
             setUploadPct(0)
+            
+            let simInterval: NodeJS.Timeout
+
             const response = await importAPI.upload(file, importType, (pct) => {
-                // If upload is done (100%), immediately switch to analyzing/processing state
-                // since the server is now reading and parsing the file (which takes time)
-                if (pct >= 100) {
-                    setUploadPct(-1)
-                } else {
-                    setUploadPct(pct)
+                if (pct < 100) {
+                    // Phase 1: Network Upload (0% -> 50%)
+                    setUploadPct(Math.round(pct * 0.5))
+                } else if (pct === 100) {
+                    // Phase 2: Server Processing (50% -> 95%)
+                    setUploadPct(prev => {
+                        // Prevent starting multiple intervals
+                        if (prev > 50) return prev;
+                        
+                        simInterval = setInterval(() => {
+                            setUploadPct(curr => {
+                                const next = curr + (Math.random() * 1.5)
+                                return next >= 95 ? 95 : next // Cap at 95% until complete
+                            })
+                        }, 600)
+                        return 50
+                    })
                 }
             })
+            
+            // Phase 3: Complete!
+            if (simInterval!) clearInterval(simInterval!)
+            setUploadPct(100)
+            
+            // Brief pause to let user see 100% before transitioning
+            await new Promise(r => setTimeout(r, 600))
+
             return response.data.data
         },
         onSuccess: (data) => {
@@ -706,39 +728,35 @@ export default function ImportPage() {
                         
                         {/* Circular Progress & Icon */}
                         <div className="relative w-24 h-24 mb-6 flex items-center justify-center">
-                            {uploadPct === -1 ? (
-                                <Loader2 className="w-12 h-12 text-emerald-400 animate-spin" />
-                            ) : (
-                                <div className="absolute inset-0">
-                                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                                        {/* Background Track */}
-                                        <circle 
-                                            cx="50" cy="50" r="48" fill="transparent" 
-                                            stroke="currentColor" strokeWidth="4" 
-                                            className="text-white/5" 
-                                        />
-                                        {/* Progress Arc */}
-                                        <circle 
-                                            cx="50" cy="50" r="48" fill="transparent" 
-                                            stroke="url(#progressGradient)" strokeWidth="4" strokeLinecap="round"
-                                            className="transition-all duration-300 ease-out shadow-[0_0_15px_rgba(16,185,129,0.5)]" 
-                                            strokeDasharray={`${(uploadPct * 301.59) / 100} 301.59`} 
-                                        />
-                                        <defs>
-                                            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                <stop offset="0%" stopColor="#10b981" />
-                                                <stop offset="100%" stopColor="#2dd4bf" />
-                                            </linearGradient>
-                                        </defs>
-                                    </svg>
-                                </div>
-                            )}
-                            <FileSpreadsheet className={`w-10 h-10 text-emerald-400 ${uploadPct === -1 ? 'absolute opacity-50' : ''}`} />
+                            <div className="absolute inset-0">
+                                <svg className="w-full h-full -rotate-90 overflow-visible" viewBox="0 0 100 100">
+                                    {/* Background Track */}
+                                    <circle 
+                                        cx="50" cy="50" r="46" fill="transparent" 
+                                        stroke="currentColor" strokeWidth="5" 
+                                        className="text-white/5" 
+                                    />
+                                    {/* Progress Arc */}
+                                    <circle 
+                                        cx="50" cy="50" r="46" fill="transparent" 
+                                        stroke="url(#progressGradient)" strokeWidth="5" strokeLinecap="round"
+                                        className="transition-all duration-300 ease-out drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]" 
+                                        strokeDasharray={`${(uploadPct * 289.02) / 100} 289.02`} 
+                                    />
+                                    <defs>
+                                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stopColor="#10b981" />
+                                            <stop offset="100%" stopColor="#2dd4bf" />
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                            </div>
+                            <FileSpreadsheet className={`w-10 h-10 text-emerald-400 ${uploadPct >= 50 && uploadPct < 100 ? 'animate-pulse' : ''}`} />
                         </div>
 
                         {/* Text Info */}
                         <h3 className="text-xl font-semibold text-white tracking-tight mb-2">
-                            {uploadPct === -1 ? 'Analysing File...' : 'Uploading File...'}
+                            {uploadPct >= 100 ? 'Upload Complete' : uploadPct >= 50 ? 'Processing File...' : 'Uploading File...'}
                         </h3>
                         
                         <p className="text-sm text-white/70 max-w-[280px] truncate mb-1">
@@ -751,17 +769,13 @@ export default function ImportPage() {
                         {/* Linear Progress Bar below */}
                         <div className="w-full space-y-2">
                             <div className="flex justify-between text-xs font-semibold text-emerald-400/90 px-1">
-                                <span>{uploadPct === -1 ? 'Please wait' : 'Progress'}</span>
-                                <span>{uploadPct === -1 ? 'Processing' : `${uploadPct}%`}</span>
+                                <span>{uploadPct >= 100 ? 'Done' : uploadPct >= 50 ? 'Processing' : 'Uploading'}</span>
+                                <span>{Math.round(uploadPct)}%</span>
                             </div>
                             <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden shadow-inner ring-1 ring-white/5">
                                 <div
-                                    className={`h-full rounded-full transition-all duration-300 ease-out ${
-                                        uploadPct === -1 
-                                        ? "bg-emerald-500/60 animate-pulse w-full" 
-                                        : "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]"
-                                    }`}
-                                    style={{ width: uploadPct === -1 ? '100%' : `${uploadPct}%` }}
+                                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_12px_rgba(16,185,129,0.8)] transition-all duration-300 ease-out"
+                                    style={{ width: `${uploadPct}%` }}
                                 />
                             </div>
                         </div>
