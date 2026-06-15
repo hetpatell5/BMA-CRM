@@ -133,9 +133,14 @@ export default function ImportPage() {
         onError: (error: any) => {
             setUploadingFile(null)
             setUploadPct(0)
+            const status = error.response?.status
+            const msg = error.response?.data?.message
+                || (status === 413 ? 'File too large — ask admin to increase nginx upload limit' : null)
+                || (status === 400 ? 'File type not accepted' : null)
+                || (status ? `Server error ${status}` : 'Network error — file may be too large for server')
             toast({
                 title: 'Upload failed',
-                description: error.response?.data?.message || 'Failed to upload file',
+                description: msg,
                 variant: 'destructive',
             })
         },
