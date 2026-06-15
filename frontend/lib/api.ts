@@ -113,22 +113,26 @@ export const studentsAPI = {
         const authStorage = typeof window !== 'undefined' ? localStorage.getItem('auth-storage') : null
         let token = ''
         try { token = JSON.parse(authStorage || '{}')?.state?.token || '' } catch { /* ignore */ }
-        const qs = new URLSearchParams()
-        if (token) qs.set('token', token)
+
+        // Build query string manually — URLSearchParams double-encodes brackets
+        // which breaks Express qs nested-object parsing (customField[key]=val)
+        const parts: string[] = []
+        if (token) parts.push(`token=${encodeURIComponent(token)}`)
+
         if (params) {
             for (const [k, v] of Object.entries(params)) {
                 if (v === undefined || v === null || v === '') continue
                 if (typeof v === 'object' && !Array.isArray(v)) {
-                    // customField[key]=value
+                    // Nested object → customField[key]=value (literal brackets, qs-compatible)
                     for (const [ck, cv] of Object.entries(v)) {
-                        if (cv) qs.set(`${k}[${ck}]`, String(cv))
+                        if (cv) parts.push(`${encodeURIComponent(k)}[${encodeURIComponent(ck)}]=${encodeURIComponent(String(cv))}`)
                     }
                 } else {
-                    qs.set(k, String(v))
+                    parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
                 }
             }
         }
-        return `${base}/students/export/excel?${qs.toString()}`
+        return `${base}/students/export/excel?${parts.join('&')}`
     },
     assignToGuide: (studentId: string, guideId: number | null, commission?: string | null, forceDuplicate?: boolean) =>
         api.post(`/students/assign/${studentId}`, { guideId, commission, forceDuplicate }),

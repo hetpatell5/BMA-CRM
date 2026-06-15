@@ -417,14 +417,23 @@ router.get('/export/excel', async (req, res, next) => {
 
         // ── Cursor-based pagination — O(1) per chunk, always as fast as the first ──
         // Walk backwards through IDs using primary key index. No OFFSET scanning.
+        // IMPORTANT: if customField filter set where.id = { in: [...ids] }, we must
+        // preserve that constraint while also applying the cursor. Use AND to combine.
         const CHUNK = 2000;
         let lastId = firstRow.id;
         let isFirst = true;
+        const idInFilter = where.id; // may be undefined or { in: BigInt[] }
+        const baseWhere = { ...where };
+        delete baseWhere.id; // remove id — we'll add it back per-chunk via AND
 
         while (true) {
-            const chunkWhere = isFirst
-                ? { ...where, id: { lte: lastId } }
-                : { ...where, id: { lt:  lastId } };
+            // Build cursor constraint
+            const cursorId = isFirst ? { lte: lastId } : { lt: lastId };
+
+            // Combine cursor with any existing id.in filter
+            const chunkWhere = idInFilter
+                ? { ...baseWhere, AND: [{ id: idInFilter }, { id: cursorId }] }
+                : { ...baseWhere, id: cursorId };
 
             const rows = await prisma.student.findMany({
                 where: chunkWhere,
