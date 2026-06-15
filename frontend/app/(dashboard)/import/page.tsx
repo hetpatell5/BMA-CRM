@@ -693,53 +693,74 @@ export default function ImportPage() {
             </div>
         </div>
 
-            {/* ── Google Drive-style Upload Progress Popup ─────────────────── */}
+            {/* ── Centered iOS Glass-style Upload Progress Modal ─────────────────── */}
             {uploadingFile && (
-                <div className="fixed bottom-6 right-6 z-50 w-80 rounded-2xl shadow-2xl border border-white/10 bg-[#1e2130]/95 backdrop-blur-xl overflow-hidden animate-fade-in">
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                        <span className="text-sm font-semibold text-white">
-                            {uploadPct === -1 ? 'Analysing file…' : 'Uploading file…'}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                            {uploadPct === -1 ? '' : `${uploadPct}%`}
-                        </span>
-                    </div>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="w-[360px] rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-white/10 bg-[#1e2130]/50 backdrop-blur-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col items-center p-8 text-center">
+                        
+                        {/* Circular Progress & Icon */}
+                        <div className="relative w-24 h-24 mb-6 flex items-center justify-center">
+                            {uploadPct === -1 ? (
+                                <Loader2 className="w-12 h-12 text-emerald-400 animate-spin" />
+                            ) : (
+                                <div className="absolute inset-0">
+                                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                                        {/* Background Track */}
+                                        <circle 
+                                            cx="50" cy="50" r="48" fill="transparent" 
+                                            stroke="currentColor" strokeWidth="4" 
+                                            className="text-white/5" 
+                                        />
+                                        {/* Progress Arc */}
+                                        <circle 
+                                            cx="50" cy="50" r="48" fill="transparent" 
+                                            stroke="url(#progressGradient)" strokeWidth="4" strokeLinecap="round"
+                                            className="transition-all duration-300 ease-out shadow-[0_0_15px_rgba(16,185,129,0.5)]" 
+                                            strokeDasharray={`${(uploadPct * 301.59) / 100} 301.59`} 
+                                        />
+                                        <defs>
+                                            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                <stop offset="0%" stopColor="#10b981" />
+                                                <stop offset="100%" stopColor="#2dd4bf" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                </div>
+                            )}
+                            <FileSpreadsheet className={`w-10 h-10 text-emerald-400 ${uploadPct === -1 ? 'absolute opacity-50' : ''}`} />
+                        </div>
 
-                    {/* File row */}
-                    <div className="flex items-center gap-3 px-4 py-3">
-                        {/* File icon */}
-                        <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
-                            <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{uploadingFile.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                                {(uploadingFile.size / (1024 * 1024)).toFixed(1)} MB
-                            </p>
-                        </div>
-                        {/* Spinner or check */}
-                        {uploadPct === -1 ? (
-                            <Loader2 className="w-5 h-5 text-emerald-400 animate-spin shrink-0" />
-                        ) : (
-                            <span className="text-xs font-bold text-emerald-400 shrink-0">{uploadPct}%</span>
-                        )}
-                    </div>
+                        {/* Text Info */}
+                        <h3 className="text-xl font-semibold text-white tracking-tight mb-2">
+                            {uploadPct === -1 ? 'Analysing File...' : 'Uploading File...'}
+                        </h3>
+                        
+                        <p className="text-sm text-white/70 max-w-[280px] truncate mb-1">
+                            {uploadingFile.name}
+                        </p>
+                        <p className="text-xs font-medium text-white/40 mb-8">
+                            {(uploadingFile.size / (1024 * 1024)).toFixed(1)} MB
+                        </p>
 
-                    {/* Progress bar */}
-                    {uploadPct !== -1 && (
-                        <div className="h-1 bg-white/5 mx-4 mb-3 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300 ease-out"
-                                style={{ width: `${uploadPct}%` }}
-                            />
+                        {/* Linear Progress Bar below */}
+                        <div className="w-full space-y-2">
+                            <div className="flex justify-between text-xs font-semibold text-emerald-400/90 px-1">
+                                <span>{uploadPct === -1 ? 'Please wait' : 'Progress'}</span>
+                                <span>{uploadPct === -1 ? 'Processing' : `${uploadPct}%`}</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden shadow-inner ring-1 ring-white/5">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-300 ease-out ${
+                                        uploadPct === -1 
+                                        ? "bg-emerald-500/60 animate-pulse w-full" 
+                                        : "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]"
+                                    }`}
+                                    style={{ width: uploadPct === -1 ? '100%' : `${uploadPct}%` }}
+                                />
+                            </div>
                         </div>
-                    )}
-                    {uploadPct === -1 && (
-                        <div className="h-1 bg-white/5 mx-4 mb-3 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full animate-pulse" style={{ width: '100%' }} />
-                        </div>
-                    )}
+
+                    </div>
                 </div>
             )}
         </>
