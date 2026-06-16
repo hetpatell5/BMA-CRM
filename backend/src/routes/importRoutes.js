@@ -810,24 +810,24 @@ router.delete('/history/:id', async (req, res, next) => {
         let deletedOrdersCount = 0;
 
         if (deleteRecords === 'true' && importRecord.status === 'COMPLETED') {
-            // Count first so we can report
-            const countResult = await prisma.$queryRawUnsafe(
-                `SELECT COUNT(*) AS cnt FROM students WHERE import_batch_id = ?`,
-                BigInt(id)
-            );
-            const totalToDelete = Number(countResult[0]?.cnt || 0);
 
-            // Delete in chunks of 10,000 to avoid long table locks
-            const CHUNK = 10000;
+            // Delete in chunks to avoid long table locks.
+            // Loop until MySQL confirms 0 rows remain — don't rely on pre-counted total
+            // because affectedRows can be unreliable across Prisma/MySQL driver versions.
+            const CHUNK = 5000;
             let deleted = 0;
-            while (deleted < totalToDelete) {
-                const result = await prisma.$queryRawUnsafe(
+            let safetyMax = 100000; // max iterations guard against infinite loop
+            while (safetyMax-- > 0) {
+                const [result] = await prisma.$queryRawUnsafe(
                     `DELETE FROM students WHERE import_batch_id = ? LIMIT ${CHUNK}`,
                     BigInt(id)
                 );
-                const count = Number(result?.affectedRows ?? 0);
-                if (count === 0) break; // nothing left
+                // MySQL returns OkPacket with affectedRows
+                const count = Number(result?.affectedRows ?? result ?? 0);
                 deleted += count;
+                if (count === 0) break; // nothing left to delete
+                // Yield event loop so other requests stay responsive between chunks
+                await new Promise(resolve => setImmediate(resolve));
             }
             deletedOrdersCount = deleted;
         }
