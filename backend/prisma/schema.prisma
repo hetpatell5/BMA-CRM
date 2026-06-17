@@ -172,6 +172,7 @@ model Student {
   @@index([programme])
   @@index([course, batchYear])
   @@index([status])
+  @@index([source])
   @@index([regionalCenter])
   @@index([city, state])
   @@map("students")

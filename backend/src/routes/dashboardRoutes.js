@@ -61,36 +61,25 @@ router.get('/stats', async (req, res, next) => {
             ? ((wonLeads / totalLeads) * 100).toFixed(1)
             : 0;
 
-        // Categorize orders using raw SQL LIKE on the JSON blob column (fast, no full-table scan into Node memory)
-        // Only count real orders (not excel_import bulk rows)
-        const countByKeyword = async (keyword) => {
-            const result = await prisma.$queryRaw`
-                SELECT COUNT(*) as cnt FROM students
-                WHERE (source IS NULL OR source != 'excel_import')
-                AND LOWER(custom_fields) LIKE ${`%${keyword}%`}
-            `;
-            return Number(result[0]?.cnt ?? 0);
-        };
+        // Load ONLY real orders' customFields and count categories in JS.
+        // With the source index this query skips all 611k import rows instantly,
+        // so we only iterate over the small number of real orders in Node.js.
+        const realOrderFields = await prisma.student.findMany({
+            where: { NOT: { source: 'excel_import' } },
+            select: { customFields: true },
+        });
 
-        const [synopsisCount, reportCount, assignmentCount, practicalCount, guessPaperCount, studyGuideCount, notesCount] = await Promise.all([
-            countByKeyword('synopsis'),
-            countByKeyword('report'),
-            countByKeyword('handwritten assignment'),
-            countByKeyword('practical'),
-            countByKeyword('guess paper'),
-            countByKeyword('study guide'),
-            countByKeyword('notes'),
-        ]);
-
-        const categories = {
-            synopsis: synopsisCount,
-            report: reportCount,
-            assignment: assignmentCount,
-            practical: practicalCount,
-            guessPaper: guessPaperCount,
-            studyGuide: studyGuideCount,
-            notes: notesCount,
-        };
+        const categories = { synopsis: 0, report: 0, assignment: 0, practical: 0, guessPaper: 0, studyGuide: 0, notes: 0 };
+        for (const s of realOrderFields) {
+            const content = JSON.stringify(s.customFields || {}).toLowerCase();
+            if (content.includes('synopsis'))             categories.synopsis++;
+            if (content.includes('report'))               categories.report++;
+            if (content.includes('handwritten assignment')) categories.assignment++;
+            if (content.includes('practical'))            categories.practical++;
+            if (content.includes('guess paper'))          categories.guessPaper++;
+            if (content.includes('study guide'))          categories.studyGuide++;
+            if (content.includes('notes'))                categories.notes++;
+        }
 
         res.json({
             success: true,
