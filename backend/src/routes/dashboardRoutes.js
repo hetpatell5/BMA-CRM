@@ -24,11 +24,11 @@ router.get('/stats', async (req, res, next) => {
             todayLeads,
             recentImports,
         ] = await Promise.all([
-            // Student counts
-            prisma.student.count(),
-            prisma.student.count({ where: { status: { in: ['NEW_LEAD', 'REPORT_IN_PROGRESS', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED'] } } }),
-            prisma.student.count({ where: { status: 'SHIPPED' } }),
-            prisma.student.count({ where: { status: 'ALL_DONE' } }),
+            // Student counts — exclude excel_import rows so dashboard only reflects real orders
+            prisma.student.count({ where: { NOT: { source: 'excel_import' } } }),
+            prisma.student.count({ where: { NOT: { source: 'excel_import' }, status: { in: ['NEW_LEAD', 'REPORT_IN_PROGRESS', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED'] } } }),
+            prisma.student.count({ where: { NOT: { source: 'excel_import' }, status: 'SHIPPED' } }),
+            prisma.student.count({ where: { NOT: { source: 'excel_import' }, status: 'ALL_DONE' } }),
 
             // Lead counts
             prisma.lead.count(),
@@ -36,8 +36,8 @@ router.get('/stats', async (req, res, next) => {
             prisma.lead.count({ where: { stage: 'QUALIFIED' } }),
             prisma.lead.count({ where: { stage: 'WON' } }),
 
-            // Today's additions
-            prisma.student.count({ where: { createdAt: { gte: today } } }),
+            // Today's additions — exclude excel_import
+            prisma.student.count({ where: { NOT: { source: 'excel_import' }, createdAt: { gte: today } } }),
             prisma.lead.count({ where: { createdAt: { gte: today } } }),
 
             // Recent imports
@@ -534,7 +534,9 @@ router.get('/payment-summary', async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Access denied' });
         }
 
+        // Exclude excel_import rows — payment summary should only reflect real orders
         const allStudents = await prisma.student.findMany({
+            where: { NOT: { source: 'excel_import' } },
             select: { customFields: true }
         });
 
