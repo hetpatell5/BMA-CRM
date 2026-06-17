@@ -61,30 +61,36 @@ router.get('/stats', async (req, res, next) => {
             ? ((wonLeads / totalLeads) * 100).toFixed(1)
             : 0;
 
-        // Categorize orders for display
-        const allStudentsForCategories = await prisma.student.findMany({ select: { id: true, customFields: true } });
-        const categories = {
-            synopsis: 0,
-            report: 0,
-            assignment: 0,
-            practical: 0,
-            guessPaper: 0,
-            studyGuide: 0,
-            notes: 0
+        // Categorize orders using raw SQL LIKE on the JSON blob column (fast, no full-table scan into Node memory)
+        // Only count real orders (not excel_import bulk rows)
+        const countByKeyword = async (keyword) => {
+            const result = await prisma.$queryRaw`
+                SELECT COUNT(*) as cnt FROM students
+                WHERE (source IS NULL OR source != 'excel_import')
+                AND LOWER(custom_fields) LIKE ${`%${keyword}%`}
+            `;
+            return Number(result[0]?.cnt ?? 0);
         };
 
-        allStudentsForCategories.forEach(s => {
-            const fields = s.customFields || {};
-            const content = JSON.stringify(fields).toLowerCase();
-            
-            if (content.includes('synopsis')) categories.synopsis++;
-            if (content.includes('report')) categories.report++;
-            if (content.includes('handwritten assignment')) categories.assignment++;
-            if (content.includes('practical')) categories.practical++;
-            if (content.includes('guess paper')) categories.guessPaper++;
-            if (content.includes('study guide')) categories.studyGuide++;
-            if (content.includes('notes')) categories.notes++;
-        });
+        const [synopsisCount, reportCount, assignmentCount, practicalCount, guessPaperCount, studyGuideCount, notesCount] = await Promise.all([
+            countByKeyword('synopsis'),
+            countByKeyword('report'),
+            countByKeyword('handwritten assignment'),
+            countByKeyword('practical'),
+            countByKeyword('guess paper'),
+            countByKeyword('study guide'),
+            countByKeyword('notes'),
+        ]);
+
+        const categories = {
+            synopsis: synopsisCount,
+            report: reportCount,
+            assignment: assignmentCount,
+            practical: practicalCount,
+            guessPaper: guessPaperCount,
+            studyGuide: studyGuideCount,
+            notes: notesCount,
+        };
 
         res.json({
             success: true,
@@ -199,12 +205,15 @@ router.get('/charts/monthly-trends', async (req, res, next) => {
             endDate.setMonth(endDate.getMonth() + 1);
 
             const [students, leads] = await Promise.all([
+                // Only count real orders (manual/form), NOT excel_import bulk imports
+                // This prevents large historic imports from spiking the chart
                 prisma.student.count({
                     where: {
                         createdAt: {
                             gte: startDate,
                             lt: endDate,
                         },
+                        NOT: { source: 'excel_import' },
                     },
                 }),
                 prisma.lead.count({
