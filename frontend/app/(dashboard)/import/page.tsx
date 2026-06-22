@@ -546,7 +546,9 @@ export default function ImportPage() {
                         </Button>
                     </div>
                 </div>
-                   {/* Step 3: Processing */}
+            )}
+
+            {/* Step 3: Processing */}
             {step === 'processing' && (
                 <div className="relative rounded-[32px] border border-white/5 bg-[#12141D]/80 backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-14 text-center max-w-2xl mx-auto mt-10">
 
