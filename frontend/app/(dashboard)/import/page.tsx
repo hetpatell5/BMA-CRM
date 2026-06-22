@@ -530,45 +530,74 @@ export default function ImportPage() {
 
             {/* Step 3: Processing */}
             {step === 'processing' && (
-                <div className="glass rounded-xl p-12 text-center animate-fade-in">
-                    <div className="relative w-24 h-24 mx-auto mb-8">
-                        <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
-                        <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
-                        <FileSpreadsheet className="absolute inset-0 m-auto w-8 h-8 text-primary" />
+                <div className="relative rounded-[32px] border border-white/5 bg-[#12141D]/80 backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-12 text-center max-w-2xl mx-auto mt-10">
+                    
+                    {/* Ambient glow behind loader */}
+                    <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 bg-primary/20 blur-[80px] rounded-full pointer-events-none" />
+
+                    <div className="relative w-28 h-28 mx-auto mb-10 flex items-center justify-center">
+                        {/* Outer rotating ring */}
+                        <svg className="absolute inset-0 w-full h-full animate-spin-slow" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="48" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray="4 4" />
+                        </svg>
+                        {/* Inner glowing ring */}
+                        <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
+                            <circle 
+                                cx="50" cy="50" r="40" fill="transparent" 
+                                stroke="url(#processingGradient)" strokeWidth="4" strokeLinecap="round"
+                                className="transition-all duration-300 ease-out animate-[spin_2s_linear_infinite]" 
+                                style={{ filter: 'drop-shadow(0 0 12px rgba(99,102,241,0.5))' }}
+                                strokeDasharray="180 251.2" 
+                            />
+                            <defs>
+                                <linearGradient id="processingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#818cf8" />
+                                    <stop offset="100%" stopColor="#4f46e5" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <FileSpreadsheet className="relative w-10 h-10 text-primary animate-pulse" />
                     </div>
-                    <h3 className="text-2xl font-bold mb-3">Processing Intelligent Import</h3>
-                    <p className="text-muted-foreground mb-10 max-w-md mx-auto">
-                        We are importing records, handling duplicates, and parsing custom fields automatically.
+
+                    <h3 className="text-3xl font-bold text-white tracking-tight mb-3 relative z-10">Processing Intelligent Import</h3>
+                    <p className="text-white/50 mb-12 max-w-md mx-auto relative z-10 text-sm">
+                        We are importing records, handling duplicates, and parsing custom fields automatically. Please do not close this window.
                     </p>
 
-                    <div className="max-w-md mx-auto mb-8 p-6 bg-black/20 rounded-2xl border border-white/5">
-                        <div className="flex items-center justify-between text-sm mb-3">
-                            <span className="font-medium">Total Progress</span>
-                            <span className="font-mono text-primary font-bold">{progress.progress}%</span>
-                        </div>
-                        <div className="h-4 bg-white/5 rounded-full overflow-hidden mb-4 border border-white/5">
-                            <div
-                                className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-primary transition-all duration-300 ease-out relative"
-                                style={{ width: `${Math.max(progress.progress, 0)}%` }}
-                            >
-                                <div className="absolute inset-0 bg-white/20 w-full animate-pulse"></div>
+                    <div className="max-w-md mx-auto mb-10 p-1 bg-white/[0.03] rounded-2xl border border-white/5 backdrop-blur-sm relative z-10">
+                        <div className="p-5">
+                            <div className="flex items-center justify-between text-sm mb-4">
+                                <span className="font-medium text-white/70">Total Progress</span>
+                                <span className="text-primary font-bold text-lg">{progress.progress}%</span>
                             </div>
+                            <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden shadow-inner ring-1 ring-white/5 mb-4">
+                                <div
+                                    className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-primary shadow-[0_0_12px_rgba(99,102,241,0.8)] transition-all duration-300 ease-out relative"
+                                    style={{ width: `${Math.max(progress.progress, 0)}%` }}
+                                >
+                                    <div className="absolute inset-0 bg-white/20 w-full animate-[pulse_1s_ease-in-out_infinite]"></div>
+                                </div>
+                            </div>
+                            {uploadData?.totalRows && (
+                                <p className="text-xs text-white/40 flex justify-between">
+                                    <span>Processing row</span>
+                                    <span>{formatNumber(progress.imported + progress.failed)} / {formatNumber(uploadData.totalRows)}</span>
+                                </p>
+                            )}
                         </div>
-                        {uploadData?.totalRows && (
-                            <p className="text-sm text-muted-foreground">
-                                Processing row {(progress.imported + progress.failed).toLocaleString()} of {uploadData.totalRows.toLocaleString()}
-                            </p>
-                        )}
                     </div>
 
-                    <div className="flex items-center justify-center gap-8 text-sm">
-                        <div className="px-6 py-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                            <p className="text-3xl font-bold text-emerald-400 font-mono mb-1">{progress.imported.toLocaleString()}</p>
-                            <p className="text-emerald-500/80 font-medium tracking-wide text-xs uppercase">Imported</p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6 relative z-10">
+                        <div className="w-full sm:w-1/3 p-5 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col items-center justify-center relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <p className="text-4xl font-bold text-white tracking-tighter mb-2">{formatNumber(progress.imported)}</p>
+                            <p className="text-emerald-400 font-semibold tracking-widest text-[10px] uppercase">Imported</p>
                         </div>
-                        <div className="px-6 py-4 rounded-xl bg-red-500/10 border border-red-500/20">
-                            <p className="text-3xl font-bold text-red-400 font-mono mb-1">{progress.failed.toLocaleString()}</p>
-                            <p className="text-red-500/80 font-medium tracking-wide text-xs uppercase">Errors</p>
+                        <div className="w-full sm:w-1/3 p-5 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col items-center justify-center relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <p className="text-4xl font-bold text-white tracking-tighter mb-2">{formatNumber(progress.failed)}</p>
+                            <p className="text-red-400 font-semibold tracking-widest text-[10px] uppercase">Errors</p>
                         </div>
                     </div>
                 </div>
@@ -576,59 +605,77 @@ export default function ImportPage() {
 
             {/* Step 4: Complete */}
             {step === 'complete' && result && (
-                 <div className="glass rounded-xl p-10 text-center animate-fade-in">
-                 <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-6 border-4 border-emerald-500/30">
-                     <CheckCircle className="w-10 h-10 text-emerald-400" />
-                 </div>
-                 <h3 className="text-2xl font-bold mb-3">Import Successfully Completed</h3>
-                 <p className="text-muted-foreground mb-8">
-                     Your data has been intelligently parsed and saved.
-                 </p>
+                <div className="relative rounded-[32px] border border-white/5 bg-[#12141D]/80 backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-12 text-center max-w-4xl mx-auto mt-10">
+                    
+                    {/* Ambient glow behind success icon */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none" />
 
-                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto mb-10">
-                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6">
-                         <p className="text-4xl font-bold text-emerald-400 font-mono mb-2">{formatNumber(result.imported)}</p>
-                         <p className="text-sm font-medium text-emerald-500/80 uppercase tracking-wider">New</p>
-                     </div>
-                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6">
-                         <p className="text-4xl font-bold text-blue-400 font-mono mb-2">{formatNumber(result.updated || 0)}</p>
-                         <p className="text-sm font-medium text-blue-500/80 uppercase tracking-wider">Updated</p>
-                     </div>
-                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-6">
-                         <p className="text-4xl font-bold text-yellow-400 font-mono mb-2">{formatNumber(result.skipped || 0)}</p>
-                         <p className="text-sm font-medium text-yellow-500/80 uppercase tracking-wider">Skipped</p>
-                     </div>
-                     <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
-                         <p className="text-4xl font-bold text-red-400 font-mono mb-2">{formatNumber(result.failed)}</p>
-                         <p className="text-sm font-medium text-red-500/80 uppercase tracking-wider">Failed</p>
-                     </div>
-                 </div>
+                    <div className="relative w-28 h-28 mx-auto mb-8 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping opacity-20" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/30 to-emerald-600/30 rounded-full blur-md" />
+                        <div className="relative w-24 h-24 bg-[#0a1f16] border border-emerald-500/30 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(16,185,129,0.3)]">
+                            <CheckCircle className="w-12 h-12 text-emerald-400" />
+                        </div>
+                    </div>
 
-                 {result.errors?.length > 0 && (
-                     <div className="max-w-3xl mx-auto mb-10 text-left">
-                         <h4 className="font-semibold mb-3 flex items-center gap-2 text-red-400 bg-red-500/10 p-3 rounded-t-xl border-x border-t border-red-500/20">
-                             <AlertCircle className="w-5 h-5" /> Import Errors ({result.errors.length})
-                         </h4>
-                         <div className="max-h-56 overflow-y-auto bg-black/40 border-x border-b border-red-500/20 rounded-b-xl p-4 text-sm font-mono scrollbar-thin">
-                             {result.errors.map((error: any, i: number) => (
-                                 <div key={i} className="mb-2 pb-2 border-b border-red-500/10 last:border-0 last:mb-0 last:pb-0">
-                                     <span className="text-red-300/60 mr-4">Row {error.row}</span> 
-                                     <span className="text-red-400">{error.error}</span>
-                                 </div>
-                             ))}
-                         </div>
-                     </div>
-                 )}
+                    <h3 className="text-3xl font-bold text-white tracking-tight mb-3 relative z-10">Import Successfully Completed</h3>
+                    <p className="text-white/50 mb-12 max-w-lg mx-auto relative z-10">
+                        Your data has been intelligently parsed, analyzed, and securely stored in the system.
+                    </p>
 
-                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                     <Button variant="outline" onClick={handleReset} className="gap-2 px-6">
-                         <Upload className="w-4 h-4" /> Import Another File
-                     </Button>
-                     <Button onClick={() => window.location.href = importType === 'STUDENTS' ? `/import-preview?batchId=${uploadData?.importId || ''}` : '/leads'} className="gap-2 gradient-primary text-white px-8">
-                         View {importType === 'STUDENTS' ? 'Import Preview' : 'Leads'} <ArrowRight className="w-4 h-4" />
-                     </Button>
-                 </div>
-             </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 max-w-4xl mx-auto mb-12 relative z-10">
+                        {/* New */}
+                        <div className="relative overflow-hidden bg-white/[0.02] border border-emerald-500/20 rounded-2xl p-6 flex flex-col items-center justify-center group hover:bg-white/[0.04] transition-all">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/0 via-emerald-500/50 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <p className="text-5xl font-bold text-white tracking-tighter mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">{formatNumber(result.imported)}</p>
+                            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-emerald-500/20">New Records</span>
+                        </div>
+                        {/* Updated */}
+                        <div className="relative overflow-hidden bg-white/[0.02] border border-blue-500/20 rounded-2xl p-6 flex flex-col items-center justify-center group hover:bg-white/[0.04] transition-all">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500/0 via-blue-500/50 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <p className="text-5xl font-bold text-white tracking-tighter mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">{formatNumber(result.updated || 0)}</p>
+                            <span className="px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-blue-500/20">Updated</span>
+                        </div>
+                        {/* Skipped */}
+                        <div className="relative overflow-hidden bg-white/[0.02] border border-amber-500/20 rounded-2xl p-6 flex flex-col items-center justify-center group hover:bg-white/[0.04] transition-all">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/0 via-amber-500/50 to-amber-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <p className="text-5xl font-bold text-white tracking-tighter mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">{formatNumber(result.skipped || 0)}</p>
+                            <span className="px-3 py-1 bg-amber-500/10 text-amber-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-amber-500/20">Skipped</span>
+                        </div>
+                        {/* Failed */}
+                        <div className="relative overflow-hidden bg-white/[0.02] border border-red-500/20 rounded-2xl p-6 flex flex-col items-center justify-center group hover:bg-white/[0.04] transition-all">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500/0 via-red-500/50 to-red-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <p className="text-5xl font-bold text-white tracking-tighter mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">{formatNumber(result.failed)}</p>
+                            <span className="px-3 py-1 bg-red-500/10 text-red-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-red-500/20">Failed</span>
+                        </div>
+                    </div>
+
+                    {result.errors?.length > 0 && (
+                        <div className="max-w-4xl mx-auto mb-12 text-left relative z-10">
+                            <div className="flex items-center gap-2 text-red-400 bg-red-500/10 p-4 rounded-t-2xl border-x border-t border-red-500/20 shadow-inner">
+                                <AlertCircle className="w-5 h-5 shrink-0" /> 
+                                <h4 className="font-semibold tracking-tight">Import Errors ({formatNumber(result.errors.length)})</h4>
+                            </div>
+                            <div className="max-h-64 overflow-y-auto bg-[#0a0a0f]/80 border-x border-b border-red-500/20 rounded-b-2xl p-5 text-[13px] font-mono scrollbar-thin scrollbar-thumb-white/10 shadow-inner">
+                                {result.errors.map((error: any, i: number) => (
+                                    <div key={i} className="mb-3 pb-3 border-b border-white/5 last:border-0 last:mb-0 last:pb-0 flex items-start gap-4">
+                                        <span className="text-white/30 shrink-0 mt-0.5">Row {error.row}</span> 
+                                        <span className="text-red-300/80 leading-relaxed">{error.error}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-5 relative z-10 mt-4">
+                        <Button variant="outline" onClick={handleReset} className="h-12 px-8 rounded-full border-white/10 hover:bg-white/5 gap-2 font-medium text-white/80 transition-all">
+                            <Upload className="w-4 h-4" /> Import Another File
+                        </Button>
+                        <Button onClick={() => window.location.href = importType === 'STUDENTS' ? `/import-preview?batchId=${uploadData?.importId || ''}` : '/leads'} className="h-12 px-10 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-white shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] border-0 gap-2 font-semibold transition-all">
+                            View {importType === 'STUDENTS' ? 'Import Preview' : 'Leads Dashboard'} <ArrowRight className="w-4 h-4" />
+                        </Button>
+                    </div>
+                </div>
             )}
 
             {/* Import History */}
