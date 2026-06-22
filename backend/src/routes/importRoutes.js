@@ -807,53 +807,70 @@ router.delete('/history/:id', async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Import record not found' });
         }
 
-        let deletedOrdersCount = 0;
-
         if (deleteRecords === 'true' && importRecord.status === 'COMPLETED') {
+            // ─── Fire-and-forget background deletion ────────────────────────────────
+            // Deleting 100k–500k rows in chunks takes minutes. Nginx times out the
+            // HTTP connection (usually at 60–90s), which was causing the old code to
+            // abort mid-loop and then null-out the remaining rows, making them orphans.
+            //
+            // Fix: return the HTTP response immediately, then continue deleting in the
+            // background. The import history record is deleted AFTER all rows are gone.
 
-            // Delete in chunks to avoid long table locks.
-            // Loop until MySQL confirms 0 rows remain — don't rely on pre-counted total
-            // because affectedRows can be unreliable across Prisma/MySQL driver versions.
-            const CHUNK = 5000;
-            let deleted = 0;
-            let safetyMax = 100000; // max iterations guard against infinite loop
-            while (safetyMax-- > 0) {
-                const [result] = await prisma.$queryRawUnsafe(
-                    `DELETE FROM students WHERE import_batch_id = ? LIMIT ${CHUNK}`,
-                    BigInt(id)
-                );
-                // MySQL returns OkPacket with affectedRows
-                const count = Number(result?.affectedRows ?? result ?? 0);
-                deleted += count;
-                if (count === 0) break; // nothing left to delete
-                // Yield event loop so other requests stay responsive between chunks
-                await new Promise(resolve => setImmediate(resolve));
-            }
-            deletedOrdersCount = deleted;
+            // Respond immediately so the frontend doesn't hang
+            res.json({
+                success: true,
+                message: 'Deletion started in background. All records will be removed shortly.',
+                data: { deletedOrdersCount: 'pending' },
+            });
+
+            // Background deletion — runs after response is sent
+            const batchIdNum = Number(id); // use Number, not BigInt — safer with MySQL coercion
+            setImmediate(async () => {
+                try {
+                    const CHUNK = 5000;
+                    let deleted = 0;
+                    let safetyMax = 200000;
+                    while (safetyMax-- > 0) {
+                        // Inline the numeric ID — no SQL injection risk since it's a validated number
+                        const count = await prisma.$executeRawUnsafe(
+                            `DELETE FROM students WHERE import_batch_id = ${batchIdNum} LIMIT ${CHUNK}`
+                        );
+                        deleted += count;
+                        if (count === 0) break; // no rows left
+                        // Yield between chunks so other requests stay responsive
+                        await new Promise(resolve => setImmediate(resolve));
+                    }
+                    // NOW delete the import history — only after all student rows are gone
+                    await prisma.importHistory.delete({ where: { id: BigInt(id) } });
+                    console.log(`[delete-import] Background deletion complete: ${deleted} rows removed for batch ${batchIdNum}`);
+                } catch (bgErr) {
+                    console.error(`[delete-import] Background deletion failed for batch ${batchIdNum}:`, bgErr);
+                }
+            });
+
+            return; // response already sent above
         }
 
-        if (['PENDING', 'FAILED', 'PROCESSING'].includes(importRecord.status) || deleteRecords === 'true') {
-            // Null-out any remaining batch references (e.g. records not deleted)
-            await prisma.$queryRawUnsafe(
-                `UPDATE students SET import_batch_id = NULL WHERE import_batch_id = ?`,
-                BigInt(id)
+        if (['PENDING', 'FAILED', 'PROCESSING'].includes(importRecord.status)) {
+            // For non-completed imports: just nullify batch refs and delete history record
+            await prisma.$executeRawUnsafe(
+                `UPDATE students SET import_batch_id = NULL WHERE import_batch_id = ${Number(id)}`
             );
-
             await prisma.importHistory.delete({ where: { id: BigInt(id) } });
 
             return res.json({
                 success: true,
-                message: deleteRecords === 'true'
-                    ? `Import and ${deletedOrdersCount} records deleted successfully`
-                    : 'Import record deleted successfully',
-                data: { deletedOrdersCount },
-            });
-        } else {
-            return res.status(400).json({
-                success: false,
-                message: 'To delete a completed import, set deleteRecords=true to also remove imported data',
+                message: 'Import record deleted successfully',
+                data: { deletedOrdersCount: 0 },
             });
         }
+
+        // deleteRecords=false on a COMPLETED import — not allowed
+        return res.status(400).json({
+            success: false,
+            message: 'To delete a completed import, confirm deletion of all imported records.',
+        });
+
     } catch (error) {
         next(error);
     }
