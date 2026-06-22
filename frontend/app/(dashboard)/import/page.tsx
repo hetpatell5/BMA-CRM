@@ -41,6 +41,8 @@ export default function ImportPage() {
     const [duplicateHandling, setDuplicateHandling] = useState<'skip' | 'update'>('skip')
     const [progress, setProgress] = useState({ progress: 0, imported: 0, failed: 0 })
     const [result, setResult] = useState<any>(null)
+    // Track which import IDs are being deleted (background delete runs after HTTP response)
+    const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
 
     // Upload progress popup state
     const [uploadingFile, setUploadingFile] = useState<{ name: string; size: number } | null>(null)
@@ -58,20 +60,38 @@ export default function ImportPage() {
     // Delete import mutation
     const deleteMutation = useMutation({
         mutationFn: async ({ importId, deleteRecords = false }: { importId: string; deleteRecords?: boolean }) => {
+            // Mark this row as deleting BEFORE the request
+            setDeletingIds(prev => new Set(prev).add(importId))
             const response = await importAPI.delete(importId, deleteRecords)
-            return response.data
+            return { data: response.data, importId, deleteRecords }
         },
-        onSuccess: (data) => {
-            refetchHistory()
-            toast({
-                title: 'Import deleted',
-                description: data.data?.deletedOrdersCount
-                    ? `Removed ${data.data.deletedOrdersCount} records`
-                    : 'The import has been removed',
-                variant: 'success',
-            })
+        onSuccess: ({ data, importId, deleteRecords }) => {
+            if (deleteRecords) {
+                // Background delete: keep spinner on, poll history until the row disappears
+                const poll = setInterval(() => {
+                    refetchHistory().then((res: any) => {
+                        const stillExists = res.data?.data?.some((h: any) => h.id === importId)
+                        if (!stillExists) {
+                            clearInterval(poll)
+                            setDeletingIds(prev => { const s = new Set(prev); s.delete(importId); return s })
+                            toast({ title: 'Deleted', description: 'All records have been permanently removed.', variant: 'success' })
+                        }
+                    })
+                }, 3000) // poll every 3s
+                // Safety: stop after 10 min no matter what
+                setTimeout(() => {
+                    clearInterval(poll)
+                    setDeletingIds(prev => { const s = new Set(prev); s.delete(importId); return s })
+                    refetchHistory()
+                }, 600000)
+            } else {
+                setDeletingIds(prev => { const s = new Set(prev); s.delete(importId); return s })
+                refetchHistory()
+                toast({ title: 'Import record deleted', description: 'The import history entry has been removed.', variant: 'success' })
+            }
         },
-        onError: (error: any) => {
+        onError: (error: any, { importId }: any) => {
+            setDeletingIds(prev => { const s = new Set(prev); s.delete(importId); return s })
             toast({
                 title: 'Delete failed',
                 description: error.response?.data?.message || 'Failed to delete import',
@@ -728,9 +748,15 @@ export default function ImportPage() {
                                         <td className="p-3 text-emerald-400 font-mono font-medium">{formatNumber(imp.importedCount)}</td>
                                         <td className="p-3 text-red-400 font-mono font-medium">{formatNumber(imp.failedCount)}</td>
                                         <td className="p-3">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${imp.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' : imp.status === 'PROCESSING' ? 'bg-blue-500/20 text-blue-400' : imp.status === 'FAILED' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                                                {imp.status}
-                                            </span>
+                                            {deletingIds.has(imp.id) ? (
+                                                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse">
+                                                    <Loader2 className="w-3 h-3 animate-spin" /> Deleting…
+                                                </span>
+                                            ) : (
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${imp.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' : imp.status === 'PROCESSING' ? 'bg-blue-500/20 text-blue-400' : imp.status === 'FAILED' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                                    {imp.status}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="p-3 text-muted-foreground">{formatDateTime(imp.createdAt)}</td>
                                         <td className="p-3">
@@ -741,20 +767,26 @@ export default function ImportPage() {
                                                     </Button>
                                                 )}
                                                 {['PENDING', 'FAILED', 'COMPLETED', 'PROCESSING'].includes(imp.status) && (
-                                                    <Button variant="ghost" size="sm" onClick={() => {
-                                                        if (imp.status === 'COMPLETED') {
-                                                            if (confirm(`Delete this import?\n\nClick OK to also delete ${imp.importedCount} imported records.\nClick Cancel to keep this message.`)) {
-                                                                if (confirm(`⚠️ WARNING: This will permanently delete ${imp.importedCount} order records!\n\nAre you absolutely sure?`)) {
-                                                                    deleteMutation.mutate({ importId: imp.id, deleteRecords: true })
+                                                    <Button
+                                                        variant="ghost" size="sm"
+                                                        disabled={deletingIds.has(imp.id)}
+                                                        onClick={() => {
+                                                            if (imp.status === 'COMPLETED') {
+                                                                if (confirm(`Delete this import?\n\nClick OK to also delete ${formatNumber(imp.importedCount)} imported records.\nClick Cancel to go back.`)) {
+                                                                    if (confirm(`⚠️ WARNING: This will permanently delete ${formatNumber(imp.importedCount)} student records!\n\nAre you absolutely sure?`)) {
+                                                                        deleteMutation.mutate({ importId: imp.id, deleteRecords: true })
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                if (confirm('Are you sure you want to delete this import record?')) {
+                                                                    deleteMutation.mutate({ importId: imp.id })
                                                                 }
                                                             }
-                                                        } else {
-                                                            if (confirm('Are you sure you want to delete this import?')) {
-                                                                deleteMutation.mutate({ importId: imp.id })
-                                                            }
-                                                        }
-                                                    }} disabled={deleteMutation.isPending} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 h-8 w-8" title={imp.status === 'COMPLETED' ? 'Delete import and records' : 'Delete import'}>
-                                                        {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                        }}
+                                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 h-8 w-8"
+                                                        title={imp.status === 'COMPLETED' ? 'Delete import and all records' : 'Delete import'}
+                                                    >
+                                                        {deletingIds.has(imp.id) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                                     </Button>
                                                 )}
                                             </div>
