@@ -546,78 +546,51 @@ export default function ImportPage() {
                         </Button>
                     </div>
                 </div>
-            )}
-
-            {/* Step 3: Processing */}
+                   {/* Step 3: Processing */}
             {step === 'processing' && (
-                <div className="relative rounded-[32px] border border-white/5 bg-[#12141D]/80 backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-12 text-center max-w-2xl mx-auto mt-10">
-                    
-                    {/* Ambient glow behind loader */}
-                    <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 bg-primary/20 blur-[80px] rounded-full pointer-events-none" />
+                <div className="relative rounded-[32px] border border-white/5 bg-[#12141D]/80 backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-14 text-center max-w-2xl mx-auto mt-10">
 
-                    <div className="relative w-28 h-28 mx-auto mb-10 flex items-center justify-center">
-                        {/* Outer rotating ring */}
-                        <svg className="absolute inset-0 w-full h-full animate-spin-slow" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="48" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray="4 4" />
-                        </svg>
-                        {/* Inner glowing ring */}
-                        <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
-                            <circle 
-                                cx="50" cy="50" r="40" fill="transparent" 
-                                stroke="url(#processingGradient)" strokeWidth="4" strokeLinecap="round"
-                                className="transition-all duration-300 ease-out animate-[spin_2s_linear_infinite]" 
-                                style={{ filter: 'drop-shadow(0 0 12px rgba(99,102,241,0.5))' }}
-                                strokeDasharray="180 251.2" 
-                            />
-                            <defs>
-                                <linearGradient id="processingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stopColor="#818cf8" />
-                                    <stop offset="100%" stopColor="#4f46e5" />
-                                </linearGradient>
-                            </defs>
-                        </svg>
-                        <FileSpreadsheet className="relative w-10 h-10 text-primary animate-pulse" />
+                    {/* Ambient glow */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-80 bg-indigo-500/15 blur-[100px] rounded-full pointer-events-none" />
+
+                    {/* Custom drip loader */}
+                    <div className="flex justify-center mb-10 relative z-10">
+                        <div className="import-loader" />
                     </div>
 
-                    <h3 className="text-3xl font-bold text-white tracking-tight mb-3 relative z-10">Processing Intelligent Import</h3>
-                    <p className="text-white/50 mb-12 max-w-md mx-auto relative z-10 text-sm">
-                        We are importing records, handling duplicates, and parsing custom fields automatically. Please do not close this window.
+                    <h3 className="text-2xl font-bold text-white tracking-tight mb-2 relative z-10">Processing Import</h3>
+                    <p className="text-white/45 mb-10 max-w-sm mx-auto relative z-10 text-sm leading-relaxed">
+                        Importing records and handling duplicates automatically.<br/>Please do not close this window.
                     </p>
 
-                    <div className="max-w-md mx-auto mb-10 p-1 bg-white/[0.03] rounded-2xl border border-white/5 backdrop-blur-sm relative z-10">
-                        <div className="p-5">
-                            <div className="flex items-center justify-between text-sm mb-4">
-                                <span className="font-medium text-white/70">Total Progress</span>
-                                <span className="text-primary font-bold text-lg">{progress.progress}%</span>
-                            </div>
-                            <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden shadow-inner ring-1 ring-white/5 mb-4">
-                                <div
-                                    className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-primary shadow-[0_0_12px_rgba(99,102,241,0.8)] transition-all duration-300 ease-out relative"
-                                    style={{ width: `${Math.max(progress.progress, 0)}%` }}
-                                >
-                                    <div className="absolute inset-0 bg-white/20 w-full animate-[pulse_1s_ease-in-out_infinite]"></div>
-                                </div>
-                            </div>
-                            {uploadData?.totalRows && (
-                                <p className="text-xs text-white/40 flex justify-between">
-                                    <span>Processing row</span>
-                                    <span>{formatNumber(progress.imported + progress.failed)} / {formatNumber(uploadData.totalRows)}</span>
-                                </p>
-                            )}
+                    {/* Progress bar */}
+                    <div className="max-w-sm mx-auto mb-10 relative z-10">
+                        <div className="flex items-center justify-between text-xs mb-2">
+                            <span className="text-white/50 font-medium">Progress</span>
+                            <span className="text-indigo-400 font-bold tabular-nums">{progress.progress}%</span>
                         </div>
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                            <div
+                                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-400 shadow-[0_0_8px_rgba(99,102,241,0.7)] transition-all duration-500 ease-out"
+                                style={{ width: `${Math.max(progress.progress, 0)}%` }}
+                            />
+                        </div>
+                        {uploadData?.totalRows && (
+                            <p className="text-[11px] text-white/30 mt-2 tabular-nums">
+                                {formatNumber(progress.imported + progress.failed)} of {formatNumber(uploadData.totalRows)} rows
+                            </p>
+                        )}
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6 relative z-10">
-                        <div className="w-full sm:w-1/3 p-5 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col items-center justify-center relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <p className="text-4xl font-bold text-white tracking-tighter mb-2">{formatNumber(progress.imported)}</p>
-                            <p className="text-emerald-400 font-semibold tracking-widest text-[10px] uppercase">Imported</p>
+                    {/* Live counters */}
+                    <div className="flex items-stretch justify-center gap-4 relative z-10">
+                        <div className="flex-1 max-w-[140px] py-5 px-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                            <p className="text-3xl font-bold text-white tabular-nums tracking-tight mb-1">{formatNumber(progress.imported)}</p>
+                            <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-widest">Imported</p>
                         </div>
-                        <div className="w-full sm:w-1/3 p-5 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col items-center justify-center relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <p className="text-4xl font-bold text-white tracking-tighter mb-2">{formatNumber(progress.failed)}</p>
-                            <p className="text-red-400 font-semibold tracking-widest text-[10px] uppercase">Errors</p>
+                        <div className="flex-1 max-w-[140px] py-5 px-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                            <p className="text-3xl font-bold text-white tabular-nums tracking-tight mb-1">{formatNumber(progress.failed)}</p>
+                            <p className="text-[11px] font-semibold text-red-400 uppercase tracking-widest">Errors</p>
                         </div>
                     </div>
                 </div>
@@ -625,74 +598,66 @@ export default function ImportPage() {
 
             {/* Step 4: Complete */}
             {step === 'complete' && result && (
-                <div className="relative rounded-[32px] border border-white/5 bg-[#12141D]/80 backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-12 text-center max-w-4xl mx-auto mt-10">
-                    
-                    {/* Ambient glow behind success icon */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none" />
+                <div className="relative rounded-[32px] border border-white/5 bg-[#12141D]/80 backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-12 text-center max-w-3xl mx-auto mt-10">
 
-                    <div className="relative w-28 h-28 mx-auto mb-8 flex items-center justify-center">
-                        <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping opacity-20" />
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/30 to-emerald-600/30 rounded-full blur-md" />
-                        <div className="relative w-24 h-24 bg-[#0a1f16] border border-emerald-500/30 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(16,185,129,0.3)]">
-                            <CheckCircle className="w-12 h-12 text-emerald-400" />
+                    {/* Ambient glow */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-64 bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none" />
+
+                    {/* Success icon */}
+                    <div className="relative w-20 h-20 mx-auto mb-7 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping opacity-30" />
+                        <div className="relative w-20 h-20 bg-[#0b1f15] border border-emerald-500/30 rounded-full flex items-center justify-center shadow-[0_0_32px_rgba(16,185,129,0.25)]">
+                            <CheckCircle className="w-10 h-10 text-emerald-400" />
                         </div>
                     </div>
 
-                    <h3 className="text-3xl font-bold text-white tracking-tight mb-3 relative z-10">Import Successfully Completed</h3>
-                    <p className="text-white/50 mb-12 max-w-lg mx-auto relative z-10">
-                        Your data has been intelligently parsed, analyzed, and securely stored in the system.
+                    <h3 className="text-2xl font-bold text-white tracking-tight mb-2 relative z-10">Import Successfully Completed</h3>
+                    <p className="text-white/45 mb-10 max-w-md mx-auto relative z-10 text-sm">
+                        Your data has been parsed, deduplicated, and securely stored.
                     </p>
 
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 max-w-4xl mx-auto mb-12 relative z-10">
-                        {/* New */}
-                        <div className="relative overflow-hidden bg-white/[0.02] border border-emerald-500/20 rounded-2xl p-6 flex flex-col items-center justify-center group hover:bg-white/[0.04] transition-all">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/0 via-emerald-500/50 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <p className="text-5xl font-bold text-white tracking-tighter mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">{formatNumber(result.imported)}</p>
-                            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-emerald-500/20">New Records</span>
-                        </div>
-                        {/* Updated */}
-                        <div className="relative overflow-hidden bg-white/[0.02] border border-blue-500/20 rounded-2xl p-6 flex flex-col items-center justify-center group hover:bg-white/[0.04] transition-all">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500/0 via-blue-500/50 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <p className="text-5xl font-bold text-white tracking-tighter mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">{formatNumber(result.updated || 0)}</p>
-                            <span className="px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-blue-500/20">Updated</span>
-                        </div>
-                        {/* Skipped */}
-                        <div className="relative overflow-hidden bg-white/[0.02] border border-amber-500/20 rounded-2xl p-6 flex flex-col items-center justify-center group hover:bg-white/[0.04] transition-all">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/0 via-amber-500/50 to-amber-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <p className="text-5xl font-bold text-white tracking-tighter mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">{formatNumber(result.skipped || 0)}</p>
-                            <span className="px-3 py-1 bg-amber-500/10 text-amber-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-amber-500/20">Skipped</span>
-                        </div>
-                        {/* Failed */}
-                        <div className="relative overflow-hidden bg-white/[0.02] border border-red-500/20 rounded-2xl p-6 flex flex-col items-center justify-center group hover:bg-white/[0.04] transition-all">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500/0 via-red-500/50 to-red-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <p className="text-5xl font-bold text-white tracking-tighter mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">{formatNumber(result.failed)}</p>
-                            <span className="px-3 py-1 bg-red-500/10 text-red-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-red-500/20">Failed</span>
-                        </div>
+                    {/* Stat cards — 4 equal columns */}
+                    <div className="grid grid-cols-4 gap-3 mb-10 relative z-10">
+                        {[
+                            { value: result.imported,        label: 'New',     color: 'emerald' },
+                            { value: result.updated  || 0,  label: 'Updated',  color: 'blue'    },
+                            { value: result.skipped  || 0,  label: 'Skipped',  color: 'amber'   },
+                            { value: result.failed,          label: 'Failed',   color: 'red'     },
+                        ].map(({ value, label, color }) => (
+                            <div key={label} className={`relative flex flex-col items-center justify-center py-6 px-3 rounded-2xl bg-white/[0.02] border border-${color}-500/20 overflow-hidden`}>
+                                {/* top accent line */}
+                                <div className={`absolute top-0 inset-x-0 h-[2px] bg-${color}-400/60 rounded-t-2xl`} />
+                                <p className="text-3xl sm:text-4xl font-bold text-white tabular-nums tracking-tight leading-none mb-3">
+                                    {formatNumber(value)}
+                                </p>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest text-${color}-400`}>{label}</span>
+                            </div>
+                        ))}
                     </div>
 
                     {result.errors?.length > 0 && (
-                        <div className="max-w-4xl mx-auto mb-12 text-left relative z-10">
-                            <div className="flex items-center gap-2 text-red-400 bg-red-500/10 p-4 rounded-t-2xl border-x border-t border-red-500/20 shadow-inner">
-                                <AlertCircle className="w-5 h-5 shrink-0" /> 
-                                <h4 className="font-semibold tracking-tight">Import Errors ({formatNumber(result.errors.length)})</h4>
+                        <div className="mb-10 text-left relative z-10">
+                            <div className="flex items-center gap-2 text-red-400 bg-red-500/10 p-3.5 rounded-t-2xl border-x border-t border-red-500/20">
+                                <AlertCircle className="w-4 h-4 shrink-0" />
+                                <h4 className="text-sm font-semibold">Import Errors ({formatNumber(result.errors.length)})</h4>
                             </div>
-                            <div className="max-h-64 overflow-y-auto bg-[#0a0a0f]/80 border-x border-b border-red-500/20 rounded-b-2xl p-5 text-[13px] font-mono scrollbar-thin scrollbar-thumb-white/10 shadow-inner">
+                            <div className="max-h-52 overflow-y-auto bg-[#0a0a0f]/80 border-x border-b border-red-500/20 rounded-b-2xl p-4 text-[12px] font-mono scrollbar-thin">
                                 {result.errors.map((error: any, i: number) => (
-                                    <div key={i} className="mb-3 pb-3 border-b border-white/5 last:border-0 last:mb-0 last:pb-0 flex items-start gap-4">
-                                        <span className="text-white/30 shrink-0 mt-0.5">Row {error.row}</span> 
-                                        <span className="text-red-300/80 leading-relaxed">{error.error}</span>
+                                    <div key={i} className="mb-2.5 pb-2.5 border-b border-white/5 last:border-0 flex gap-4">
+                                        <span className="text-white/25 shrink-0">Row {error.row}</span>
+                                        <span className="text-red-300/70">{error.error}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-5 relative z-10 mt-4">
-                        <Button variant="outline" onClick={handleReset} className="h-12 px-8 rounded-full border-white/10 hover:bg-white/5 gap-2 font-medium text-white/80 transition-all">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
+                        <Button variant="outline" onClick={handleReset} className="h-11 px-7 rounded-full border-white/10 hover:bg-white/5 gap-2 text-sm font-medium text-white/70">
                             <Upload className="w-4 h-4" /> Import Another File
                         </Button>
-                        <Button onClick={() => window.location.href = importType === 'STUDENTS' ? `/import-preview?batchId=${uploadData?.importId || ''}` : '/leads'} className="h-12 px-10 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-white shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] border-0 gap-2 font-semibold transition-all">
-                            View {importType === 'STUDENTS' ? 'Import Preview' : 'Leads Dashboard'} <ArrowRight className="w-4 h-4" />
+                        <Button onClick={() => window.location.href = importType === 'STUDENTS' ? `/import-preview?batchId=${uploadData?.importId || ''}` : '/leads'} className="h-11 px-8 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-90 text-white border-0 gap-2 text-sm font-semibold shadow-[0_0_24px_rgba(16,185,129,0.35)]">
+                            View {importType === 'STUDENTS' ? 'Import Preview' : 'Leads'} <ArrowRight className="w-4 h-4" />
                         </Button>
                     </div>
                 </div>

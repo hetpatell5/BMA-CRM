@@ -389,3 +389,44 @@ select:focus {
 .dark {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
+
+/* ═══════════════════════════════════════════════════════
+   IMPORT PAGE — CUSTOM LOADERS
+   ═══════════════════════════════════════════════════════ */
+
+/* Drip / hourglass loader (user-specified) */
+.import-loader {
+  display: inline-flex;
+  gap: 14px;
+}
+.import-loader:before,
+.import-loader:after {
+  content: "";
+  height: 28px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    linear-gradient(#6366f1 0 0) top/100% 0% no-repeat,
+    radial-gradient(farthest-side, #4f46e5 95%, #0000) 50%/10px 10px no-repeat
+    rgba(255,255,255,0.06);
+  animation: importDrip 4s infinite ease-in;
+  box-shadow: 0 0 18px rgba(99,102,241,0.35);
+}
+.import-loader:after {
+  animation-delay: -2s;
+}
+@keyframes importDrip {
+  0%  { background-size: 100% 0%,   10px 10px; background-position: top, 50% 50%; }
+  80% { background-size: 100% 70%,  10px 10px; background-position: top, 50% 70%; }
+  84%,
+  100%{ background-size: 100% 0%,   10px 10px; background-position: top, 50% 50%; }
+}
+
+/* Slow outer ring spin */
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spinSlow 12s linear infinite;
+}
