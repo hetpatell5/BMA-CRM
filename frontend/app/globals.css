@@ -411,9 +411,7 @@ select:focus {
     #fff;
   animation: importDrip 4s infinite ease-in;
 }
-.import-loader:after {
-  animation-delay: -2s;
-}
+
 @keyframes importDrip {
   0%   { background-size: 100% 0%,  8px 8px; background-position: top, 50% 50%; }
   80%  { background-size: 100% 70%, 8px 8px; background-position: top, 50% 70%; }
