@@ -162,12 +162,18 @@ router.get('/charts/lead-pipeline', async (req, res, next) => {
     try {
         const stages = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
 
-        const pipeline = await Promise.all(
-            stages.map(async (stage) => ({
-                stage,
-                count: await prisma.lead.count({ where: { stage } }),
-            }))
-        );
+        // Single groupBy query instead of 7 separate COUNT queries
+        const grouped = await prisma.lead.groupBy({
+            by: ['stage'],
+            _count: { id: true },
+        });
+
+        const countByStage = Object.fromEntries(grouped.map(g => [g.stage, g._count.id]));
+
+        const pipeline = stages.map(stage => ({
+            stage,
+            count: countByStage[stage] || 0,
+        }));
 
         res.json({
             success: true,
@@ -375,26 +381,25 @@ router.get('/payments/expert-workload', async (req, res, next) => {
 // Get comprehensive stats for the Telecaller dashboard
 router.get('/telecaller-stats', authenticateToken, async (req, res, next) => {
     try {
-        const userId = req.user.id;
-        
-        // Ensure only telecallers or admins use this
-        // but practically it scopes data to the caller anyway.
-        
         const todayAtStart = new Date();
         todayAtStart.setHours(0, 0, 0, 0);
 
         const todayAtEnd = new Date();
         todayAtEnd.setHours(23, 59, 59, 999);
 
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { fullName: true, email: true, role: true }
-        });
-
-        // The user expects all 4 orders to show up, including admin-created ones and 'form_submission' ones.
-        // So we will fetch all students for the telecaller dashboard for now.
+        // IMPORTANT: Only fetch real orders (not excel_import bulk rows) to avoid OOM.
+        // Select only the fields we actually use to minimise memory.
         const myOrders = await prisma.student.findMany({
-            orderBy: { createdAt: 'desc' }
+            where: { NOT: { source: 'excel_import' } },
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true,
+                createdAt: true,
+                source: true,
+                customFields: true,
+                fullName: true,
+                status: true,
+            },
         });
 
         // Calculate Revenue bounds
@@ -426,12 +431,14 @@ router.get('/telecaller-stats', authenticateToken, async (req, res, next) => {
                 }
             }
         });
-        
+
         pendingPayment = Math.max(0, totalRevenue - totalCollected);
 
-        // Fetch leads 
+        // Fetch leads — cap at 500 for performance; pipeline uses groupBy separately
         const myLeads = await prisma.lead.findMany({
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
+            take: 500,
+            select: { id: true, stage: true, createdAt: true, nextFollowUp: true },
         });
 
         const pipeline = {
@@ -448,7 +455,6 @@ router.get('/telecaller-stats', authenticateToken, async (req, res, next) => {
         let overdueLeadsList = [];
 
         myLeads.forEach(lead => {
-            // Pipeline count
             if (pipeline[lead.stage] !== undefined) {
                 pipeline[lead.stage]++;
             } else {
@@ -458,13 +464,11 @@ router.get('/telecaller-stats', authenticateToken, async (req, res, next) => {
             if (lead.stage === 'NEW') newLeads++;
             if (lead.stage === 'WON') wonLeads++;
 
-            // Follow-up categorization
             if (lead.nextFollowUp) {
                 const followUpDate = new Date(lead.nextFollowUp);
                 if (followUpDate >= todayAtStart && followUpDate <= todayAtEnd) {
                     followUpsTodayList.push(lead);
                 } else if (followUpDate < todayAtStart) {
-                    // Overdue follow up ignores WON/LOST ones ideally
                     if (lead.stage !== 'WON' && lead.stage !== 'LOST') {
                         overdueLeadsList.push(lead);
                     }
@@ -472,14 +476,9 @@ router.get('/telecaller-stats', authenticateToken, async (req, res, next) => {
             }
         });
 
-        // Calculate how many orders were specifically created manually (source: 'manual' or via telecaller form)
         let createdCount = 0;
         myOrders.forEach(order => {
-            if (order.source === 'manual') {
-                createdCount++;
-            }
-            // For older records or different source names
-            else if (order.source === 'telecaller' || order.source === 'TELECALLER') {
+            if (order.source === 'manual' || order.source === 'telecaller' || order.source === 'TELECALLER') {
                 createdCount++;
             }
         });
@@ -490,8 +489,8 @@ router.get('/telecaller-stats', authenticateToken, async (req, res, next) => {
                 orders: {
                     total: myOrders.length,
                     today: ordersToday,
-                    createdCount: createdCount,
-                    recentList: myOrders.sort((a, b) => b.createdAt - a.createdAt).slice(0, 8)
+                    createdCount,
+                    recentList: myOrders.slice(0, 8),
                 },
                 revenue: {
                     total: totalRevenue,
@@ -505,7 +504,7 @@ router.get('/telecaller-stats', authenticateToken, async (req, res, next) => {
                     conversionRate: myLeads.length > 0 ? Math.round((wonLeads / myLeads.length) * 100) : 0,
                     followUpsToday: followUpsTodayList.length,
                     overdue: overdueLeadsList.length,
-                    followUpList: [...overdueLeadsList, ...followUpsTodayList].sort((a,b) => new Date(a.nextFollowUp) - new Date(b.nextFollowUp)),
+                    followUpList: [...overdueLeadsList, ...followUpsTodayList].sort((a, b) => new Date(a.nextFollowUp) - new Date(b.nextFollowUp)),
                 },
                 pipeline,
             }

@@ -283,7 +283,13 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
-        const updateData = { ...req.body };
+
+        // Allowlist only safe, updatable fields (prevent mass-assignment)
+        const {
+            fullName, email, phone, alternatePhone, interestedCourse,
+            source, sourceDetails, priority, stage, assignedToId,
+            nextFollowUp, followUpNotes, customFields, notes,
+        } = req.body;
 
         // Get current lead for stage change tracking
         const currentLead = await prisma.lead.findUnique({
@@ -297,13 +303,21 @@ router.put('/:id', async (req, res, next) => {
             });
         }
 
-        // Convert dates
-        if (updateData.nextFollowUp) {
-            updateData.nextFollowUp = new Date(updateData.nextFollowUp);
-        }
-        if (updateData.assignedToId) {
-            updateData.assignedToId = parseInt(updateData.assignedToId);
-        }
+        const updateData = {};
+        if (fullName !== undefined)         updateData.fullName = fullName;
+        if (email !== undefined)            updateData.email = email;
+        if (phone !== undefined)            updateData.phone = phone;
+        if (alternatePhone !== undefined)   updateData.alternatePhone = alternatePhone;
+        if (interestedCourse !== undefined) updateData.interestedCourse = interestedCourse;
+        if (source !== undefined)           updateData.source = source;
+        if (sourceDetails !== undefined)    updateData.sourceDetails = sourceDetails;
+        if (priority !== undefined)         updateData.priority = priority;
+        if (stage !== undefined)            updateData.stage = stage;
+        if (notes !== undefined)            updateData.notes = notes;
+        if (customFields !== undefined)     updateData.customFields = customFields;
+        if (assignedToId !== undefined)     updateData.assignedToId = assignedToId ? parseInt(assignedToId) : null;
+        if (nextFollowUp !== undefined)     updateData.nextFollowUp = nextFollowUp ? new Date(nextFollowUp) : null;
+        if (followUpNotes !== undefined)    updateData.followUpNotes = followUpNotes;
 
         // Track stage change
         const stageChanged = updateData.stage && updateData.stage !== currentLead.stage;
@@ -312,11 +326,6 @@ router.put('/:id', async (req, res, next) => {
         if (updateData.stage === 'WON' && !currentLead.convertedAt) {
             updateData.convertedAt = new Date();
         }
-
-        // Remove fields that shouldn't be updated
-        delete updateData.id;
-        delete updateData.createdAt;
-        delete updateData.createdById;
 
         const lead = await prisma.lead.update({
             where: { id: BigInt(id) },

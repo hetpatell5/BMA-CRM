@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { leadsAPI, teamAPI } from '@/lib/api'
 import { formatNumber, formatDate, getPriorityColor, getInitials } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore } from '@/stores/authStore' 
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 

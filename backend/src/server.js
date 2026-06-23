@@ -88,6 +88,10 @@ app.set('io', io);
 // Start Alert Service
 startAlertService(io);
 
+// Globally serialize BigInt to string for JSON.stringify (used by all routes)
+// Must be set before any route handlers load.
+BigInt.prototype.toJSON = function () { return this.toString(); };
+
 // Security middleware
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -106,7 +110,9 @@ app.use(cors({
     credentials: true,
 }));
 
-// Trust proxy (nginx sits in front — must be set before rate limiter)
+// Trust proxy MUST come before rate limiter so express-rate-limit
+// sees the real client IP from the X-Forwarded-For header (set by Nginx),
+// not Nginx's loopback address.
 app.set('trust proxy', 1);
 
 // Rate limiting
@@ -114,6 +120,8 @@ const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 1000, // Limit each IP to 1000 requests per windowMs
     message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 app.use('/api', limiter);
 

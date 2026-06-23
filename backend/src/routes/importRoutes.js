@@ -198,21 +198,70 @@ router.get('/resume/:importId', async (req, res, next) => {
             });
         }
 
-        // Re-read the file
-        const workbook = XLSX.readFile(importRecord.filePath);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
+        const filePath = importRecord.filePath;
+        const isCSVResume = /\.csv$/i.test(filePath) || importRecord.fileName?.toLowerCase().endsWith('.csv');
 
-        // Get headers
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        const headers = jsonData[0] || [];
-        const totalRows = jsonData.length - 1;
+        let headers = [];
+        let totalRows = 0;
+        let previewData = [];
+        let previewRows = [];
 
-        // Get preview data
-        const previewData = XLSX.utils.sheet_to_json(worksheet).slice(0, 10);
+        if (isCSVResume) {
+            const parseCSVLine = (line) => {
+                const result = [];
+                let cur = '';
+                let inQ = false;
+                for (let i = 0; i < line.length; i++) {
+                    const ch = line[i];
+                    if (inQ) {
+                        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+                        else if (ch === '"') { inQ = false; }
+                        else { cur += ch; }
+                    } else {
+                        if (ch === '"') { inQ = true; }
+                        else if (ch === ',') { result.push(cur); cur = ''; }
+                        else { cur += ch; }
+                    }
+                }
+                result.push(cur);
+                return result;
+            };
 
-        // ── Smart auto-mapping ──────────────────────────────────────────────
-        const previewRows = jsonData.slice(1, 6);
+            const rl = readline.createInterface({
+                input: fs.createReadStream(filePath, { encoding: 'utf8' }),
+                crlfDelay: Infinity,
+            });
+
+            let headerParsed = false;
+            for await (const line of rl) {
+                const cleanLine = headerParsed ? line : line.replace(/^\uFEFF/, '');
+                if (!cleanLine.trim()) continue;
+                if (!headerParsed) {
+                    headers = parseCSVLine(cleanLine);
+                    headerParsed = true;
+                } else {
+                    totalRows++;
+                    if (totalRows <= 10) {
+                        const vals = parseCSVLine(line);
+                        const obj = {};
+                        headers.forEach((h, i) => { obj[h] = vals[i] !== undefined ? vals[i] : ''; });
+                        previewData.push(obj);
+                    }
+                    if (totalRows <= 5) previewRows.push(parseCSVLine(line));
+                }
+            }
+        } else {
+            // XLSX/XLS
+            const workbook = XLSX.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            headers   = jsonData[0] || [];
+            totalRows = jsonData.length - 1;
+            previewData = XLSX.utils.sheet_to_json(worksheet).slice(0, 10);
+            previewRows = jsonData.slice(1, 6);
+        }
+
         const mappingResults = mapHeaders(headers, previewRows, importRecord.importType);
         const suggestedMappings = resultsToSuggestedMappings(mappingResults);
 
@@ -249,6 +298,16 @@ router.post('/process/:importId', async (req, res, next) => {
             return res.status(400).json({
                 success: false,
                 message: 'Column mapping is required',
+            });
+        }
+
+        // Security: ensure filePath is inside the uploads directory (prevent path traversal)
+        const resolvedPath = path.resolve(filePath || '');
+        const uploadsDir = path.resolve('./uploads');
+        if (!filePath || !resolvedPath.startsWith(uploadsDir)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid file path',
             });
         }
 
@@ -810,8 +869,13 @@ router.delete('/history/:id', async (req, res, next) => {
         if (deleteRecords === 'true' && importRecord.status === 'COMPLETED') {
             // ─── Fire-and-forget background deletion ────────────────────────────────
             // Response is sent immediately — deletion runs fully in background.
-            // Single DELETE with no LIMIT — removes every row for this batch, no matter
-            // how many there are and how long it takes.
+            // Single DELETE with no LIMIT — removes every row for this batch.
+
+            // Security: ensure batchId is a safe integer before using in raw SQL
+            const batchIdNum = parseInt(id, 10);
+            if (isNaN(batchIdNum) || batchIdNum <= 0) {
+                return res.status(400).json({ success: false, message: 'Invalid import ID' });
+            }
 
             res.json({
                 success: true,
@@ -819,14 +883,10 @@ router.delete('/history/:id', async (req, res, next) => {
                 data: { deletedOrdersCount: 'pending' },
             });
 
-            const batchIdNum = Number(id);
             setImmediate(async () => {
                 try {
-                    // No LIMIT — delete every single row for this batch in one statement
-                    const deleted = await prisma.$executeRawUnsafe(
-                        `DELETE FROM students WHERE import_batch_id = ${batchIdNum}`
-                    );
-                    // Delete the import history record only AFTER all rows are confirmed gone
+                    // Parameterized to prevent SQL injection
+                    const deleted = await prisma.$executeRaw`DELETE FROM students WHERE import_batch_id = ${batchIdNum}`;
                     await prisma.importHistory.delete({ where: { id: BigInt(id) } });
                     console.log(`[delete-import] Done: ${deleted} rows permanently removed for batch ${batchIdNum}`);
                 } catch (bgErr) {

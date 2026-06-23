@@ -17,8 +17,7 @@ const STAFF_ASSIGNMENT_ROLES = ['GUIDE', 'EXPERT', 'BOTH', 'TELECALLER', 'WRITTE
 const STUDENT_ASSIGNMENT_ROLES = ['GUIDE', 'EXPERT', 'BOTH'];
 const DEGREE_REQUIRED_STAFF_ROLES = ['GUIDE', 'EXPERT', 'BOTH', 'WRITTER'];
 
-// Serialize Prisma BigInt fields such as student IDs in payment breakdown data.
-BigInt.prototype.toJSON = function () { return this.toString() };
+// BigInt.prototype.toJSON is now set globally in server.js — no need to repeat here.
 
 const normalizeStaffRole = (staffRole) => {
     if (staffRole === undefined || staffRole === null || staffRole === '') {

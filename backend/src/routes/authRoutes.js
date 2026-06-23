@@ -145,6 +145,13 @@ router.post('/register', authenticateToken, async (req, res, next) => {
             });
         }
 
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 6 characters',
+            });
+        }
+
         const existingUser = await prisma.user.findUnique({
             where: { email: email.toLowerCase() },
         });
@@ -235,12 +242,26 @@ router.put('/change-password', authenticateToken, async (req, res, next) => {
             where: { id: req.user.id },
         });
 
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+            });
+        }
+
         const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
 
         if (!isValidPassword) {
             return res.status(400).json({
                 success: false,
                 message: 'Current password is incorrect',
+            });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'New password must be at least 6 characters',
             });
         }
 
