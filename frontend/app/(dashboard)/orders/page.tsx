@@ -358,7 +358,6 @@ export default function StudentsPage() {
         status:         searchParams.get('status') || '',
         programme:      searchParams.get('programme') || '',
         regionalCenter: searchParams.get('regionalCenter') || '',
-        importBatchId:  searchParams.get('importBatchId') || '',
         source:         searchParams.get('source') || '',
         subject:        searchParams.get('subject') || '',
     })
@@ -736,7 +735,7 @@ export default function StudentsPage() {
     // State for filter panel search
     const [filterSearch, setFilterSearch] = useState('')
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-        imports: true, source: true, programme: false, regional: false, subject: false
+        source: true, programme: false, regional: false, subject: false
     })
     const toggleSection = (key: string) => setOpenSections(s => ({ ...s, [key]: !s[key] }))
 
@@ -1341,13 +1340,6 @@ export default function StudentsPage() {
             {/* Active filter chips */}
             {activeFilterCount > 0 && (
                 <div className="flex flex-wrap gap-2 -mt-2">
-                    {filters.importBatchId && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/25">
-                            <FolderOpen className="w-3 h-3" />
-                            {filterOptions?.importBatches?.find((b: any) => b.id === filters.importBatchId)?.fileName || 'Import'}
-                            <button onClick={() => setFilters(f => ({ ...f, importBatchId: '' }))} className="ml-0.5 hover:text-blue-900 dark:hover:text-white"><X className="w-3 h-3" /></button>
-                        </span>
-                    )}
                     {filters.source && (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/25">
                             Source: {filters.source}
@@ -1374,7 +1366,7 @@ export default function StudentsPage() {
                         </span>
                     )}
                     <button
-                        onClick={() => setFilters({ status: '', programme: '', regionalCenter: '', importBatchId: '', source: '', subject: '' })}
+                        onClick={() => setFilters({ status: '', programme: '', regionalCenter: '', source: '', subject: '' })}
                         className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                     >
                         Clear all
@@ -1436,46 +1428,6 @@ export default function StudentsPage() {
 
                         <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
 
-                            {/* ── Data Sources (Import Batches) ── */}
-                            {filterOptions?.importBatches?.length > 0 && (
-                                <div>
-                                    <button
-                                        className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-                                        onClick={() => toggleSection('imports')}
-                                    >
-                                        <span className="flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5" />Imported Files</span>
-                                        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", openSections.imports && "rotate-180")} />
-                                    </button>
-                                    {openSections.imports && (
-                                        <div className="space-y-0.5 mb-3">
-                                            {filterOptions.importBatches
-                                                .filter((b: any) => !filterSearch || b.fileName.toLowerCase().includes(filterSearch.toLowerCase()))
-                                                .map((batch: any) => (
-                                                    <label
-                                                        key={batch.id}
-                                                        className={cn(
-                                                            "flex items-start gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors group",
-                                                            filters.importBatchId === batch.id
-                                                                ? "bg-blue-50 dark:bg-blue-500/10"
-                                                                : "hover:bg-slate-100 dark:hover:bg-white/5"
-                                                        )}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={filters.importBatchId === batch.id}
-                                                            onChange={() => setFilters(f => ({ ...f, importBatchId: f.importBatchId === batch.id ? '' : batch.id }))}
-                                                            className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 accent-blue-500 cursor-pointer shrink-0"
-                                                        />
-                                                        <div className="min-w-0">
-                                                            <p className="text-[13px] font-medium leading-tight truncate text-foreground">{batch.fileName}</p>
-                                                            <p className="text-[11px] text-muted-foreground mt-0.5">{batch.importedCount} records</p>
-                                                        </div>
-                                                    </label>
-                                                ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
 
                             {/* ── Source ── */}
                             <div>
@@ -1490,7 +1442,6 @@ export default function StudentsPage() {
                                     <div className="space-y-0.5 mb-3">
                                         {[
                                             { value: 'form_submission', label: 'Form Submission' },
-                                            { value: 'excel_import', label: 'Excel Import' },
                                             { value: 'manual', label: 'Manual Entry' },
                                         ].filter(opt => !filterSearch || opt.label.toLowerCase().includes(filterSearch.toLowerCase()))
                                             .map(opt => (
