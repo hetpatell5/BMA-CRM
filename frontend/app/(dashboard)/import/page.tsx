@@ -550,35 +550,35 @@ export default function ImportPage() {
 
             {/* Step 3: Processing */}
             {step === 'processing' && (
-                <div className="relative rounded-[32px] border border-white/5 bg-[#12141D]/80 backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-14 text-center max-w-2xl mx-auto mt-10">
+                <div className="relative rounded-[32px] border border-slate-200 dark:border-white/5 bg-white/90 dark:bg-[#12141D]/80 backdrop-blur-3xl shadow-xl dark:shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-14 text-center max-w-2xl mx-auto mt-10">
 
                     {/* Ambient glow */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-80 bg-indigo-500/15 blur-[100px] rounded-full pointer-events-none" />
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-80 bg-indigo-500/10 dark:bg-indigo-500/15 blur-[100px] rounded-full pointer-events-none" />
 
                     {/* Custom drip loader */}
                     <div className="flex justify-center mb-10 relative z-10">
                         <div className="import-loader" />
                     </div>
 
-                    <h3 className="text-2xl font-bold text-white tracking-tight mb-2 relative z-10">Processing Import</h3>
-                    <p className="text-white/45 mb-10 max-w-sm mx-auto relative z-10 text-sm leading-relaxed">
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-2 relative z-10">Processing Import</h3>
+                    <p className="text-slate-500 dark:text-white/45 mb-10 max-w-sm mx-auto relative z-10 text-sm leading-relaxed">
                         Importing records and handling duplicates automatically.<br/>Please do not close this window.
                     </p>
 
                     {/* Progress bar */}
                     <div className="max-w-sm mx-auto mb-10 relative z-10">
                         <div className="flex items-center justify-between text-xs mb-2">
-                            <span className="text-white/50 font-medium">Progress</span>
-                            <span className="text-indigo-400 font-bold tabular-nums">{progress.progress}%</span>
+                            <span className="text-slate-500 dark:text-white/50 font-medium">Progress</span>
+                            <span className="text-indigo-600 dark:text-indigo-400 font-bold tabular-nums">{progress.progress}%</span>
                         </div>
-                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                             <div
-                                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-400 shadow-[0_0_8px_rgba(99,102,241,0.7)] transition-all duration-500 ease-out"
+                                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-400 shadow-[0_0_8px_rgba(99,102,241,0.5)] dark:shadow-[0_0_8px_rgba(99,102,241,0.7)] transition-all duration-500 ease-out"
                                 style={{ width: `${Math.max(progress.progress, 0)}%` }}
                             />
                         </div>
                         {uploadData?.totalRows && (
-                            <p className="text-[11px] text-white/30 mt-2 tabular-nums">
+                            <p className="text-[11px] text-slate-400 dark:text-white/30 mt-2 tabular-nums">
                                 {formatNumber(progress.imported + progress.failed)} of {formatNumber(uploadData.totalRows)} rows
                             </p>
                         )}
@@ -586,13 +586,13 @@ export default function ImportPage() {
 
                     {/* Live counters */}
                     <div className="flex items-stretch justify-center gap-4 relative z-10">
-                        <div className="flex-1 max-w-[140px] py-5 px-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                            <p className="text-3xl font-bold text-white tabular-nums tracking-tight mb-1">{formatNumber(progress.imported)}</p>
-                            <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-widest">Imported</p>
+                        <div className="flex-1 max-w-[140px] py-5 px-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.06]">
+                            <p className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums tracking-tight mb-1">{formatNumber(progress.imported)}</p>
+                            <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Imported</p>
                         </div>
-                        <div className="flex-1 max-w-[140px] py-5 px-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                            <p className="text-3xl font-bold text-white tabular-nums tracking-tight mb-1">{formatNumber(progress.failed)}</p>
-                            <p className="text-[11px] font-semibold text-red-400 uppercase tracking-widest">Errors</p>
+                        <div className="flex-1 max-w-[140px] py-5 px-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.06]">
+                            <p className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums tracking-tight mb-1">{formatNumber(progress.failed)}</p>
+                            <p className="text-[11px] font-semibold text-red-600 dark:text-red-400 uppercase tracking-widest">Errors</p>
                         </div>
                     </div>
                 </div>
@@ -600,21 +600,21 @@ export default function ImportPage() {
 
             {/* Step 4: Complete */}
             {step === 'complete' && result && (
-                <div className="relative rounded-[32px] border border-white/5 bg-[#12141D]/80 backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-12 text-center max-w-3xl mx-auto mt-10">
+                <div className="relative rounded-[32px] border border-slate-200 dark:border-white/5 bg-white/90 dark:bg-[#12141D]/80 backdrop-blur-3xl shadow-xl dark:shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 p-12 text-center max-w-3xl mx-auto mt-10">
 
                     {/* Ambient glow */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-64 bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none" />
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-64 bg-emerald-500/5 dark:bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none" />
 
                     {/* Success icon */}
                     <div className="relative w-20 h-20 mx-auto mb-7 flex items-center justify-center">
-                        <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping opacity-30" />
-                        <div className="relative w-20 h-20 bg-[#0b1f15] border border-emerald-500/30 rounded-full flex items-center justify-center shadow-[0_0_32px_rgba(16,185,129,0.25)]">
-                            <CheckCircle className="w-10 h-10 text-emerald-400" />
+                        <div className="absolute inset-0 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-full animate-ping opacity-30" />
+                        <div className="relative w-20 h-20 bg-emerald-50 dark:bg-[#0b1f15] border border-emerald-500/20 dark:border-emerald-500/30 rounded-full flex items-center justify-center shadow-[0_0_32px_rgba(16,185,129,0.1)] dark:shadow-[0_0_32px_rgba(16,185,129,0.25)]">
+                            <CheckCircle className="w-10 h-10 text-emerald-500 dark:text-emerald-400" />
                         </div>
                     </div>
 
-                    <h3 className="text-2xl font-bold text-white tracking-tight mb-2 relative z-10">Import Successfully Completed</h3>
-                    <p className="text-white/45 mb-10 max-w-md mx-auto relative z-10 text-sm">
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-2 relative z-10">Import Successfully Completed</h3>
+                    <p className="text-slate-500 dark:text-white/45 mb-10 max-w-md mx-auto relative z-10 text-sm">
                         Your data has been parsed, deduplicated, and securely stored.
                     </p>
 
@@ -626,28 +626,28 @@ export default function ImportPage() {
                             { value: result.skipped  || 0,  label: 'Skipped',  color: 'amber'   },
                             { value: result.failed,          label: 'Failed',   color: 'red'     },
                         ].map(({ value, label, color }) => (
-                            <div key={label} className={`relative flex flex-col items-center justify-center py-6 px-3 rounded-2xl bg-white/[0.02] border border-${color}-500/20 overflow-hidden`}>
+                            <div key={label} className={`relative flex flex-col items-center justify-center py-6 px-3 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-${color}-500/20 overflow-hidden`}>
                                 {/* top accent line */}
-                                <div className={`absolute top-0 inset-x-0 h-[2px] bg-${color}-400/60 rounded-t-2xl`} />
-                                <p className="text-3xl sm:text-4xl font-bold text-white tabular-nums tracking-tight leading-none mb-3">
+                                <div className={`absolute top-0 inset-x-0 h-[2px] bg-${color}-500/60 dark:bg-${color}-400/60 rounded-t-2xl`} />
+                                <p className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tabular-nums tracking-tight leading-none mb-3">
                                     {formatNumber(value)}
                                 </p>
-                                <span className={`text-[10px] font-bold uppercase tracking-widest text-${color}-400`}>{label}</span>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest text-${color}-600 dark:text-${color}-400`}>{label}</span>
                             </div>
                         ))}
                     </div>
 
                     {result.errors?.length > 0 && (
                         <div className="mb-10 text-left relative z-10">
-                            <div className="flex items-center gap-2 text-red-400 bg-red-500/10 p-3.5 rounded-t-2xl border-x border-t border-red-500/20">
+                            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 p-3.5 rounded-t-2xl border-x border-t border-red-200 dark:border-red-500/20">
                                 <AlertCircle className="w-4 h-4 shrink-0" />
                                 <h4 className="text-sm font-semibold">Import Errors ({formatNumber(result.errors.length)})</h4>
                             </div>
-                            <div className="max-h-52 overflow-y-auto bg-[#0a0a0f]/80 border-x border-b border-red-500/20 rounded-b-2xl p-4 text-[12px] font-mono scrollbar-thin">
+                            <div className="max-h-52 overflow-y-auto bg-red-50/50 dark:bg-[#0a0a0f]/80 border-x border-b border-red-200 dark:border-red-500/20 rounded-b-2xl p-4 text-[12px] font-mono scrollbar-thin">
                                 {result.errors.map((error: any, i: number) => (
-                                    <div key={i} className="mb-2.5 pb-2.5 border-b border-white/5 last:border-0 flex gap-4">
-                                        <span className="text-white/25 shrink-0">Row {error.row}</span>
-                                        <span className="text-red-300/70">{error.error}</span>
+                                    <div key={i} className="mb-2.5 pb-2.5 border-b border-red-100 dark:border-white/5 last:border-0 flex gap-4">
+                                        <span className="text-red-400 dark:text-white/25 shrink-0">Row {error.row}</span>
+                                        <span className="text-red-600 dark:text-red-300/70">{error.error}</span>
                                     </div>
                                 ))}
                             </div>
@@ -655,7 +655,7 @@ export default function ImportPage() {
                     )}
 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
-                        <Button variant="outline" onClick={handleReset} className="h-11 px-7 rounded-full border-white/10 hover:bg-white/5 gap-2 text-sm font-medium text-white/70">
+                        <Button variant="outline" onClick={handleReset} className="h-11 px-7 rounded-full border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 gap-2 text-sm font-medium text-slate-700 dark:text-white/70">
                             <Upload className="w-4 h-4" /> Import Another File
                         </Button>
                         <Button onClick={() => window.location.href = importType === 'STUDENTS' ? `/import-preview?batchId=${uploadData?.importId || ''}` : '/leads'} className="h-11 px-8 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-90 text-white border-0 gap-2 text-sm font-semibold shadow-[0_0_24px_rgba(16,185,129,0.35)]">

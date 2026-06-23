@@ -409,6 +409,7 @@ select:focus {
     linear-gradient(#222 0 0) top/100% 0% no-repeat,
     radial-gradient(farthest-side, #000 95%, #0000) 50%/8px 8px no-repeat
     #fff;
+  box-shadow: 0 0 0 1.5px rgba(0,0,0,0.15);
   animation: importDrip 4s infinite ease-in;
 }
 
