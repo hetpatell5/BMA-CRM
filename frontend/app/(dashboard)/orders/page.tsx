@@ -545,11 +545,12 @@ export default function StudentsPage() {
         },
     })
 
-    // Fetch filter options
+    // Fetch filter options — scope=orders excludes excel_import rows so only real order
+    // programmes / regional centers appear (not the 500+ IGNOU codes from bulk imports)
     const { data: filterOptions } = useQuery({
-        queryKey: ['student-filters'],
+        queryKey: ['student-filters', 'orders'],
         queryFn: async () => {
-            const r = await studentsAPI.getFilters()
+            const r = await studentsAPI.getFilters('orders')
             return r.data.data
         },
     })

@@ -232,33 +232,42 @@ router.get('/meta/import-field-values', async (req, res, next) => {
 });
 
 // Get filter options (for dropdowns) - MUST be before /:id route
+// ?scope=orders — excludes excel_import rows so Orders page only shows real order data
 router.get('/meta/filters', async (req, res, next) => {
     try {
+        const isOrdersScope = req.query.scope === 'orders';
+
+        // When called from the Orders page, exclude bulk-imported records so the
+        // Programme / Regional Center lists only contain real order values.
+        const scopeWhere = isOrdersScope ? { NOT: { source: 'excel_import' } } : {};
+
         const [programmes, regionalCenters, studentsWithSubjects, importBatches, studentsForCF] = await Promise.all([
             prisma.student.findMany({
                 select: { programme: true },
                 distinct: ['programme'],
-                where: { programme: { not: null } },
+                where: { programme: { not: null }, ...scopeWhere },
             }),
             prisma.student.findMany({
                 select: { regionalCenter: true },
                 distinct: ['regionalCenter'],
-                where: { regionalCenter: { not: null } },
+                where: { regionalCenter: { not: null }, ...scopeWhere },
             }),
             prisma.student.findMany({
                 select: { subjects: true },
-                where: { subjects: { not: null } },
+                where: { subjects: { not: null }, ...scopeWhere },
             }),
-            // Completed import batches so orders page can filter by file
-            prisma.importHistory.findMany({
-                where: { status: 'COMPLETED', importType: 'STUDENTS' },
-                select: { id: true, fileName: true, importedCount: true, createdAt: true },
-                orderBy: { createdAt: 'desc' },
-            }),
-            // Scan customFields for all unique keys
+            // Completed import batches — only relevant on Import Preview page (scope !== orders)
+            isOrdersScope
+                ? Promise.resolve([])
+                : prisma.importHistory.findMany({
+                    where: { status: 'COMPLETED', importType: 'STUDENTS' },
+                    select: { id: true, fileName: true, importedCount: true, createdAt: true },
+                    orderBy: { createdAt: 'desc' },
+                }),
+            // Scan customFields for unique keys
             prisma.student.findMany({
                 select: { customFields: true },
-                where: { customFields: { not: null } },
+                where: { customFields: { not: null }, ...scopeWhere },
                 take: 500,
             }),
         ]);
@@ -286,10 +295,10 @@ router.get('/meta/filters', async (req, res, next) => {
         });
 
         // Sort all arrays alphabetically
-        const sortedProgrammes   = programmes.map(p => p.programme).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        const sortedProgrammes      = programmes.map(p => p.programme).filter(Boolean).sort((a, b) => a.localeCompare(b));
         const sortedRegionalCenters = regionalCenters.map(r => r.regionalCenter).filter(Boolean).sort((a, b) => a.localeCompare(b));
-        const sortedSubjects = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
-        const customFieldKeys = Array.from(customFieldKeysSet).sort((a, b) => a.localeCompare(b));
+        const sortedSubjects        = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
+        const customFieldKeys       = Array.from(customFieldKeysSet).sort((a, b) => a.localeCompare(b));
 
         res.json({
             success: true,
@@ -311,6 +320,7 @@ router.get('/meta/filters', async (req, res, next) => {
         next(error);
     }
 });
+
 
 // Export records to CSV — streaming, cursor-based pagination (no OFFSET), re-importable
 router.get('/export/excel', async (req, res, next) => {

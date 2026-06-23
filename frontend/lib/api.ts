@@ -102,7 +102,7 @@ export const studentsAPI = {
     update: (id: string | number, data: any) => api.put(`/students/${id}`, data),
     delete: (id: string | number) => api.delete(`/students/${id}`),
     search: (query: string) => api.get(`/students/search?q=${query}`),
-    getFilters: () => api.get('/students/meta/filters'),
+    getFilters: (scope?: string) => api.get('/students/meta/filters', { params: scope ? { scope } : undefined }),
     bulkUpdate: (ids: string[], status: string) => api.post('/students/bulk-update', { ids, status }),
     bulkDelete: (ids: string[]) => api.post('/students/bulk-delete', { ids }),
     backfillOrderIds: () => api.post('/students/backfill-order-ids'),
