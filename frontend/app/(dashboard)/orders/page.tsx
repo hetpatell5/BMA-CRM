@@ -1586,7 +1586,7 @@ export default function StudentsPage() {
                         {activeFilterCount > 0 && (
                             <div className="p-3 border-t border-border shrink-0">
                                 <button
-                                    onClick={() => setFilters({ status: '', programme: '', regionalCenter: '', importBatchId: '', source: '', subject: '' })}
+                                    onClick={() => setFilters({ status: '', programme: '', regionalCenter: '', source: '', subject: '' })}
                                     className="w-full h-8 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors border border-red-200 dark:border-red-500/20"
                                 >
                                     Clear all {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
