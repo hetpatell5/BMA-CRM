@@ -6,7 +6,7 @@
 import express from 'express';
 import ExcelJS from 'exceljs';
 import prisma from '../config/database.js';
-import { enqueueBatch, enqueueStudent, ignouQueue } from '../services/ignouQueue.js';
+import { enqueueBatch, enqueueStudent, enqueueStudentsBulk, ignouQueue } from '../services/ignouQueue.js';
 
 const router = express.Router();
 
@@ -29,27 +29,38 @@ router.post('/check/student/:studentId', async (req, res, next) => {
 });
 
 // ── POST /api/ignou/check/students ───────────────────────────────────────────
-// Enqueue a specific array of student IDs (used when rows are checkbox-selected)
+// Enqueue a specific array of student IDs (checkbox-selected rows)
+// Uses enqueueStudentsBulk which properly resets progress counters
 router.post('/check/students', async (req, res, next) => {
     try {
-        const { studentIds } = req.body; // string[]
+        const { studentIds } = req.body;
         if (!Array.isArray(studentIds) || studentIds.length === 0) {
             return res.status(400).json({ success: false, message: 'studentIds array required' });
         }
-        let queued = 0, skipped = 0, missing = 0;
-        for (const sid of studentIds) {
-            try {
-                await enqueueStudent(sid);
-                queued++;
-            } catch (e) {
-                if (e.message.includes('missing')) missing++;
-                else skipped++;
-            }
-        }
-        res.json({ success: true, data: { queued, skipped, missing } });
+        const result = await enqueueStudentsBulk(studentIds);
+        res.json({ success: true, data: result });
     } catch (err) { next(err); }
 });
 
+// ── POST /api/ignou/results/by-students ──────────────────────────────────────
+// Fetch check results for a specific list of student IDs (selected-rows mode)
+router.post('/results/by-students', async (req, res, next) => {
+    try {
+        const { studentIds } = req.body;
+        if (!Array.isArray(studentIds) || studentIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'studentIds required' });
+        }
+        const records = await prisma.ignouCheck.findMany({
+            where: { studentId: { in: studentIds.map(id => BigInt(id)) } },
+            select: {
+                id: true, studentId: true, enrollmentNo: true, programme: true, studentName: true,
+                checkStatus: true, totalItems: true, submittedCount: true, pendingCount: true,
+                pendingCourses: true, assignmentRows: true, errorMessage: true, checkedAt: true, updatedAt: true,
+            },
+        });
+        res.json({ success: true, data: { records } });
+    } catch (err) { next(err); }
+});
 
 // ── GET /api/ignou/queue/status ──────────────────────────────────────────────
 // Real-time queue counters

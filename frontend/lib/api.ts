@@ -308,6 +308,8 @@ export const ignouAPI = {
     queueStatus:    () => api.get('/ignou/queue/status'),
     /** Paginated results for a batch */
     results:        (batchId: string, params?: Record<string, any>) => api.get(`/ignou/results/${batchId}`, { params }),
+    /** Results for a specific list of student IDs (selected-rows mode) */
+    resultsByStudents: (studentIds: string[]) => api.post('/ignou/results/by-students', { studentIds }),
     /** Single student check result */
     studentResult:  (studentId: string) => api.get(`/ignou/student/${studentId}`),
     /** Re-queue all ERROR records in a batch */

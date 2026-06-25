@@ -207,6 +207,7 @@ export default function ImportPreviewPage() {
     const [ignouProgress, setIgnouProgress] = useState<{ done: number; total: number; percent: number } | null>(null)
     const [ignouChecking, setIgnouChecking] = useState(false)
     const [ignouModal, setIgnouModal]       = useState<any | null>(null) // open student drill-down
+    const [checkedStudentIds, setCheckedStudentIds] = useState<string[]>([])
 
     const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }))
 
@@ -220,6 +221,7 @@ export default function ImportPreviewPage() {
                 setIgnouChecking(false)
                 // Refresh IGNOU results after completion
                 queryClient.invalidateQueries({ queryKey: ['ignou-results'] })
+                queryClient.invalidateQueries({ queryKey: ['ignou-selected-results'] })
             }
         })
         return () => { socket.disconnect() }
@@ -268,8 +270,8 @@ export default function ImportPreviewPage() {
         queryFn: async () => (await studentsAPI.getFilters()).data.data,
     })
 
-    // ── IGNOU results for current batch ───────────────────────────────────
-    const { data: ignouData, refetch: refetchIgnou } = useQuery({
+    // ── IGNOU results — batch mode ────────────────────────────────────────────
+    const { data: ignouData } = useQuery({
         queryKey: ['ignou-results', importBatchId],
         queryFn: async () => {
             if (!importBatchId) return null
@@ -277,17 +279,32 @@ export default function ImportPreviewPage() {
             return r.data.data
         },
         enabled: !!importBatchId,
-        refetchInterval: ignouChecking ? 5000 : false,
+        refetchInterval: ignouChecking && !!importBatchId ? 5000 : false,
     })
 
-    // Build a lookup: studentId → ignouCheck record
+    // ── IGNOU results — selected-rows mode ───────────────────────────────────
+    const { data: ignouSelectedData } = useQuery({
+        queryKey: ['ignou-selected-results', checkedStudentIds],
+        queryFn: async () => {
+            if (checkedStudentIds.length === 0) return null
+            const r = await ignouAPI.resultsByStudents(checkedStudentIds)
+            return r.data.data
+        },
+        enabled: checkedStudentIds.length > 0,
+        refetchInterval: ignouChecking && checkedStudentIds.length > 0 && !importBatchId ? 3000 : false,
+    })
+
+    // Build a lookup: studentId → ignouCheck record (merges both modes)
     const ignouMap = useMemo(() => {
         const map: Record<string, any> = {}
         if (ignouData?.records) {
-            ignouData.records.forEach((r: any) => { map[r.studentId] = r })
+            ignouData.records.forEach((r: any) => { map[String(r.studentId)] = r })
+        }
+        if (ignouSelectedData?.records) {
+            ignouSelectedData.records.forEach((r: any) => { map[String(r.studentId)] = r })
         }
         return map
-    }, [ignouData])
+    }, [ignouData, ignouSelectedData])
 
     // ── Derived ────────────────────────────────────────────────────────────
     const students: any[]   = data?.students || []
@@ -426,6 +443,7 @@ export default function ImportPreviewPage() {
                     setIgnouChecking(false)
                     toast({ title: 'Nothing queued', description: missing > 0 ? `${missing} selected student(s) are missing enrollment/programme data.` : 'All selected students already checked.' })
                 } else {
+                    setCheckedStudentIds(selectedIds) // store so results query can show statuses
                     setIgnouProgress({ done: 0, total: queued, percent: 0 })
                     toast({ title: `IGNOU Check Started`, description: `${queued} selected student(s) queued. Progress will update in real-time.` })
                 }
@@ -652,16 +670,6 @@ export default function ImportPreviewPage() {
                     >
                         {promoteSelectionMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
                         Promote Selected
-                    </Button>
-                    {/* IGNOU check for selected rows */}
-                    <Button
-                        size="sm"
-                        className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white h-8"
-                        onClick={handleIgnouCheck}
-                        disabled={ignouChecking}
-                    >
-                        {ignouChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GraduationCap className="w-3.5 h-3.5" />}
-                        IGNOU Check ({selectedIds.length})
                     </Button>
                     <button onClick={() => setSelectedIds([])} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 ml-auto">
                         Clear selection

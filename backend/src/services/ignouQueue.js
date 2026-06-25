@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ignouQueue.js
  * Bull queue with 10 concurrent workers for checking IGNOU assignment status.
  * Crash-safe: on server restart, RUNNING jobs are reset to PENDING and re-enqueued.
@@ -196,4 +196,47 @@ export async function enqueueStudent(studentId) {
         studentName: student.fullName,
     });
     return { queued: 1 };
+}
+
+/**
+ * Enqueue a specific list of student IDs (checkbox-selected rows).
+ * Properly RESETS the global counter so the progress bar starts fresh.
+ * Skips students already DONE.
+ */
+export async function enqueueStudentsBulk(studentIds) {
+    const bigIds = studentIds.map(id => BigInt(id));
+
+    const students = await prisma.student.findMany({
+        where: {
+            id:           { in: bigIds },
+            enrollmentNo: { not: null },
+            programme:    { not: null },
+        },
+        select: { id: true, enrollmentNo: true, programme: true, fullName: true },
+    });
+
+    const missing = studentIds.length - students.length; // no enrollment/programme
+
+    if (students.length === 0) return { queued: 0, skipped: 0, missing };
+
+    // Reset counters for this new run
+    totalJobs = students.length;
+    doneJobs  = 0;
+    emitProgress();
+
+    // Upsert all to PENDING (re-check even if previously done)
+    for (const s of students) {
+        await prisma.ignouCheck.upsert({
+            where:  { studentId: s.id },
+            create: { studentId: s.id, enrollmentNo: s.enrollmentNo, programme: s.programme, studentName: s.fullName, checkStatus: 'PENDING' },
+            update: { checkStatus: 'PENDING', errorMessage: null },
+        });
+    }
+
+    const jobs = students.map(s => ({
+        data: { studentId: s.id.toString(), enrollmentNo: s.enrollmentNo, programme: s.programme, studentName: s.fullName },
+    }));
+    await ignouQueue.addBulk(jobs);
+
+    return { queued: students.length, skipped: 0, missing };
 }
