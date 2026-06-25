@@ -880,14 +880,20 @@ export default function ImportPreviewPage() {
                                                         >
                                                             <AlertTriangle className="w-3 h-3" />{ignouCheck.pendingCount} Pending
                                                         </button>
-                                                    ) : (
+                                                    ) : ignouCheck.totalItems > 0 ? (
                                                         <button
                                                             className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
                                                             onClick={() => setIgnouModal(ignouCheck)}
                                                         >
                                                             <CheckCircle2 className="w-3 h-3" />All Clear
                                                         </button>
+                                                    ) : (
+                                                        /* IGNOU returned an empty table — no assignment records on IGNOU portal */
+                                                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="IGNOU portal returned no assignment records for this student">
+                                                            <XCircle className="w-3 h-3 text-slate-400" />No Data
+                                                        </span>
                                                     )}
+
                                                 </td>
                                                 <td className="p-2 border-l border-border sticky right-0 bg-background group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900/80 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]" onClick={e => e.stopPropagation()}>
                                                     <Button
