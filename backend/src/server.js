@@ -29,11 +29,13 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import shiprocketRoutes from './routes/shiprocketRoutes.js';
 import appSettingsRoutes from './routes/appSettingsRoutes.js';
 import followUpRoutes from './routes/followUpRoutes.js';
+import ignouRoutes from './routes/ignouRoutes.js';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler.js';
 import { authenticateToken } from './middleware/auth.js';
 import { startAlertService } from './services/alertService.js';
+import { initIgnouQueue, setIo } from './services/ignouQueue.js';
 
 dotenv.config();
 
@@ -87,6 +89,9 @@ app.set('io', io);
 
 // Start Alert Service
 startAlertService(io);
+
+// Connect IGNOU queue to Socket.IO for real-time progress
+setIo(io);
 
 // Globally serialize BigInt to string for JSON.stringify (used by all routes)
 // Must be set before any route handlers load.
@@ -154,6 +159,7 @@ app.use('/api/notifications', authenticateToken, notificationRoutes);
 app.use('/api/shiprocket', authenticateToken, shiprocketRoutes);
 app.use('/api/app-settings', authenticateToken, appSettingsRoutes);
 app.use('/api/follow-ups', authenticateToken, followUpRoutes);
+app.use('/api/ignou', authenticateToken, ignouRoutes);
 
 
 // Error handling
@@ -191,6 +197,9 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   
   🔌 Socket.IO: Ready for real-time updates
   `);
+
+    // Initialise IGNOU queue (crash recovery) after server is ready
+    initIgnouQueue().catch(err => console.error('[IGNOU] Init failed:', err.message));
 });
 
 export { io };

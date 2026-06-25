@@ -6,16 +6,18 @@ import { useSearchParams } from 'next/navigation'
 import {
     Search, ChevronLeft, ChevronRight, Users, RefreshCw,
     ChevronDown, X, SlidersHorizontal, FolderOpen,
-    ArrowUpCircle, Download, Tag,
+    ArrowUpCircle, Download, Tag, GraduationCap,
+    CheckCircle2, AlertTriangle, Loader2, ExternalLink, XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { studentsAPI } from '@/lib/api'
+import { studentsAPI, ignouAPI } from '@/lib/api'
 import { formatNumber, debounce } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { io as socketIO } from 'socket.io-client'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 // Columns that are unique per-row — never useful as filters
@@ -201,7 +203,27 @@ export default function ImportPreviewPage() {
     const [filterSearch, setFilterSearch] = useState('')
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({ imports: true })
 
+    // ── IGNOU state ────────────────────────────────────────────────────────
+    const [ignouProgress, setIgnouProgress] = useState<{ done: number; total: number; percent: number } | null>(null)
+    const [ignouChecking, setIgnouChecking] = useState(false)
+    const [ignouModal, setIgnouModal]       = useState<any | null>(null) // open student drill-down
+
     const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }))
+
+    // ── Socket.IO for IGNOU real-time progress ─────────────────────────────
+    useEffect(() => {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000'
+        const socket = socketIO(apiBase, { transports: ['websocket', 'polling'] })
+        socket.on('ignou:progress', (data: { done: number; total: number; percent: number }) => {
+            setIgnouProgress(data)
+            if (data.done >= data.total && data.total > 0) {
+                setIgnouChecking(false)
+                // Refresh IGNOU results after completion
+                queryClient.invalidateQueries({ queryKey: ['ignou-results'] })
+            }
+        })
+        return () => { socket.disconnect() }
+    }, [])
 
     // Debounce search input → reset to page 1 on change
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -245,6 +267,27 @@ export default function ImportPreviewPage() {
         queryKey: ['student-filters'],
         queryFn: async () => (await studentsAPI.getFilters()).data.data,
     })
+
+    // ── IGNOU results for current batch ───────────────────────────────────
+    const { data: ignouData, refetch: refetchIgnou } = useQuery({
+        queryKey: ['ignou-results', importBatchId],
+        queryFn: async () => {
+            if (!importBatchId) return null
+            const r = await ignouAPI.results(importBatchId, { limit: 1000 })
+            return r.data.data
+        },
+        enabled: !!importBatchId,
+        refetchInterval: ignouChecking ? 5000 : false,
+    })
+
+    // Build a lookup: studentId → ignouCheck record
+    const ignouMap = useMemo(() => {
+        const map: Record<string, any> = {}
+        if (ignouData?.records) {
+            ignouData.records.forEach((r: any) => { map[r.studentId] = r })
+        }
+        return map
+    }, [ignouData])
 
     // ── Derived ────────────────────────────────────────────────────────────
     const students: any[]   = data?.students || []
@@ -321,23 +364,18 @@ export default function ImportPreviewPage() {
         onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' }),
     })
 
-    // ── Export ─────────────────────────────────────────────────────────────
+    // ── Export (CSV) ─────────────────────────────────────────────────────────
     const [isExporting, setIsExporting] = useState(false)
     const handleExport = () => {
         try {
             const p: Record<string, any> = { source: 'excel_import' }
             if (importBatchId)   p.importBatchId = importBatchId
             if (debouncedSearch) p.search = debouncedSearch
-
-            // Pass customField filters
             const cfParams: Record<string, string> = {}
             for (const [k, vals] of Object.entries(activeFilters)) {
                 if (vals.size > 0) cfParams[k] = Array.from(vals).join(',')
             }
             if (Object.keys(cfParams).length > 0) p.customField = cfParams
-
-            // Build a direct URL with auth token and open in a hidden <a>
-            // The browser handles streaming download natively — no axios buffering, no timeout
             const url = studentsAPI.getExportUrl(p)
             const link = document.createElement('a')
             link.href = url
@@ -348,6 +386,46 @@ export default function ImportPreviewPage() {
             toast({ title: 'Export Started', description: 'Your file will download shortly.' })
         } catch {
             toast({ title: 'Export Failed', description: 'Could not start export.', variant: 'destructive' })
+        }
+    }
+
+    // ── IGNOU Export (Excel with IGNOU columns appended) ──────────────────
+    const handleIgnouExport = (onlyPending = false) => {
+        if (!importBatchId) {
+            toast({ title: 'Select a batch first', description: 'Use the filter sidebar to select an import batch.', variant: 'destructive' })
+            return
+        }
+        const url = ignouAPI.getExportUrl(importBatchId, onlyPending)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `ignou_status_${importBatchId}_${new Date().toISOString().split('T')[0]}.xlsx`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        toast({ title: 'IGNOU Export Started', description: 'Your Excel file with IGNOU status will download shortly.' })
+    }
+
+    // ── IGNOU check batch trigger ──────────────────────────────────────────
+    const handleIgnouCheck = async () => {
+        if (!importBatchId) {
+            toast({ title: 'Select a batch first', description: 'Use the filter sidebar to select an import batch.', variant: 'destructive' })
+            return
+        }
+        try {
+            setIgnouChecking(true)
+            setIgnouProgress(null)
+            const r = await ignouAPI.checkBatch(importBatchId)
+            const { queued, skipped } = r.data.data
+            if (queued === 0) {
+                setIgnouChecking(false)
+                toast({ title: 'Nothing to check', description: skipped > 0 ? `All ${skipped} students already checked. Use retry to re-check errors.` : 'No students with enrollment + programme found in this batch.' })
+            } else {
+                setIgnouProgress({ done: 0, total: queued, percent: 0 })
+                toast({ title: `IGNOU Check Started`, description: `${queued} students queued. Progress will update in real-time.` })
+            }
+        } catch (err: any) {
+            setIgnouChecking(false)
+            toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to start IGNOU check.', variant: 'destructive' })
         }
     }
 
@@ -381,7 +459,7 @@ export default function ImportPreviewPage() {
                     <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting} className="gap-2">
                         {isExporting
                             ? <><RefreshCw className="w-4 h-4 animate-spin" /><span className="hidden sm:inline">Exporting…</span></>
-                            : <><Download className="w-4 h-4" /><span className="hidden sm:inline">Export</span></>}
+                            : <><Download className="w-4 h-4" /><span className="hidden sm:inline">Export CSV</span></>}
                     </Button>
                     {selectedIds.length > 0 && (
                         <Button
@@ -406,6 +484,83 @@ export default function ImportPreviewPage() {
                         </Button>
                     )}
                 </div>
+            </div>
+
+            {/* ── IGNOU Assignment Status Checker Toolbar ── */}
+            <div className="rounded-xl border border-border bg-gradient-to-r from-indigo-500/5 via-violet-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:via-violet-500/10 dark:to-purple-500/10 p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
+                            <GraduationCap className="w-4.5 h-4.5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div>
+                            <p className="font-semibold text-sm text-foreground">IGNOU Assignment Status Checker</p>
+                            <p className="text-xs text-muted-foreground">
+                                {importBatchId
+                                    ? `Checks assignment/practical/project submission for students in selected batch`
+                                    : 'Select a batch from the filter sidebar, then run the check'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap shrink-0">
+                        <Button
+                            size="sm"
+                            className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9"
+                            onClick={handleIgnouCheck}
+                            disabled={ignouChecking || !importBatchId}
+                        >
+                            {ignouChecking
+                                ? <><Loader2 className="w-4 h-4 animate-spin" />Checking…</>
+                                : <><GraduationCap className="w-4 h-4" />Check IGNOU Status</>}
+                        </Button>
+                        {importBatchId && (
+                            <>
+                                <Button size="sm" variant="outline" className="gap-2 h-9 border-indigo-500/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10" onClick={() => handleIgnouExport(false)}>
+                                    <Download className="w-4 h-4" />Export with IGNOU
+                                </Button>
+                                <Button size="sm" variant="outline" className="gap-2 h-9 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10" onClick={() => handleIgnouExport(true)}>
+                                    <AlertTriangle className="w-4 h-4" />Pending Only
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Stats row */}
+                {ignouData?.summary && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {[
+                            { label: 'Checked',    value: ignouData.summary.done,                   color: 'text-emerald-600 dark:text-emerald-400' },
+                            { label: 'Pending Assignments', value: ignouData.summary.totalPendingAssignments, color: 'text-amber-600 dark:text-amber-400' },
+                            { label: 'Errors',     value: ignouData.summary.errors,                  color: 'text-red-600 dark:text-red-400' },
+                            { label: 'Not Checked',value: ignouData.summary.notChecked,              color: 'text-muted-foreground' },
+                        ].map(s => (
+                            <div key={s.label} className="bg-background/60 rounded-lg px-3 py-2 border border-border/60">
+                                <p className={cn('text-xl font-bold tabular-nums', s.color)}>{formatNumber(s.value ?? 0)}</p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">{s.label}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Progress bar */}
+                {ignouProgress && ignouProgress.total > 0 && (
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1.5">
+                                <Loader2 className={cn('w-3 h-3', ignouChecking && 'animate-spin')} />
+                                {ignouProgress.done} / {ignouProgress.total} students checked
+                            </span>
+                            <span className="font-semibold text-indigo-600 dark:text-indigo-400">{ignouProgress.percent}%</span>
+                        </div>
+                        <div className="h-2 bg-border rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
+                                style={{ width: `${ignouProgress.percent}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* ── Search & Filter Bar ── */}
@@ -612,6 +767,12 @@ export default function ImportPreviewPage() {
                                             {key}
                                         </th>
                                     ))}
+                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-indigo-50 dark:bg-indigo-900/30">
+                                        <span className="flex items-center gap-1.5">
+                                            <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
+                                            IGNOU Status
+                                        </span>
+                                    </th>
                                     <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
                                         Action
                                     </th>
@@ -647,6 +808,7 @@ export default function ImportPreviewPage() {
                                         const id = String(student.id)
                                         const isSelected = selectedIds.includes(id)
                                         const isPromoting = promoteRowMutation.isPending && promoteRowMutation.variables === student.id
+                                        const ignouCheck = ignouMap[id]
                                         return (
                                             <tr key={id} className={cn('border-b border-border transition-colors group/row', isSelected ? 'bg-primary/5' : 'hover:bg-slate-50/50 dark:hover:bg-white/[0.02]')}>
                                                 <td className="p-2 border-r border-border">
@@ -659,6 +821,34 @@ export default function ImportPreviewPage() {
                                                         </span>
                                                     </td>
                                                 ))}
+                                                {/* IGNOU Status cell */}
+                                                <td className="p-2 border-r border-border text-[13px] min-w-[130px]">
+                                                    {!ignouCheck ? (
+                                                        <span className="text-[11px] text-muted-foreground">—</span>
+                                                    ) : ignouCheck.checkStatus === 'RUNNING' || ignouCheck.checkStatus === 'PENDING' ? (
+                                                        <span className="inline-flex items-center gap-1 text-[11px] text-indigo-500">
+                                                            <Loader2 className="w-3 h-3 animate-spin" />Checking…
+                                                        </span>
+                                                    ) : ignouCheck.checkStatus === 'ERROR' ? (
+                                                        <span className="inline-flex items-center gap-1 text-[11px] text-red-500" title={ignouCheck.errorMessage}>
+                                                            <XCircle className="w-3 h-3" />Error
+                                                        </span>
+                                                    ) : ignouCheck.pendingCount > 0 ? (
+                                                        <button
+                                                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+                                                            onClick={() => setIgnouModal(ignouCheck)}
+                                                        >
+                                                            <AlertTriangle className="w-3 h-3" />{ignouCheck.pendingCount} Pending
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                                                            onClick={() => setIgnouModal(ignouCheck)}
+                                                        >
+                                                            <CheckCircle2 className="w-3 h-3" />All Clear
+                                                        </button>
+                                                    )}
+                                                </td>
                                                 <td className="p-2 border-l border-border sticky right-0 bg-background group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900/80 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]" onClick={e => e.stopPropagation()}>
                                                     <Button
                                                         variant="outline" size="sm"
@@ -709,6 +899,89 @@ export default function ImportPreviewPage() {
                     )}
                 </div>
             </div>
+
+            {/* ── IGNOU Drill-down Modal ── */}
+            {ignouModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setIgnouModal(null)}>
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                    <div className="relative bg-background rounded-2xl border border-border shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-5 border-b border-border">
+                            <div>
+                                <h3 className="font-bold text-base flex items-center gap-2">
+                                    <GraduationCap className="w-5 h-5 text-indigo-500" />
+                                    {ignouModal.studentName}
+                                </h3>
+                                <p className="text-sm text-muted-foreground mt-0.5">
+                                    {ignouModal.enrollmentNo} · {ignouModal.programme}
+                                    {' · '}
+                                    <a
+                                        href={`https://isms.ignou.ac.in/changeadmdata/StatusAssignment.asp?submit=1&enrno=${ignouModal.enrollmentNo}&program=${ignouModal.programme}`}
+                                        target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-0.5 text-indigo-500 hover:underline text-xs"
+                                    >
+                                        View on IGNOU <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                </p>
+                            </div>
+                            <button onClick={() => setIgnouModal(null)} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Summary pills */}
+                        <div className="flex items-center gap-3 px-5 py-3 bg-slate-50/50 dark:bg-white/5 border-b border-border">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/10 text-xs font-semibold">
+                                Total: {ignouModal.totalItems}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> {ignouModal.submittedCount} Submitted
+                            </span>
+                            {ignouModal.pendingCount > 0 && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 text-xs font-semibold">
+                                    <AlertTriangle className="w-3.5 h-3.5" /> {ignouModal.pendingCount} Pending
+                                </span>
+                            )}
+                            {ignouModal.checkedAt && (
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                    Checked {new Date(ignouModal.checkedAt).toLocaleDateString('en-IN')}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Assignment rows table */}
+                        <div className="overflow-auto flex-1 p-1">
+                            <table className="w-full text-sm border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 dark:bg-slate-800 text-left">
+                                        {['Type', 'Course', 'Session', 'Status', 'Date'].map(h => (
+                                            <th key={h} className="px-3 py-2 font-semibold text-xs text-muted-foreground border-b border-border">{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {(ignouModal.assignmentRows || []).map((row: any, i: number) => (
+                                        <tr key={i} className={cn('transition-colors', row.isPending ? 'bg-amber-50/60 dark:bg-amber-900/10' : '')}>
+                                            <td className="px-3 py-2 text-xs font-medium">{row.type}</td>
+                                            <td className="px-3 py-2 text-xs font-mono font-semibold">{row.course}</td>
+                                            <td className="px-3 py-2 text-xs text-muted-foreground">{row.session}</td>
+                                            <td className="px-3 py-2 text-xs">{row.status || <span className="text-amber-500 font-semibold">Not Submitted</span>}</td>
+                                            <td className="px-3 py-2 text-xs">
+                                                {row.date
+                                                    ? <span className="text-emerald-600 dark:text-emerald-400 font-medium">{row.date}</span>
+                                                    : <span className="text-amber-500 font-semibold">⚠ Pending</span>}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {(!ignouModal.assignmentRows || ignouModal.assignmentRows.length === 0) && (
+                                        <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground text-xs">No assignment data found for this student</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -164,6 +164,9 @@ model Student {
   // Custom fields stored as JSON
   customFields   Json?    @map("custom_fields")
 
+  // IGNOU check results
+  ignouChecks    IgnouCheck[]
+
   @@index([controlNumber])
   @@index([enrollmentNo])
   @@index([fullName])
@@ -612,4 +615,41 @@ model DailyFollowUp {
   @@index([followupDate])
   @@index([number])
   @@map("daily_follow_ups")
+}
+
+// ============================================
+// IGNOU ASSIGNMENT STATUS CHECKS
+// ============================================
+
+model IgnouCheck {
+  id             BigInt    @id @default(autoincrement())
+  studentId      BigInt    @unique @map("student_id")
+  student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  enrollmentNo   String    @map("enrollment_no")
+  programme      String
+  studentName    String    @map("student_name")
+
+  // Job lifecycle: PENDING | RUNNING | DONE | ERROR | SKIPPED
+  checkStatus    String    @default("PENDING") @map("check_status")
+
+  // Parsed assignment/practical/project rows
+  // Each row: { type, course, session, status, date, isPending }
+  assignmentRows Json?     @map("assignment_rows")
+
+  // Denormalised counters for fast queries
+  totalItems     Int       @default(0) @map("total_items")
+  submittedCount Int       @default(0) @map("submitted_count")
+  pendingCount   Int       @default(0) @map("pending_count")
+  pendingCourses String?   @db.Text @map("pending_courses")
+
+  errorMessage   String?   @db.Text @map("error_message")
+  checkedAt      DateTime? @map("checked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([checkStatus])
+  @@index([enrollmentNo])
+  @@index([pendingCount])
+  @@map("ignou_checks")
 }

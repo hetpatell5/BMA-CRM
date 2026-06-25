@@ -295,3 +295,33 @@ export const followUpsAPI = {
     update: (id: string, data: any) => api.put(`/follow-ups/${id}`, data),
     remove: (id: string) => api.delete(`/follow-ups/${id}`),
 }
+
+// IGNOU Assignment Status Checker API
+export const ignouAPI = {
+    /** Enqueue all eligible students in an import batch */
+    checkBatch:   (batchId: string) => api.post(`/ignou/check/batch/${batchId}`),
+    /** Enqueue a single student */
+    checkStudent: (studentId: string) => api.post(`/ignou/check/student/${studentId}`),
+    /** Get current queue stats */
+    queueStatus:  () => api.get('/ignou/queue/status'),
+    /** Paginated results for a batch */
+    results:      (batchId: string, params?: Record<string, any>) => api.get(`/ignou/results/${batchId}`, { params }),
+    /** Single student check result */
+    studentResult:(studentId: string) => api.get(`/ignou/student/${studentId}`),
+    /** Re-queue all ERROR records in a batch */
+    retryErrors:  (batchId: string) => api.post(`/ignou/retry/batch/${batchId}`),
+    /** Delete all check records for a batch */
+    deleteBatch:  (batchId: string) => api.delete(`/ignou/batch/${batchId}`),
+    /** Build direct Excel export URL (uses token auth) */
+    getExportUrl: (batchId: string, onlyPending?: boolean): string => {
+        const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+        const authStorage = typeof window !== 'undefined' ? localStorage.getItem('auth-storage') : null
+        let token = ''
+        try { token = JSON.parse(authStorage || '{}')?.state?.token || '' } catch { /* ignore */ }
+        const params = new URLSearchParams()
+        if (token) params.set('token', token)
+        if (onlyPending) params.set('onlyPending', 'true')
+        return `${base}/ignou/export/${batchId}?${params.toString()}`
+    },
+}
+
