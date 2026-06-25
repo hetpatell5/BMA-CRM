@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ignouRoutes.js
  * REST endpoints for IGNOU Assignment Status Checker.
  */
@@ -27,6 +27,29 @@ router.post('/check/student/:studentId', async (req, res, next) => {
         res.json({ success: true, data: result });
     } catch (err) { next(err); }
 });
+
+// ── POST /api/ignou/check/students ───────────────────────────────────────────
+// Enqueue a specific array of student IDs (used when rows are checkbox-selected)
+router.post('/check/students', async (req, res, next) => {
+    try {
+        const { studentIds } = req.body; // string[]
+        if (!Array.isArray(studentIds) || studentIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'studentIds array required' });
+        }
+        let queued = 0, skipped = 0, missing = 0;
+        for (const sid of studentIds) {
+            try {
+                await enqueueStudent(sid);
+                queued++;
+            } catch (e) {
+                if (e.message.includes('missing')) missing++;
+                else skipped++;
+            }
+        }
+        res.json({ success: true, data: { queued, skipped, missing } });
+    } catch (err) { next(err); }
+});
+
 
 // ── GET /api/ignou/queue/status ──────────────────────────────────────────────
 // Real-time queue counters

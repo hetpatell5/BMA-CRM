@@ -405,23 +405,41 @@ export default function ImportPreviewPage() {
         toast({ title: 'IGNOU Export Started', description: 'Your Excel file with IGNOU status will download shortly.' })
     }
 
-    // ── IGNOU check batch trigger ──────────────────────────────────────────
+    // ── IGNOU check trigger — supports BOTH batch mode and selected-rows mode ──
     const handleIgnouCheck = async () => {
-        if (!importBatchId) {
-            toast({ title: 'Select a batch first', description: 'Use the filter sidebar to select an import batch.', variant: 'destructive' })
+        const useSelected = selectedIds.length > 0 && !importBatchId
+        const useBatch    = !!importBatchId
+
+        if (!useSelected && !useBatch) {
+            toast({ title: 'Nothing to check', description: 'Either select rows with checkboxes OR pick a batch from the filter sidebar.', variant: 'destructive' })
             return
         }
         try {
             setIgnouChecking(true)
             setIgnouProgress(null)
-            const r = await ignouAPI.checkBatch(importBatchId)
-            const { queued, skipped } = r.data.data
-            if (queued === 0) {
-                setIgnouChecking(false)
-                toast({ title: 'Nothing to check', description: skipped > 0 ? `All ${skipped} students already checked. Use retry to re-check errors.` : 'No students with enrollment + programme found in this batch.' })
+
+            if (useSelected) {
+                // Check only the selected rows
+                const r = await ignouAPI.checkStudents(selectedIds)
+                const { queued, missing } = r.data.data
+                if (queued === 0) {
+                    setIgnouChecking(false)
+                    toast({ title: 'Nothing queued', description: missing > 0 ? `${missing} selected student(s) are missing enrollment/programme data.` : 'All selected students already checked.' })
+                } else {
+                    setIgnouProgress({ done: 0, total: queued, percent: 0 })
+                    toast({ title: `IGNOU Check Started`, description: `${queued} selected student(s) queued. Progress will update in real-time.` })
+                }
             } else {
-                setIgnouProgress({ done: 0, total: queued, percent: 0 })
-                toast({ title: `IGNOU Check Started`, description: `${queued} students queued. Progress will update in real-time.` })
+                // Check entire batch
+                const r = await ignouAPI.checkBatch(importBatchId)
+                const { queued, skipped } = r.data.data
+                if (queued === 0) {
+                    setIgnouChecking(false)
+                    toast({ title: 'Nothing to check', description: skipped > 0 ? `All ${skipped} students already checked.` : 'No students with enrollment + programme found in this batch.' })
+                } else {
+                    setIgnouProgress({ done: 0, total: queued, percent: 0 })
+                    toast({ title: `IGNOU Batch Check Started`, description: `${queued} students queued. Progress updates in real-time.` })
+                }
             }
         } catch (err: any) {
             setIgnouChecking(false)
@@ -497,8 +515,10 @@ export default function ImportPreviewPage() {
                             <p className="font-semibold text-sm text-foreground">IGNOU Assignment Status Checker</p>
                             <p className="text-xs text-muted-foreground">
                                 {importBatchId
-                                    ? `Checks assignment/practical/project submission for students in selected batch`
-                                    : 'Select a batch from the filter sidebar, then run the check'}
+                                    ? 'Checks entire selected batch · or tick rows to check specific students'
+                                    : selectedIds.length > 0
+                                        ? `${selectedIds.length} row(s) selected — click the button to check their IGNOU status`
+                                        : 'Select rows with checkboxes, or pick a batch from the filter sidebar'}
                             </p>
                         </div>
                     </div>
@@ -507,11 +527,13 @@ export default function ImportPreviewPage() {
                             size="sm"
                             className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9"
                             onClick={handleIgnouCheck}
-                            disabled={ignouChecking || !importBatchId}
+                            disabled={ignouChecking || (!importBatchId && selectedIds.length === 0)}
                         >
                             {ignouChecking
                                 ? <><Loader2 className="w-4 h-4 animate-spin" />Checking…</>
-                                : <><GraduationCap className="w-4 h-4" />Check IGNOU Status</>}
+                                : selectedIds.length > 0 && !importBatchId
+                                    ? <><GraduationCap className="w-4 h-4" />Check {selectedIds.length} Selected</>
+                                    : <><GraduationCap className="w-4 h-4" />Check IGNOU {importBatchId ? 'Batch' : 'Status'}</>}
                         </Button>
                         {importBatchId && (
                             <>
@@ -630,6 +652,16 @@ export default function ImportPreviewPage() {
                     >
                         {promoteSelectionMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
                         Promote Selected
+                    </Button>
+                    {/* IGNOU check for selected rows */}
+                    <Button
+                        size="sm"
+                        className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white h-8"
+                        onClick={handleIgnouCheck}
+                        disabled={ignouChecking}
+                    >
+                        {ignouChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GraduationCap className="w-3.5 h-3.5" />}
+                        IGNOU Check ({selectedIds.length})
                     </Button>
                     <button onClick={() => setSelectedIds([])} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 ml-auto">
                         Clear selection

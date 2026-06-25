@@ -299,19 +299,21 @@ export const followUpsAPI = {
 // IGNOU Assignment Status Checker API
 export const ignouAPI = {
     /** Enqueue all eligible students in an import batch */
-    checkBatch:   (batchId: string) => api.post(`/ignou/check/batch/${batchId}`),
+    checkBatch:     (batchId: string) => api.post(`/ignou/check/batch/${batchId}`),
     /** Enqueue a single student */
-    checkStudent: (studentId: string) => api.post(`/ignou/check/student/${studentId}`),
+    checkStudent:   (studentId: string) => api.post(`/ignou/check/student/${studentId}`),
+    /** Enqueue a specific list of student IDs (checkbox-selected rows) */
+    checkStudents:  (studentIds: string[]) => api.post('/ignou/check/students', { studentIds }),
     /** Get current queue stats */
-    queueStatus:  () => api.get('/ignou/queue/status'),
+    queueStatus:    () => api.get('/ignou/queue/status'),
     /** Paginated results for a batch */
-    results:      (batchId: string, params?: Record<string, any>) => api.get(`/ignou/results/${batchId}`, { params }),
+    results:        (batchId: string, params?: Record<string, any>) => api.get(`/ignou/results/${batchId}`, { params }),
     /** Single student check result */
-    studentResult:(studentId: string) => api.get(`/ignou/student/${studentId}`),
+    studentResult:  (studentId: string) => api.get(`/ignou/student/${studentId}`),
     /** Re-queue all ERROR records in a batch */
-    retryErrors:  (batchId: string) => api.post(`/ignou/retry/batch/${batchId}`),
+    retryErrors:    (batchId: string) => api.post(`/ignou/retry/batch/${batchId}`),
     /** Delete all check records for a batch */
-    deleteBatch:  (batchId: string) => api.delete(`/ignou/batch/${batchId}`),
+    deleteBatch:    (batchId: string) => api.delete(`/ignou/batch/${batchId}`),
     /** Build direct Excel export URL (uses token auth) */
     getExportUrl: (batchId: string, onlyPending?: boolean): string => {
         const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
@@ -324,4 +326,5 @@ export const ignouAPI = {
         return `${base}/ignou/export/${batchId}?${params.toString()}`
     },
 }
+
 
