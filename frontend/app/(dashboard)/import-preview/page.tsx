@@ -386,7 +386,20 @@ export default function ImportPreviewPage() {
     const [isExporting, setIsExporting] = useState(false)
     const handleExport = () => {
         try {
-            const p: Record<string, any> = { source: 'excel_import' }
+            // Build smart filename from active filters FIRST
+            const filterParts: string[] = []
+            // 1. Batch file name (e.g. "MCA_NEW_PENDING")
+            const batchLabel = filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0]
+            if (batchLabel) filterParts.push(batchLabel)
+            // 2. All active custom-field filter values (e.g. Programme → "MLIS")
+            for (const [, vals] of Object.entries(activeFilters)) {
+                if ((vals as Set<string>).size > 0) filterParts.push(Array.from(vals as Set<string>).join('-'))
+            }
+            // 3. Search term
+            if (debouncedSearch) filterParts.push(debouncedSearch.replace(/\s+/g, '_'))
+            const namePart = filterParts.length > 0 ? filterParts.join('_') : 'export'
+
+            const p: Record<string, any> = { source: 'excel_import', filename: namePart }
             if (importBatchId)   p.importBatchId = importBatchId
             if (debouncedSearch) p.search = debouncedSearch
             const cfParams: Record<string, string> = {}
@@ -394,25 +407,11 @@ export default function ImportPreviewPage() {
                 if (vals.size > 0) cfParams[k] = Array.from(vals).join(',')
             }
             if (Object.keys(cfParams).length > 0) p.customField = cfParams
+
             const url = studentsAPI.getExportUrl(p)
             const link = document.createElement('a')
             link.href = url
-
-            // Build smart filename from active filters
-            const today = new Date().toISOString().split('T')[0]
-            const filterParts: string[] = []
-            // 1. Batch file name
-            const batchName = filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0]
-            if (batchName) filterParts.push(batchName)
-            // 2. All active custom-field filters (e.g. Programme=MLIS)
-            for (const [k, vals] of Object.entries(activeFilters)) {
-                if ((vals as Set<string>).size > 0) filterParts.push(Array.from(vals as Set<string>).join('-'))
-            }
-            // 3. Search term
-            if (debouncedSearch) filterParts.push(debouncedSearch.replace(/\s+/g, '_'))
-
-            const namePart = filterParts.length > 0 ? filterParts.join('_') : 'export'
-            link.download = `${namePart}.csv`
+            link.download = `${namePart}.csv`  // fallback if server header absent
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)

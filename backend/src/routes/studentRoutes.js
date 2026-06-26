@@ -416,7 +416,9 @@ router.get('/export/excel', async (req, res, next) => {
         };
 
         // ── Plain streaming CSV response (no gzip — nginx proxies strip Content-Encoding) ─
-        const filename = `export_${new Date().toISOString().split('T')[0]}.csv`;
+        // Accept a `filename` query param so the frontend can control the download name
+        const rawFilename = req.query.filename ? String(req.query.filename).replace(/[^a-zA-Z0-9_\-\.]/g, '_') : 'export';
+        const filename = rawFilename.endsWith('.csv') ? rawFilename : `${rawFilename}.csv`;
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Transfer-Encoding', 'chunked');
