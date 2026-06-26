@@ -109,6 +109,7 @@ router.get('/results/:batchId', async (req, res, next) => {
                     id: true, studentId: true, enrollmentNo: true, programme: true, studentName: true,
                     checkStatus: true, totalItems: true, submittedCount: true, pendingCount: true,
                     pendingCourses: true, assignmentRows: true, errorMessage: true, checkedAt: true, updatedAt: true,
+                    gradeCardRows: true, gradeCardTotal: true, gradeCardCompleted: true, gradeCardPending: true,
                 },
             }),
             prisma.ignouCheck.count({ where }),

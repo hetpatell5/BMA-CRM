@@ -6,7 +6,7 @@
 
 import Bull from 'bull';
 import prisma from '../config/database.js';
-import { checkStudent } from './ignouScraper.js';
+import { checkStudent, checkGradeCard } from './ignouScraper.js';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -48,19 +48,32 @@ ignouQueue.process(3, async (job) => {
     });
 
     try {
-        const result = await checkStudent(enrollmentNo, programme);
+        // Fetch assignment status AND grade card in parallel — saves 50% time
+        const [assignRes, gradeRes] = await Promise.allSettled([
+            checkStudent(enrollmentNo, programme),
+            checkGradeCard(enrollmentNo, programme),
+        ]);
+
+        const aR = assignRes.status === 'fulfilled' ? assignRes.value
+            : { assignmentRows: [], totalItems: 0, submittedCount: 0, pendingCount: 0, pendingCourses: '' };
+        const gR = gradeRes.status === 'fulfilled' ? gradeRes.value
+            : { gradeCardRows: [], totalCourses: 0, completedCount: 0, notCompletedCount: 0 };
 
         await prisma.ignouCheck.update({
             where: { studentId: BigInt(studentId) },
             data: {
-                checkStatus:    'DONE',
-                assignmentRows: result.assignmentRows,
-                totalItems:     result.totalItems,
-                submittedCount: result.submittedCount,
-                pendingCount:   result.pendingCount,
-                pendingCourses: result.pendingCourses || null,
-                checkedAt:      new Date(),
-                errorMessage:   null,
+                checkStatus:       'DONE',
+                assignmentRows:    aR.assignmentRows,
+                totalItems:        aR.totalItems,
+                submittedCount:    aR.submittedCount,
+                pendingCount:      aR.pendingCount,
+                pendingCourses:    aR.pendingCourses || null,
+                gradeCardRows:     gR.gradeCardRows,
+                gradeCardTotal:    gR.totalCourses,
+                gradeCardCompleted: gR.completedCount,
+                gradeCardPending:  gR.notCompletedCount,
+                checkedAt:         new Date(),
+                errorMessage:      null,
             },
         });
     } catch (err) {

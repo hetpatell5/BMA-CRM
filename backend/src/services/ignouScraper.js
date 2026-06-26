@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ignouScraper.js
  * Fetches Assignment/Practical/Project Marks Submission Status from IGNOU public portal.
  * No captcha, no login, no session required.
@@ -9,6 +9,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 
 const IGNOU_ASSIGNMENT_URL = 'https://isms.ignou.ac.in/changeadmdata/StatusAssignment.asp';
+const IGNOU_GRADECARD_URL  = 'https://gradecard.ignou.ac.in/view_gradecard.aspx';
 const HTTP_TIMEOUT_MS = 20_000;
 
 const AXIOS_HEADERS = {
@@ -89,4 +90,70 @@ async function checkStudent(enrollmentNo, programme) {
     return { assignmentRows, totalItems: assignmentRows.length, submittedCount, pendingCount, pendingCourses };
 }
 
-export { checkStudent, normaliseProgramme };
+/**
+ * Parse the HTML grade card table from gradecard.ignou.ac.in.
+ * Table ID: ctl00_ContentPlaceHolder1_gvDetail
+ * Columns: COURSE | Asgn1 | LAB1 | LAB2 | LAB3 | LAB4 | TERM END THEORY | TERM END PRACTICAL | STATUS
+ */
+function parseGradeCardTable(html) {
+    const $ = cheerio.load(html);
+    const rows = [];
+
+    // Primary selector — known table ID from the ASP.NET page
+    let table = $('#ctl00_ContentPlaceHolder1_gvDetail');
+
+    // Fallback: find any table whose header contains "COURSE" and "STATUS"
+    if (!table.length) {
+        $('table').each((_, t) => {
+            const headers = [];
+            $(t).find('tr').first().find('th, td').each((_, el) => {
+                headers.push($(el).text().trim().toUpperCase());
+            });
+            if (headers.includes('COURSE') && headers.includes('STATUS')) {
+                table = $(t);
+                return false;
+            }
+        });
+    }
+
+    if (!table.length) return rows;
+
+    table.find('tr').each((rowIdx, row) => {
+        if (rowIdx === 0) return; // skip header
+        const cells = [];
+        $(row).find('td').each((_, el) => cells.push($(el).text().trim()));
+        if (cells.length < 2) return;
+
+        // Expect at least: COURSE + STATUS (last column)
+        const course             = cells[0];
+        const asgn1              = cells[1]  || '';
+        const lab1               = cells[2]  || '';
+        const lab2               = cells[3]  || '';
+        const lab3               = cells[4]  || '';
+        const lab4               = cells[5]  || '';
+        const termEndTheory      = cells[6]  || '';
+        const termEndPractical   = cells[7]  || '';
+        const status             = cells[cells.length - 1] || '';
+
+        if (!course) return;
+        const isCompleted = status.trim().toUpperCase() === 'COMPLETED';
+        rows.push({ course: course.trim(), asgn1, lab1, lab2, lab3, lab4, termEndTheory, termEndPractical, status: status.trim(), isCompleted });
+    });
+
+    return rows;
+}
+
+/**
+ * Fetch and parse grade card for one student from gradecard.ignou.ac.in.
+ */
+async function checkGradeCard(enrollmentNo, programme) {
+    const prog = normaliseProgramme(programme);
+    const url  = `${IGNOU_GRADECARD_URL}?eno=${encodeURIComponent(enrollmentNo)}&prog=${encodeURIComponent(prog)}&type=1`;
+    const response = await axios.get(url, { timeout: HTTP_TIMEOUT_MS, headers: AXIOS_HEADERS, maxRedirects: 3 });
+    const gradeCardRows    = parseGradeCardTable(response.data);
+    const completedCount   = gradeCardRows.filter(r => r.isCompleted).length;
+    const notCompletedCount = gradeCardRows.filter(r => !r.isCompleted).length;
+    return { gradeCardRows, totalCourses: gradeCardRows.length, completedCount, notCompletedCount };
+}
+
+export { checkStudent, checkGradeCard, normaliseProgramme };
