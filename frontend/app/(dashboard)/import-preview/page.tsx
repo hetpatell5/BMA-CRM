@@ -412,7 +412,7 @@ export default function ImportPreviewPage() {
             if (debouncedSearch) filterParts.push(debouncedSearch.replace(/\s+/g, '_'))
 
             const namePart = filterParts.length > 0 ? filterParts.join('_') : 'export'
-            link.download = `${namePart}_${today}.csv`
+            link.download = `${namePart}.csv`
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
@@ -436,7 +436,7 @@ export default function ImportPreviewPage() {
         const today = new Date().toISOString().split('T')[0]
         const batchName = filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0] || importBatchId
         const suffix = onlyPending ? '_pending' : ''
-        link.download = `${batchName}${suffix}_ignou_${today}.xlsx`
+        link.download = `${batchName}${suffix}_ignou.xlsx`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
