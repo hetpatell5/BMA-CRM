@@ -35,8 +35,9 @@ function emitProgress() {
     });
 }
 
-// ── 10 concurrent workers ─────────────────────────────────────────────────────
-ignouQueue.process(10, async (job) => {
+// ── 3 concurrent workers (polite rate for IGNOU portal) ────────────────────────────
+// 3 workers × 1 req/s = ~3 req/s to IGNOU. Avoids rate-limit / "Not found" blocks.
+ignouQueue.process(3, async (job) => {
     const { studentId, enrollmentNo, programme, studentName } = job.data;
 
     // Mark RUNNING in DB
@@ -72,8 +73,9 @@ ignouQueue.process(10, async (job) => {
     doneJobs++;
     emitProgress();
 
-    // Polite 200ms delay between each worker's requests
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Polite 1 second delay per worker to stay under IGNOU rate limit
+    // 3 workers × 1 req/s = ~3 req/s, well within IGNOU's tolerance
+    await new Promise(resolve => setTimeout(resolve, 1000));
 });
 
 // ── Crash Recovery ────────────────────────────────────────────────────────────

@@ -424,8 +424,9 @@ export default function ImportPreviewPage() {
 
     // ── IGNOU check trigger — supports BOTH batch mode and selected-rows mode ──
     const handleIgnouCheck = async () => {
-        const useSelected = selectedIds.length > 0 && !importBatchId
-        const useBatch    = !!importBatchId
+        // Selected rows ALWAYS take priority — never let a batch override explicit selections.
+        const useSelected = selectedIds.length > 0
+        const useBatch    = !useSelected && !!importBatchId
 
         if (!useSelected && !useBatch) {
             toast({ title: 'Nothing to check', description: 'Either select rows with checkboxes OR pick a batch from the filter sidebar.', variant: 'destructive' })
@@ -532,11 +533,11 @@ export default function ImportPreviewPage() {
                         <div>
                             <p className="font-semibold text-sm text-foreground">IGNOU Assignment Status Checker</p>
                             <p className="text-xs text-muted-foreground">
-                                {importBatchId
-                                    ? 'Checks entire selected batch · or tick rows to check specific students'
-                                    : selectedIds.length > 0
-                                        ? `${selectedIds.length} row(s) selected — click the button to check their IGNOU status`
-                                        : 'Select rows with checkboxes, or pick a batch from the filter sidebar'}
+                                {selectedIds.length > 0
+                                    ? `${selectedIds.length} row(s) ticked — will check only these (batch ignored)`
+                                    : importBatchId
+                                        ? 'Will check all students in selected batch · tick rows to narrow to specific students'
+                                        : 'Tick rows with checkboxes, or pick a batch from the filter sidebar'}
                             </p>
                         </div>
                     </div>
@@ -549,7 +550,7 @@ export default function ImportPreviewPage() {
                         >
                             {ignouChecking
                                 ? <><Loader2 className="w-4 h-4 animate-spin" />Checking…</>
-                                : selectedIds.length > 0 && !importBatchId
+                                : selectedIds.length > 0
                                     ? <><GraduationCap className="w-4 h-4" />Check {selectedIds.length} Selected</>
                                     : <><GraduationCap className="w-4 h-4" />Check IGNOU {importBatchId ? 'Batch' : 'Status'}</>}
                         </Button>

@@ -82,8 +82,8 @@ router.get('/results/:batchId', async (req, res, next) => {
     try {
         const { batchId } = req.params;
         const page   = Math.max(1, parseInt(req.query.page  || '1'));
-        const limit  = Math.min(200, parseInt(req.query.limit || '50'));
-        const status = req.query.status || ''; // DONE | ERROR | PENDING | RUNNING
+        const limit  = Math.min(10000, parseInt(req.query.limit || '100')); // high cap: need ALL records for ignouMap
+        const status = req.query.status || '';
         const onlyPending = req.query.onlyPending === 'true';
 
         // Get students in this batch that have ignou checks
@@ -108,7 +108,7 @@ router.get('/results/:batchId', async (req, res, next) => {
                 select: {
                     id: true, studentId: true, enrollmentNo: true, programme: true, studentName: true,
                     checkStatus: true, totalItems: true, submittedCount: true, pendingCount: true,
-                    pendingCourses: true, errorMessage: true, checkedAt: true, updatedAt: true,
+                    pendingCourses: true, assignmentRows: true, errorMessage: true, checkedAt: true, updatedAt: true,
                 },
             }),
             prisma.ignouCheck.count({ where }),
