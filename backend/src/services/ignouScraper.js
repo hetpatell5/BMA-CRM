@@ -99,6 +99,9 @@ function parseGradeCardTable(html) {
     const $ = cheerio.load(html);
     const rows = [];
 
+    // Helper: strip &nbsp; (U+00A0) and regular whitespace
+    const cleanText = (el) => $(el).text().replace(/\u00a0/g, '').trim();
+
     // Primary selector — known table ID from the ASP.NET page
     let table = $('#ctl00_ContentPlaceHolder1_gvDetail');
 
@@ -107,7 +110,7 @@ function parseGradeCardTable(html) {
         $('table').each((_, t) => {
             const headers = [];
             $(t).find('tr').first().find('th, td').each((_, el) => {
-                headers.push($(el).text().trim().toUpperCase());
+                headers.push(cleanText(el).toUpperCase());
             });
             if (headers.includes('COURSE') && headers.includes('STATUS')) {
                 table = $(t);
@@ -119,23 +122,24 @@ function parseGradeCardTable(html) {
     if (!table.length) return rows;
 
     table.find('tr').each((rowIdx, row) => {
-        if (rowIdx === 0) return; // skip header
+        if (rowIdx === 0) return; // skip header row (th elements)
         const cells = [];
-        $(row).find('td').each((_, el) => cells.push($(el).text().trim()));
+        $(row).find('td').each((_, el) => cells.push(cleanText(el)));
         if (cells.length < 2) return;
 
-        // Expect at least: COURSE + STATUS (last column)
-        const course             = cells[0];
-        const asgn1              = cells[1]  || '';
-        const lab1               = cells[2]  || '';
-        const lab2               = cells[3]  || '';
-        const lab3               = cells[4]  || '';
-        const lab4               = cells[5]  || '';
-        const termEndTheory      = cells[6]  || '';
-        const termEndPractical   = cells[7]  || '';
-        const status             = cells[cells.length - 1] || '';
+        const course = cells[0];
+        // Skip footer rows: the last blue row has &nbsp; in every cell
+        if (!course || course === '') return;
 
-        if (!course) return;
+        const asgn1            = cells[1]  || '';
+        const lab1             = cells[2]  || '';
+        const lab2             = cells[3]  || '';
+        const lab3             = cells[4]  || '';
+        const lab4             = cells[5]  || '';
+        const termEndTheory    = cells[6]  || '';
+        const termEndPractical = cells[7]  || '';
+        const status           = cells[cells.length - 1] || '';
+
         const isCompleted = status.trim().toUpperCase() === 'COMPLETED';
         rows.push({ course: course.trim(), asgn1, lab1, lab2, lab3, lab4, termEndTheory, termEndPractical, status: status.trim(), isCompleted });
     });
@@ -145,15 +149,18 @@ function parseGradeCardTable(html) {
 
 /**
  * Fetch and parse grade card for one student from gradecard.ignou.ac.in.
+ * NOTE: programme code must NOT be URL-encoded (IGNOU rejects MCA%5FNEW; needs MCA_NEW).
  */
 async function checkGradeCard(enrollmentNo, programme) {
     const prog = normaliseProgramme(programme);
-    const url  = `${IGNOU_GRADECARD_URL}?eno=${encodeURIComponent(enrollmentNo)}&prog=${encodeURIComponent(prog)}&type=1`;
+    // Enrolment no is user input — encode it. Programme is alphanumeric+underscore — keep literal.
+    const url  = `${IGNOU_GRADECARD_URL}?eno=${encodeURIComponent(enrollmentNo)}&prog=${prog}&type=1`;
     const response = await axios.get(url, { timeout: HTTP_TIMEOUT_MS, headers: AXIOS_HEADERS, maxRedirects: 3 });
-    const gradeCardRows    = parseGradeCardTable(response.data);
-    const completedCount   = gradeCardRows.filter(r => r.isCompleted).length;
+    const gradeCardRows     = parseGradeCardTable(response.data);
+    const completedCount    = gradeCardRows.filter(r => r.isCompleted).length;
     const notCompletedCount = gradeCardRows.filter(r => !r.isCompleted).length;
     return { gradeCardRows, totalCourses: gradeCardRows.length, completedCount, notCompletedCount };
 }
+
 
 export { checkStudent, checkGradeCard, normaliseProgramme };

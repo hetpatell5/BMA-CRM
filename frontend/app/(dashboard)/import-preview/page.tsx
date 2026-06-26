@@ -794,9 +794,9 @@ export default function ImportPreviewPage() {
                 <div className="bg-background rounded-xl overflow-hidden min-w-0 border border-border shadow-sm flex flex-col">
                     <div className="overflow-auto scrollbar-thin max-h-[calc(100vh-320px)]">
                         <table className="w-full border-collapse text-sm">
-                            <thead className="sticky top-0 z-10 shadow-sm">
-                                <tr className="border-b border-border bg-slate-50 dark:bg-slate-800">
-                                    <th className="p-2 text-left w-10 border-r border-border bg-slate-100 dark:bg-slate-800">
+                            <thead>
+                                <tr className="border-b border-border">
+                                    <th className="p-2 text-left w-10 border-r border-border bg-slate-100 dark:bg-slate-800 sticky top-0 z-10">
                                         <input
                                             type="checkbox"
                                             checked={students.length > 0 && selectedIds.length === students.length}
@@ -805,7 +805,7 @@ export default function ImportPreviewPage() {
                                         />
                                     </th>
                                     {customFieldCols.map(key => (
-                                        <th key={key} className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800">
+                                        <th key={key} className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 z-10">
                                             {key}
                                         </th>
                                     ))}

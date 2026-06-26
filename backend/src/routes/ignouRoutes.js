@@ -56,6 +56,7 @@ router.post('/results/by-students', async (req, res, next) => {
                 id: true, studentId: true, enrollmentNo: true, programme: true, studentName: true,
                 checkStatus: true, totalItems: true, submittedCount: true, pendingCount: true,
                 pendingCourses: true, assignmentRows: true, errorMessage: true, checkedAt: true, updatedAt: true,
+                gradeCardRows: true, gradeCardTotal: true, gradeCardCompleted: true, gradeCardPending: true,
             },
         });
         res.json({ success: true, data: { records } });
