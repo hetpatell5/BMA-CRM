@@ -809,13 +809,13 @@ export default function ImportPreviewPage() {
                                             {key}
                                         </th>
                                     ))}
-                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-r border-border whitespace-nowrap bg-indigo-50 dark:bg-slate-900 sticky right-[100px] z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-[100px] z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
                                         <span className="flex items-center gap-1.5">
                                             <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
                                             IGNOU Status
                                         </span>
                                     </th>
-                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky right-0 z-30 w-[100px] min-w-[100px]">
+                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-0 z-30 w-[100px] min-w-[100px]">
                                         Action
                                     </th>
                                 </tr>
@@ -864,7 +864,7 @@ export default function ImportPreviewPage() {
                                                     </td>
                                                 ))}
                                                 {/* IGNOU Status cell */}
-                                                <td className="p-2 border-r border-border text-[13px] min-w-[130px] sticky right-[100px] z-10 bg-white dark:bg-slate-950 group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]">
+                                                <td className="p-2 border-border text-[13px] min-w-[130px] sticky right-[100px] z-10 bg-white dark:bg-[#0b1120] group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]">
                                                     {!ignouCheck ? (
                                                         <span className="text-[11px] text-muted-foreground">—</span>
                                                     ) : ignouCheck.checkStatus === 'RUNNING' || ignouCheck.checkStatus === 'PENDING' ? (
@@ -897,7 +897,7 @@ export default function ImportPreviewPage() {
                                                     )}
 
                                                 </td>
-                                                <td className="p-2 border-l border-border sticky right-0 z-20 bg-white dark:bg-slate-950 group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900 w-[100px] min-w-[100px]" onClick={e => e.stopPropagation()}>
+                                                <td className="p-2 border-border sticky right-0 z-20 bg-white dark:bg-[#0b1120] group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900 w-[100px] min-w-[100px]" onClick={e => e.stopPropagation()}>
                                                     <Button
                                                         variant="outline" size="sm"
                                                         className="h-8 text-[11px] font-bold uppercase tracking-wider text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 whitespace-nowrap gap-1.5"
