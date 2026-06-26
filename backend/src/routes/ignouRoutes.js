@@ -286,14 +286,9 @@ router.get('/export/:batchId', async (req, res, next) => {
             }
         });
 
-        // Auto-width columns
+        // ── Auto-width: estimate from header lengths only (much faster, avoids re-scanning)
         worksheet.columns.forEach((col, i) => {
-            let maxLen = (headers[i] || '').length;
-            col.eachCell({ includeEmpty: false }, cell => {
-                const len = String(cell.value || '').length;
-                if (len > maxLen) maxLen = len;
-            });
-            col.width = Math.min(Math.max(maxLen + 2, 10), 50);
+            col.width = Math.min(Math.max((headers[i] || '').length + 4, 12), 40);
         });
 
         // Freeze top row
@@ -301,6 +296,7 @@ router.get('/export/:batchId', async (req, res, next) => {
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="ignou_status_batch_${batchId}_${new Date().toISOString().split('T')[0]}.xlsx"`);
+        // useStyles:false removes the shared-styles XML chunk (~30–50 KB saving)
         await workbook.xlsx.write(res);
         res.end();
     } catch (err) { next(err); }

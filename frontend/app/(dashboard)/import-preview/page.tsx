@@ -397,7 +397,22 @@ export default function ImportPreviewPage() {
             const url = studentsAPI.getExportUrl(p)
             const link = document.createElement('a')
             link.href = url
-            link.download = `export_${new Date().toISOString().split('T')[0]}.csv`
+
+            // Build smart filename from active filters
+            const today = new Date().toISOString().split('T')[0]
+            const filterParts: string[] = []
+            // 1. Batch file name
+            const batchName = filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0]
+            if (batchName) filterParts.push(batchName)
+            // 2. All active custom-field filters (e.g. Programme=MLIS)
+            for (const [k, vals] of Object.entries(activeFilters)) {
+                if ((vals as Set<string>).size > 0) filterParts.push(Array.from(vals as Set<string>).join('-'))
+            }
+            // 3. Search term
+            if (debouncedSearch) filterParts.push(debouncedSearch.replace(/\s+/g, '_'))
+
+            const namePart = filterParts.length > 0 ? filterParts.join('_') : 'export'
+            link.download = `${namePart}_${today}.csv`
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
@@ -416,7 +431,12 @@ export default function ImportPreviewPage() {
         const url = ignouAPI.getExportUrl(importBatchId, onlyPending)
         const link = document.createElement('a')
         link.href = url
-        link.download = `ignou_status_${importBatchId}_${new Date().toISOString().split('T')[0]}.xlsx`
+
+        // Smart filename: batch name + pending suffix + date
+        const today = new Date().toISOString().split('T')[0]
+        const batchName = filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0] || importBatchId
+        const suffix = onlyPending ? '_pending' : ''
+        link.download = `${batchName}${suffix}_ignou_${today}.xlsx`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
