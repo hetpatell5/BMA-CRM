@@ -386,19 +386,31 @@ export default function ImportPreviewPage() {
     const [isExporting, setIsExporting] = useState(false)
     const handleExport = () => {
         try {
-            // Build smart filename from active filters FIRST
-            const filterParts: string[] = []
-            // 1. Batch file name (e.g. "MCA_NEW_PENDING")
-            const batchLabel = filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0]
-            if (batchLabel) filterParts.push(batchLabel)
-            // 2. All active custom-field filter values (e.g. Programme → "MLIS")
-            for (const [, vals] of Object.entries(activeFilters)) {
-                if ((vals as Set<string>).size > 0) filterParts.push(Array.from(vals as Set<string>).join('-'))
-            }
-            // 3. Search term
-            if (debouncedSearch) filterParts.push(debouncedSearch.replace(/\s+/g, '_'))
-            const namePart = filterParts.length > 0 ? filterParts.join('_') : 'export'
+            // Build filename: collect all active filter VALUES (not keys) as the name
+            // Priority: custom-field filter values > search term > 'export'
+            const nameParts: string[] = []
 
+            // Active custom-field filter values, e.g. activeFilters = { Programme: Set(["ACE"]) } → "ACE"
+            for (const vals of Object.values(activeFilters)) {
+                const arr = Array.from(vals as Set<string>).filter(Boolean)
+                if (arr.length > 0) nameParts.push(arr.join('-'))
+            }
+
+            // Batch label as fallback when no field-filters are set
+            if (nameParts.length === 0 && importBatchId) {
+                const batch = filterOptions?.importBatches?.find((b: any) => String(b.id) === String(importBatchId))
+                const label = batch?.fileName?.split('.')?.[0] || batch?.batchName || ''
+                if (label) nameParts.push(label)
+            }
+
+            // Search term as last fallback
+            if (nameParts.length === 0 && debouncedSearch) {
+                nameParts.push(debouncedSearch.trim().replace(/\s+/g, '_'))
+            }
+
+            const namePart = nameParts.length > 0 ? nameParts.join('_') : 'export'
+
+            // Pass filename to backend so Content-Disposition header is correct
             const p: Record<string, any> = { source: 'excel_import', filename: namePart }
             if (importBatchId)   p.importBatchId = importBatchId
             if (debouncedSearch) p.search = debouncedSearch
@@ -411,15 +423,16 @@ export default function ImportPreviewPage() {
             const url = studentsAPI.getExportUrl(p)
             const link = document.createElement('a')
             link.href = url
-            link.download = `${namePart}.csv`  // fallback if server header absent
+            link.download = `${namePart}.csv`
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
-            toast({ title: 'Export Started', description: 'Your file will download shortly.' })
+            toast({ title: 'Export Started', description: `Downloading as ${namePart}.csv` })
         } catch {
             toast({ title: 'Export Failed', description: 'Could not start export.', variant: 'destructive' })
         }
     }
+
 
     // ── IGNOU Export (Excel with IGNOU columns appended) ──────────────────
     const handleIgnouExport = (onlyPending = false) => {
