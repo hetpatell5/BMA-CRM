@@ -393,7 +393,7 @@ router.post('/process/:importId', async (req, res, next) => {
         let skipped = 0;
         let failed = 0;
         const errors = [];
-        const BATCH_SIZE = 2000; // Larger batches for bulk insert
+        const BATCH_SIZE = 500; // Smaller batches to avoid starving the DB connection pool
 
         // Process in batches - prepare data first, then bulk insert
         for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
