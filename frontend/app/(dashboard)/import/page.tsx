@@ -38,7 +38,7 @@ export default function ImportPage() {
     const [importType, setImportType] = useState<'STUDENTS' | 'LEADS'>('STUDENTS')
     const [uploadData, setUploadData] = useState<any>(null)
     const [columnMapping, setColumnMapping] = useState<Record<string, string>>({})
-    const [duplicateHandling, setDuplicateHandling] = useState<'skip' | 'update'>('skip')
+    const [duplicateHandling, setDuplicateHandling] = useState<'skip' | 'update' | 'force'>('force')
     const [progress, setProgress] = useState({ progress: 0, imported: 0, failed: 0 })
     const [result, setResult] = useState<any>(null)
     // Track which import IDs are being deleted (background delete runs after HTTP response)
@@ -527,11 +527,14 @@ export default function ImportPage() {
 
                     <div className="glass rounded-xl p-6">
                         <h3 className="font-semibold mb-4">Duplicate Handling Strategy</h3>
-                        <div className="flex flex-wrap items-center gap-4">
-                            <Button variant={duplicateHandling === 'skip' ? 'default' : 'outline'} onClick={() => setDuplicateHandling('skip')}>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <Button variant={duplicateHandling === 'force' ? 'default' : 'outline'} onClick={() => setDuplicateHandling('force')} className="gap-2">
+                                Import As-Is
+                            </Button>
+                            <Button variant={duplicateHandling === 'skip' ? 'default' : 'outline'} onClick={() => setDuplicateHandling('skip')} className="gap-2">
                                 Skip Duplicates
                             </Button>
-                            <Button variant={duplicateHandling === 'update' ? 'default' : 'outline'} onClick={() => setDuplicateHandling('update')}>
+                            <Button variant={duplicateHandling === 'update' ? 'default' : 'outline'} onClick={() => setDuplicateHandling('update')} className="gap-2">
                                 Update Existing Records
                             </Button>
                         </div>
@@ -659,7 +662,7 @@ export default function ImportPage() {
                             <Upload className="w-4 h-4" /> Import Another File
                         </Button>
                         <Button onClick={() => window.location.href = importType === 'STUDENTS' ? `/import-preview?batchId=${uploadData?.importId || ''}` : '/leads'} className="h-11 px-8 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:opacity-90 text-white border-0 gap-2 text-sm font-semibold shadow-[0_0_24px_rgba(16,185,129,0.35)]">
-                            View {importType === 'STUDENTS' ? 'Import Preview' : 'Leads'} <ArrowRight className="w-4 h-4" />
+                            View {importType === 'STUDENTS' ? 'Data' : 'Leads'} <ArrowRight className="w-4 h-4" />
                         </Button>
                     </div>
                 </div>

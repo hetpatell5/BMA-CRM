@@ -140,8 +140,10 @@ export const studentsAPI = {
         api.post(`/students/co-handle/${studentId}`, coHandlerId ? { coHandlerId } : {}),
     promoteImportedRow: (id: string | number) => api.post(`/students/promote-import/${id}`),
     promoteImportBatch: (importBatchId: string) => api.post(`/students/promote-import-batch/${importBatchId}`),
-    getImportFieldValues: (field: string, batchId?: string) =>
-        api.get('/students/meta/import-field-values', { params: { field, ...(batchId ? { batchId } : {}) } }),
+    getImportFieldValues: (field: string, batchIds?: string[]) =>
+        api.get('/students/meta/import-field-values', { params: { field, ...(batchIds && batchIds.length > 0 ? { batchId: batchIds[0] } : {}) } }),
+    segregate: (data: { assigneeIds: number[], importBatchIds?: string[], programmes?: string[], customField?: Record<string, string>, dryRun?: boolean }) =>
+        api.post('/students/segregate', data),
 }
 
 // Leads API

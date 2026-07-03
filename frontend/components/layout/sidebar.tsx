@@ -42,7 +42,7 @@ const navigation = [
     { name: 'Orders', href: '/orders', icon: Users, roles: ['ADMIN', 'MANAGER', 'STAFF'] },
     { name: 'Leads', href: '/leads', icon: Target, roles: ['ADMIN', 'MANAGER', 'STAFF'] },
     { name: 'Import Data', href: '/import', icon: Upload, roles: ['ADMIN', 'MANAGER'] },
-    { name: 'Import Preview', href: '/import-preview', icon: FileSearch, roles: ['ADMIN', 'MANAGER'] },
+    { name: 'Data', href: '/import-preview', icon: FileSearch, roles: ['ADMIN', 'MANAGER', 'STAFF'] },
     { name: 'Payments', href: '/payment', icon: Users, roles: ['ADMIN', 'MANAGER'] },
     { name: 'Team Management', href: '/team', icon: UserPlus, roles: ['ADMIN', 'MANAGER'], exact: true },
     { name: 'Form Templates', href: '/team/templates', icon: Settings, roles: ['ADMIN', 'MANAGER'], staffRoles: ['TELECALLER'] },

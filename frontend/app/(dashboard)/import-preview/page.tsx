@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { studentsAPI, ignouAPI } from '@/lib/api'
+import { studentsAPI, ignouAPI, teamAPI } from '@/lib/api'
 import { formatNumber, debounce } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
@@ -95,11 +95,11 @@ const ACCENTS = [
 // ─── FilterColumn component: loads values lazily when section opens ────────
 
 function FilterColumn({
-    colKey, accentIdx, batchId, selectedVals, filterSearch, onToggle, openSections, toggleSection,
+    colKey, accentIdx, batchIds, selectedVals, filterSearch, onToggle, openSections, toggleSection,
 }: {
     colKey: string
     accentIdx: number
-    batchId: string
+    batchIds: string[]
     selectedVals: Set<string>
     filterSearch: string
     onToggle: (key: string, val: string) => void
@@ -111,9 +111,9 @@ function FilterColumn({
     const accent = ACCENTS[accentIdx % ACCENTS.length]
 
     const { data: vals, isLoading } = useQuery({
-        queryKey: ['import-field-values', colKey, batchId],
-        queryFn: async () => (await studentsAPI.getImportFieldValues(colKey, batchId || undefined)).data.data as string[],
-        enabled: isOpen, // only fetch when section is open
+        queryKey: ['import-field-values', colKey, batchIds],
+        queryFn: async () => (await studentsAPI.getImportFieldValues(colKey, batchIds.length > 0 ? batchIds : undefined)).data.data as string[],
+        enabled: isOpen,
         staleTime: 5 * 60 * 1000,
     })
 
@@ -124,10 +124,8 @@ function FilterColumn({
         return vals.filter(v => v.toLowerCase().includes(q) || colKey.toLowerCase().includes(q))
     }, [vals, filterSearch, colKey])
 
-    // Never fetched yet (section not opened) → show the header but no content
-    // Fetched and got values → show list
-    // Fetched and got 0 values → keep header visible, show a hint (DON'T hide)
     const hasBeenFetched = vals !== undefined
+    const allSelected = displayed.length > 0 && displayed.every(v => selectedVals.has(v))
 
     return (
         <div>
@@ -156,23 +154,39 @@ function FilterColumn({
                             Use Search above to find specific values
                         </div>
                     ) : (
-                        displayed.map(val => (
-                            <label
-                                key={val}
-                                className={cn(
-                                    'flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors',
-                                    selectedVals.has(val) ? accent.active : 'hover:bg-slate-100 dark:hover:bg-white/5'
-                                )}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={selectedVals.has(val)}
-                                    onChange={() => onToggle(colKey, val)}
-                                    className={cn('w-3.5 h-3.5 rounded border-slate-300 cursor-pointer shrink-0', accent.check)}
-                                />
-                                <span className="text-[13px] font-medium text-foreground truncate" title={val}>{val}</span>
-                            </label>
-                        ))
+                        <>
+                            {/* Select All row */}
+                            {displayed.length > 1 && (
+                                <label className={cn('flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-colors font-semibold text-xs text-muted-foreground', allSelected ? accent.active : 'hover:bg-slate-100 dark:hover:bg-white/5')}>
+                                    <input
+                                        type="checkbox"
+                                        checked={allSelected}
+                                        onChange={() => displayed.forEach(v => {
+                                            if (allSelected ? selectedVals.has(v) : !selectedVals.has(v)) onToggle(colKey, v)
+                                        })}
+                                        className={cn('w-3.5 h-3.5 rounded border-slate-300 cursor-pointer shrink-0', accent.check)}
+                                    />
+                                    Select All ({displayed.length})
+                                </label>
+                            )}
+                            {displayed.map(val => (
+                                <label
+                                    key={val}
+                                    className={cn(
+                                        'flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors',
+                                        selectedVals.has(val) ? accent.active : 'hover:bg-slate-100 dark:hover:bg-white/5'
+                                    )}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedVals.has(val)}
+                                        onChange={() => onToggle(colKey, val)}
+                                        className={cn('w-3.5 h-3.5 rounded border-slate-300 cursor-pointer shrink-0', accent.check)}
+                                    />
+                                    <span className="text-[13px] font-medium text-foreground truncate" title={val}>{val}</span>
+                                </label>
+                            ))}
+                        </>
                     )}
                 </div>
             )}
@@ -197,11 +211,24 @@ export default function ImportPreviewPage() {
     const [pageInput, setPageInput]   = useState('1')
     const [selectedIds, setSelectedIds] = useState<string[]>([])
     const [showFilters, setShowFilters] = useState(false)
-    const [importBatchId, setImportBatchId] = useState(searchParams.get('importBatchId') || '')
+    // Multi-select batch IDs (Set of string IDs)
+    const [importBatchIds, setImportBatchIds] = useState<Set<string>>(() => {
+        const bid = searchParams.get('importBatchId') || searchParams.get('batchId') || ''
+        return bid ? new Set([bid]) : new Set()
+    })
     // { "Regional Center": new Set(["Mumbai","Delhi"]), ... }
     const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({})
     const [filterSearch, setFilterSearch] = useState('')
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({ imports: true })
+
+    // ── Segregation state ──────────────────────────────────────────────────
+    const [showSegregateModal, setShowSegregateModal] = useState(false)
+    const [segregatePlan, setSegregatePlan]           = useState<any[] | null>(null)
+    const [segregateApplying, setSegregateApplying]   = useState(false)
+    const [selectedAssignees, setSelectedAssignees]   = useState<number[]>([])
+
+    // Compatibility shim: single batch ID for IGNOU / old helpers
+    const importBatchId = importBatchIds.size === 1 ? Array.from(importBatchIds)[0] : ''
 
     // ── IGNOU state ────────────────────────────────────────────────────────
     const [ignouProgress, setIgnouProgress] = useState<{ done: number; total: number; percent: number } | null>(null)
@@ -241,12 +268,15 @@ export default function ImportPreviewPage() {
             source: 'excel_import',
         }
         if (debouncedSearch) p.search = debouncedSearch
-        if (importBatchId)   p.importBatchId = importBatchId
 
-        // Pass as a NESTED object so axios serializes correctly:
-        // { customField: { 'Regional Center': 'Mumbai,Delhi' } }
-        // → ?customField[Regional%20Center]=Mumbai%2CDelhi
-        // Express/qs then parses req.query.customField = { 'Regional Center': 'Mumbai,Delhi' }
+        // Multi-batch support
+        if (importBatchIds.size === 1) {
+            p.importBatchId = Array.from(importBatchIds)[0]
+        } else if (importBatchIds.size > 1) {
+            p.importBatchIds = Array.from(importBatchIds).join(',')
+        }
+
+        // Pass as a NESTED object so axios serializes correctly
         const cfParams: Record<string, string> = {}
         for (const [k, vals] of Object.entries(activeFilters)) {
             if (vals.size > 0) cfParams[k] = Array.from(vals).join(',')
@@ -254,7 +284,7 @@ export default function ImportPreviewPage() {
         if (Object.keys(cfParams).length > 0) p.customField = cfParams
 
         return p
-    }, [page, debouncedSearch, importBatchId, activeFilters])
+    }, [page, debouncedSearch, importBatchIds, activeFilters])
 
     // ── Main data query (server-side pagination) ───────────────────────────
     const { data, isLoading, refetch } = useQuery({
@@ -324,11 +354,11 @@ export default function ImportPreviewPage() {
     }, [students, customFieldCols])
 
     const activeFilterCount =
-        (importBatchId ? 1 : 0) +
+        (importBatchIds.size > 0 ? importBatchIds.size : 0) +
         Object.values(activeFilters).reduce((n, s) => n + s.size, 0)
 
     // Reset page when filters/batch change
-    useEffect(() => { setPage(1); setPageInput('1') }, [importBatchId, activeFilters])
+    useEffect(() => { setPage(1); setPageInput('1') }, [importBatchIds, activeFilters])
 
     // Toggle a value in a multi-select filter
     const toggleFilterValue = (colKey: string, value: string) => {
@@ -341,7 +371,16 @@ export default function ImportPreviewPage() {
         })
     }
 
-    const clearAllFilters = () => { setImportBatchId(''); setActiveFilters({}) }
+    const clearAllFilters = () => { setImportBatchIds(new Set()); setActiveFilters({}) }
+
+    // Toggle a batch ID in/out of the multi-select set
+    const toggleBatchId = (id: string) => {
+        setImportBatchIds(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id); else next.add(id)
+            return next
+        })
+    }
 
     // ── Selection ──────────────────────────────────────────────────────────
     const handleSelectAll = () =>
@@ -349,14 +388,14 @@ export default function ImportPreviewPage() {
     const handleSelect = (id: string) =>
         setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
 
-    // ── Promote mutations ──────────────────────────────────────────────────
+    // ── Mark as Order mutations ────────────────────────────────────────────
     const promoteRowMutation = useMutation({
         mutationFn: (id: string | number) => studentsAPI.promoteImportedRow(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['import-preview'] })
             queryClient.invalidateQueries({ queryKey: ['students'] })
             setSelectedIds(prev => prev.filter(sid => sid !== String(promoteRowMutation.variables)))
-            toast({ title: 'Promoted!', description: 'Record moved to active Orders.', variant: 'success' })
+            toast({ title: 'Marked as Order!', description: 'Record moved to active Orders.', variant: 'success' })
         },
         onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' }),
     })
@@ -367,7 +406,7 @@ export default function ImportPreviewPage() {
             queryClient.invalidateQueries({ queryKey: ['import-preview'] })
             queryClient.invalidateQueries({ queryKey: ['students'] })
             setSelectedIds([])
-            toast({ title: 'Promoted!', description: 'Selected records moved to active Orders.', variant: 'success' })
+            toast({ title: 'Marked as Order!', description: 'Selected records moved to active Orders.', variant: 'success' })
         },
         onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' }),
     })
@@ -377,10 +416,57 @@ export default function ImportPreviewPage() {
         onSuccess: (res: any) => {
             queryClient.invalidateQueries({ queryKey: ['import-preview'] })
             queryClient.invalidateQueries({ queryKey: ['students'] })
-            toast({ title: 'Batch Promoted!', description: res?.data?.message || 'All records moved to Orders.', variant: 'success' })
+            toast({ title: 'Batch Marked as Order!', description: res?.data?.message || 'All records moved to Orders.', variant: 'success' })
         },
         onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' }),
     })
+
+    // ── Team members (for segregation) ────────────────────────────────────
+    const { data: teamData } = useQuery({
+        queryKey: ['team-members-segregate'],
+        queryFn: async () => (await teamAPI.getAll()).data.data,
+        enabled: isAdminManager,
+    })
+
+    const teamMembers: any[] = (teamData?.users || teamData || []).filter((u: any) =>
+        u.role === 'ADMIN' || u.role === 'MANAGER' || (u.role === 'STAFF' && u.staffRole === 'TELECALLER')
+    )
+
+    // ── Segregation mutation ────────────────────────────────────────────────
+    const segregateMutation = useMutation({
+        mutationFn: (payload: Parameters<typeof studentsAPI.segregate>[0]) => studentsAPI.segregate(payload),
+        onSuccess: (res: any) => {
+            const { plan, totalStudents } = res.data.data || {}
+            toast({ title: 'Segregation Complete!', description: `${totalStudents} records assigned to ${plan?.length ?? 0} groups.`, variant: 'success' })
+            setShowSegregateModal(false)
+            setSegregatePlan(null)
+            setSelectedAssignees([])
+            queryClient.invalidateQueries({ queryKey: ['import-preview'] })
+        },
+        onError: (err: any) => toast({ title: 'Segregation Failed', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' }),
+    })
+
+    const handleSegregatePreview = async () => {
+        if (selectedAssignees.length === 0) {
+            toast({ title: 'Select team members first', variant: 'destructive' }); return
+        }
+        const payload = {
+            assigneeIds: selectedAssignees,
+            importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
+            programmes: Object.keys(activeFilters).includes('Programme') ? Array.from(activeFilters['Programme'] || []) : undefined,
+            dryRun: true,
+        }
+        const res = await studentsAPI.segregate(payload)
+        setSegregatePlan(res.data.data?.plan || [])
+    }
+
+    const handleSegregateApply = () => {
+        segregateMutation.mutate({
+            assigneeIds: selectedAssignees,
+            importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
+            programmes: Object.keys(activeFilters).includes('Programme') ? Array.from(activeFilters['Programme'] || []) : undefined,
+        })
+    }
 
     // ── Export (CSV) ─────────────────────────────────────────────────────────
     const [isExporting, setIsExporting] = useState(false)
@@ -412,7 +498,11 @@ export default function ImportPreviewPage() {
 
             // Pass filename to backend so Content-Disposition header is correct
             const p: Record<string, any> = { source: 'excel_import', filename: namePart }
-            if (importBatchId)   p.importBatchId = importBatchId
+            if (importBatchIds.size === 1) {
+                p.importBatchId = Array.from(importBatchIds)[0]
+            } else if (importBatchIds.size > 1) {
+                p.importBatchIds = Array.from(importBatchIds).join(',')
+            }
             if (debouncedSearch) p.search = debouncedSearch
             const cfParams: Record<string, string> = {}
             for (const [k, vals] of Object.entries(activeFilters)) {
@@ -477,7 +567,7 @@ export default function ImportPreviewPage() {
                     setIgnouChecking(false)
                     toast({ title: 'Nothing queued', description: missing > 0 ? `${missing} selected student(s) are missing enrollment/programme data.` : 'All selected students already checked.' })
                 } else {
-                    setCheckedStudentIds(selectedIds) // store so results query can show statuses
+                    setCheckedStudentIds(selectedIds)
                     setIgnouProgress({ done: 0, total: queued, percent: 0 })
                     toast({ title: `IGNOU Check Started`, description: `${queued} selected student(s) queued. Progress will update in real-time.` })
                 }
@@ -499,64 +589,68 @@ export default function ImportPreviewPage() {
         }
     }
 
-    // ── Access Gate ────────────────────────────────────────────────────────
-    if (currentUser && !isAdminManager) {
-        return (
-            <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-center">
-                <Users className="w-16 h-16 text-muted-foreground/40" />
-                <h2 className="text-xl font-semibold">Access Restricted</h2>
-                <p className="text-muted-foreground max-w-sm">Import Preview is only available to Admins and Managers.</p>
-                <Link href="/orders"><Button variant="outline">Go to Orders</Button></Link>
-            </div>
-        )
-    }
-
-    // ── Render ─────────────────────────────────────────────────────────────
+    // ── Render ──────────────────────────────────────────────────────────────
     return (
         <div className="space-y-6 animate-fade-in">
             {/* ── Page Header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold">Import Preview</h1>
+                    <h1 className="text-2xl font-bold">Data</h1>
                     <p className="text-muted-foreground text-sm mt-0.5">
-                        Review imported records. Promote individual rows or entire batches to active Orders.
+                        {isAdminManager
+                            ? 'Review imported records. Mark individual rows or batches as Orders.'
+                            : 'Your assigned records. Use “Mark as Order” to move a record to active Orders.'}
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                     <Button variant="outline" size="sm" onClick={() => refetch()}>
                         <RefreshCw className="w-4 h-4" />
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting} className="gap-2">
-                        {isExporting
-                            ? <><RefreshCw className="w-4 h-4 animate-spin" /><span className="hidden sm:inline">Exporting…</span></>
-                            : <><Download className="w-4 h-4" /><span className="hidden sm:inline">Export CSV</span></>}
-                    </Button>
-                    {selectedIds.length > 0 && (
+                    {isAdminManager && (
+                        <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting} className="gap-2">
+                            {isExporting
+                                ? <><RefreshCw className="w-4 h-4 animate-spin" /><span className="hidden sm:inline">Exporting…</span></>
+                                : <><Download className="w-4 h-4" /><span className="hidden sm:inline">Export CSV</span></>}
+                        </Button>
+                    )}
+                    {isAdminManager && selectedIds.length > 0 && (
                         <Button
                             size="sm"
                             className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => { if (window.confirm(`Promote ${selectedIds.length} selected record(s)?`)) promoteSelectionMutation.mutate(selectedIds) }}
+                            onClick={() => { if (window.confirm(`Mark ${selectedIds.length} selected record(s) as Order?`)) promoteSelectionMutation.mutate(selectedIds) }}
                             disabled={promoteSelectionMutation.isPending}
                         >
                             {promoteSelectionMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowUpCircle className="w-4 h-4" />}
-                            Promote Selection ({selectedIds.length})
+                            Mark as Order ({selectedIds.length})
                         </Button>
                     )}
-                    {importBatchId && (
+                    {isAdminManager && importBatchId && (
                         <Button
                             size="sm"
                             className="gap-2 gradient-primary text-white"
-                            onClick={() => { if (window.confirm('Promote ALL un-promoted records in this batch?')) promoteBatchMutation.mutate(importBatchId) }}
+                            onClick={() => { if (window.confirm('Mark ALL records in this batch as Orders?')) promoteBatchMutation.mutate(importBatchId) }}
                             disabled={promoteBatchMutation.isPending}
                         >
                             {promoteBatchMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowUpCircle className="w-4 h-4" />}
-                            <span className="hidden sm:inline">Promote Entire Batch</span>
+                            <span className="hidden sm:inline">Mark Entire Batch as Order</span>
+                        </Button>
+                    )}
+                    {isAdminManager && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-2 border-violet-500/30 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10"
+                            onClick={() => { setShowSegregateModal(true); setSegregatePlan(null) }}
+                        >
+                            <Users className="w-4 h-4" />
+                            <span className="hidden sm:inline">Segregate</span>
                         </Button>
                     )}
                 </div>
             </div>
 
-            {/* ── IGNOU Assignment Status Checker Toolbar ── */}
+            {/* ── IGNOU Assignment Status Checker Toolbar (Admin/Manager only) ── */}
+            {isAdminManager && (
             <div className="rounded-xl border border-border bg-gradient-to-r from-indigo-500/5 via-violet-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:via-violet-500/10 dark:to-purple-500/10 p-4 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
@@ -636,6 +730,7 @@ export default function ImportPreviewPage() {
                     </div>
                 )}
             </div>
+            )}
 
             {/* ── Search & Filter Bar ── */}
             <div className="border border-border rounded-xl p-3 flex flex-col sm:flex-row gap-3 flex-wrap">
@@ -699,11 +794,11 @@ export default function ImportPreviewPage() {
                     <Button
                         size="sm"
                         className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-8"
-                        onClick={() => { if (window.confirm(`Promote ${selectedIds.length} selected record(s)?`)) promoteSelectionMutation.mutate(selectedIds) }}
+                        onClick={() => { if (window.confirm(`Mark ${selectedIds.length} selected record(s) as Order?`)) promoteSelectionMutation.mutate(selectedIds) }}
                         disabled={promoteSelectionMutation.isPending}
                     >
                         {promoteSelectionMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
-                        Promote Selected
+                        Mark as Order
                     </Button>
                     <button onClick={() => setSelectedIds([])} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 ml-auto">
                         Clear selection
@@ -747,15 +842,15 @@ export default function ImportPreviewPage() {
                                     Active ({activeFilterCount})
                                 </p>
                                 <div className="flex flex-wrap gap-1">
-                                    {importBatchId && (
-                                        <span className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] font-medium border border-blue-200 dark:border-blue-500/30">
+                                    {importBatchIds.size > 0 && Array.from(importBatchIds).map(bid => (
+                                        <span key={bid} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] font-medium border border-blue-200 dark:border-blue-500/30">
                                             <FolderOpen className="w-2.5 h-2.5 shrink-0" />
                                             <span className="truncate max-w-[130px]">
-                                                {filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0] || 'Batch'}
+                                                {filterOptions?.importBatches?.find((b: any) => b.id === bid)?.fileName?.split('.')[0] || 'Batch'}
                                             </span>
-                                            <button onClick={() => setImportBatchId('')} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
+                                            <button onClick={() => toggleBatchId(bid)} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
                                         </span>
-                                    )}
+                                    ))}
                                     {Object.entries(activeFilters).flatMap(([col, vals]) =>
                                         Array.from(vals).map(val => (
                                             <span key={`${col}:${val}`} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium border border-primary/20">
@@ -772,7 +867,7 @@ export default function ImportPreviewPage() {
                         )}
 
                         <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
-                            {/* Import Batches */}
+            {/* Import Batches — multi-select with Select All */}
                             {filterOptions?.importBatches?.length > 0 && (
                                 <div>
                                     <button
@@ -784,14 +879,46 @@ export default function ImportPreviewPage() {
                                     </button>
                                     {openSections.imports && (
                                         <div className="space-y-0.5 mb-3">
+                                            {/* Select All row */}
+                                            {filterOptions.importBatches.length > 1 && (() => {
+                                                const filtered = filterOptions.importBatches.filter((b: any) =>
+                                                    !filterSearch || b.fileName.toLowerCase().includes(filterSearch.toLowerCase())
+                                                )
+                                                const allSelected = filtered.length > 0 && filtered.every((b: any) => importBatchIds.has(b.id))
+                                                return (
+                                                    <label className={cn('flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-colors font-semibold text-xs text-muted-foreground', allSelected ? 'bg-blue-50 dark:bg-blue-500/10' : 'hover:bg-slate-100 dark:hover:bg-white/5')}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={allSelected}
+                                                            onChange={() => {
+                                                                if (allSelected) {
+                                                                    setImportBatchIds(prev => {
+                                                                        const next = new Set(prev)
+                                                                        filtered.forEach((b: any) => next.delete(b.id))
+                                                                        return next
+                                                                    })
+                                                                } else {
+                                                                    setImportBatchIds(prev => {
+                                                                        const next = new Set(prev)
+                                                                        filtered.forEach((b: any) => next.add(b.id))
+                                                                        return next
+                                                                    })
+                                                                }
+                                                            }}
+                                                            className="w-3.5 h-3.5 rounded border-slate-300 accent-blue-500 cursor-pointer shrink-0"
+                                                        />
+                                                        Select All ({filtered.length})
+                                                    </label>
+                                                )
+                                            })()}
                                             {filterOptions.importBatches
                                                 .filter((b: any) => !filterSearch || b.fileName.toLowerCase().includes(filterSearch.toLowerCase()))
                                                 .map((batch: any) => (
-                                                    <label key={batch.id} className={cn('flex items-start gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors', importBatchId === batch.id ? 'bg-blue-50 dark:bg-blue-500/10' : 'hover:bg-slate-100 dark:hover:bg-white/5')}>
+                                                    <label key={batch.id} className={cn('flex items-start gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors', importBatchIds.has(batch.id) ? 'bg-blue-50 dark:bg-blue-500/10' : 'hover:bg-slate-100 dark:hover:bg-white/5')}>
                                                         <input
                                                             type="checkbox"
-                                                            checked={importBatchId === batch.id}
-                                                            onChange={() => setImportBatchId(prev => prev === batch.id ? '' : batch.id)}
+                                                            checked={importBatchIds.has(batch.id)}
+                                                            onChange={() => toggleBatchId(batch.id)}
                                                             className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 accent-blue-500 cursor-pointer shrink-0"
                                                         />
                                                         <div className="min-w-0">
@@ -805,13 +932,14 @@ export default function ImportPreviewPage() {
                                 </div>
                             )}
 
+
                             {/* Adaptive column filters — lazy loaded */}
                             {filterableCols.map((colKey, idx) => (
                                 <FilterColumn
                                     key={colKey}
                                     colKey={colKey}
                                     accentIdx={idx}
-                                    batchId={importBatchId}
+                                    batchIds={Array.from(importBatchIds)}
                                     selectedVals={activeFilters[colKey] || new Set()}
                                     filterSearch={filterSearch}
                                     onToggle={toggleFilterValue}
@@ -844,7 +972,7 @@ export default function ImportPreviewPage() {
                                     <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-[100px] z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
                                         <span className="flex items-center gap-1.5">
                                             <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
-                                            IGNOU Status
+                                            Data
                                         </span>
                                     </th>
                                     <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-0 z-30 w-[100px] min-w-[100px]">
@@ -933,11 +1061,11 @@ export default function ImportPreviewPage() {
                                                     <Button
                                                         variant="outline" size="sm"
                                                         className="h-8 text-[11px] font-bold uppercase tracking-wider text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 whitespace-nowrap gap-1.5"
-                                                        onClick={() => { if (window.confirm('Promote this record to active Orders?')) promoteRowMutation.mutate(student.id) }}
+                                                        onClick={() => { if (window.confirm('Mark this record as an Order?')) promoteRowMutation.mutate(student.id) }}
                                                         disabled={isPromoting || promoteSelectionMutation.isPending}
                                                     >
                                                         {isPromoting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ArrowUpCircle className="w-3 h-3" />}
-                                                        Promote
+                                                        Mark as Order
                                                     </Button>
                                                 </td>
                                             </tr>
@@ -1245,6 +1373,99 @@ export default function ImportPreviewPage() {
                     </div>
                 )
             })()}
+
+            {/* ── Segregation Modal ─────────────────────────────────────── */}
+            {showSegregateModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowSegregateModal(false)}>
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                    <div className="relative bg-background rounded-2xl border border-border shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-5 border-b border-border">
+                            <div>
+                                <h3 className="font-bold text-base flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-violet-500" />
+                                    Segregate Data
+                                </h3>
+                                <p className="text-sm text-muted-foreground mt-0.5">Split records round-robin per programme among selected team members</p>
+                            </div>
+                            <button onClick={() => setShowSegregateModal(false)} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                            <div className="rounded-lg bg-slate-50 dark:bg-white/5 p-3 text-sm space-y-1">
+                                <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-2">Applied Scope</p>
+                                <p><span className="text-muted-foreground">Batches: </span>{importBatchIds.size > 0 ? `${importBatchIds.size} selected` : 'All'}</p>
+                                <p><span className="text-muted-foreground">Programme: </span>{activeFilters['Programme']?.size > 0 ? Array.from(activeFilters['Programme']).join(', ') : 'All programmes'}</p>
+                                <p><span className="text-muted-foreground">Visible records: </span>{formatNumber(pagination.total)}</p>
+                            </div>
+
+                            <div>
+                                <p className="font-semibold text-sm mb-3">Select Team Members</p>
+                                {teamMembers.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground italic">Loading…</p>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto">
+                                        <label className={cn('col-span-full flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer border transition-colors font-semibold text-sm', selectedAssignees.length === teamMembers.length && teamMembers.length > 0 ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-300 dark:border-violet-500/40' : 'border-border hover:bg-slate-50 dark:hover:bg-white/5')}>
+                                            <input type="checkbox" checked={selectedAssignees.length === teamMembers.length && teamMembers.length > 0} onChange={() => setSelectedAssignees(selectedAssignees.length === teamMembers.length ? [] : teamMembers.map((m: any) => m.id))} className="w-4 h-4 rounded accent-violet-500 cursor-pointer" />
+                                            Select All ({teamMembers.length})
+                                        </label>
+                                        {teamMembers.map((m: any) => (
+                                            <label key={m.id} className={cn('flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer border transition-colors', selectedAssignees.includes(m.id) ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-300 dark:border-violet-500/40' : 'border-border hover:bg-slate-50 dark:hover:bg-white/5')}>
+                                                <input type="checkbox" checked={selectedAssignees.includes(m.id)} onChange={() => setSelectedAssignees(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])} className="w-4 h-4 rounded accent-violet-500 cursor-pointer" />
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium truncate">{m.fullName}</p>
+                                                    <p className="text-xs text-muted-foreground">{m.role === 'STAFF' ? m.staffRole : m.role}</p>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {segregatePlan && segregatePlan.length > 0 && (
+                                <div>
+                                    <p className="font-semibold text-sm mb-2 text-emerald-600 dark:text-emerald-400">Preview Plan</p>
+                                    <div className="rounded-lg border border-border overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead><tr className="bg-slate-50 dark:bg-white/5 text-left">
+                                                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground">Assignee</th>
+                                                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground">Programme</th>
+                                                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground text-right">Records</th>
+                                            </tr></thead>
+                                            <tbody>
+                                                {segregatePlan.map((row: any, i: number) => (
+                                                    <tr key={i} className="border-t border-border">
+                                                        <td className="px-3 py-2 font-medium">{row.assigneeName}</td>
+                                                        <td className="px-3 py-2 text-muted-foreground">{row.programme}</td>
+                                                        <td className="px-3 py-2 text-right font-semibold">{formatNumber(row.count)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                            {segregatePlan && segregatePlan.length === 0 && (
+                                <p className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-500/10 rounded-lg px-3 py-2">No records matched the current filter scope.</p>
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t border-border flex items-center justify-between gap-3">
+                            <Button variant="outline" onClick={() => setShowSegregateModal(false)}>Cancel</Button>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" className="gap-2" onClick={handleSegregatePreview} disabled={selectedAssignees.length === 0}>
+                                    <RefreshCw className="w-4 h-4" />Preview
+                                </Button>
+                                <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleSegregateApply} disabled={!segregatePlan || segregatePlan.length === 0 || segregateMutation.isPending}>
+                                    {segregateMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                                    Apply Segregation
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     )

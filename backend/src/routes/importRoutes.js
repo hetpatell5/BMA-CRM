@@ -292,7 +292,7 @@ router.get('/resume/:importId', async (req, res, next) => {
 router.post('/process/:importId', async (req, res, next) => {
     try {
         const { importId } = req.params;
-        const { columnMapping, duplicateHandling = 'skip', filePath } = req.body;
+        const { columnMapping, duplicateHandling = 'force', filePath } = req.body;
 
         if (!columnMapping || Object.keys(columnMapping).length === 0) {
             return res.status(400).json({
@@ -567,11 +567,15 @@ router.post('/process/:importId', async (req, res, next) => {
                         };
 
                         // Add optional standard fields
-                        if (mappedData.enrollmentNo) studentData.enrollmentNo = mappedData.enrollmentNo;
+                        // When duplicateHandling === 'force', skip unique-indexed fields
+                        // (enrollmentNo, email, phone) to avoid DB unique-constraint errors.
+                        // These values are still fully preserved in customFields.
+                        const skipUnique = duplicateHandling === 'force';
+                        if (!skipUnique && mappedData.enrollmentNo) studentData.enrollmentNo = mappedData.enrollmentNo;
+                        if (!skipUnique && mappedData.email)        studentData.email = mappedData.email;
+                        if (!skipUnique && mappedData.phone)        studentData.phone = mappedData.phone;
                         if (mappedData.controlNumber) studentData.controlNumber = mappedData.controlNumber;
-                        if (mappedData.email) studentData.email = mappedData.email;
                         if (mappedData.alternateEmail) studentData.alternateEmail = mappedData.alternateEmail;
-                        if (mappedData.phone) studentData.phone = mappedData.phone;
                         if (mappedData.alternatePhone) studentData.alternatePhone = mappedData.alternatePhone;
                         if (mappedData.programme) studentData.programme = mappedData.programme;
                         if (mappedData.course) studentData.course = mappedData.course;
@@ -590,10 +594,6 @@ router.post('/process/:importId', async (req, res, next) => {
                         if (mappedData.customFields && Object.keys(mappedData.customFields).length > 0) {
                             studentData.customFields = mappedData.customFields;
                         }
-
-                        // For excel imports the Control Number comes from the sheet — skip the
-                        // per-row order-ID generator (it's a major speed bottleneck at 380k rows).
-                        // The orderIdService is still called for manual/form_submission records.
 
                         studentsToCreate.push(studentData);
                     } else {
@@ -658,7 +658,7 @@ router.post('/process/:importId', async (req, res, next) => {
                 try {
                     const result = await prisma.student.createMany({
                         data: studentsToCreate,
-                        skipDuplicates: duplicateHandling === 'skip', // Skip if enrollment already exists
+                        skipDuplicates: duplicateHandling === 'skip',
                     });
                     imported += result.count;
                     skipped += studentsToCreate.length - result.count; // Difference is skipped duplicates

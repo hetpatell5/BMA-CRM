@@ -344,7 +344,12 @@ router.get('/export/excel', async (req, res, next) => {
             where.source = { not: 'excel_import' };
         }
 
-        if (importBatchId) where.importBatchId = BigInt(importBatchId);
+        if (importBatchId) {
+            where.importBatchId = BigInt(importBatchId);
+        } else if (req.query.importBatchIds) {
+            const bids = String(req.query.importBatchIds).split(',').map(s => s.trim()).filter(Boolean);
+            if (bids.length > 0) where.importBatchId = { in: bids.map(id => BigInt(id)) };
+        }
 
         if (search) {
             where.OR = [
@@ -865,7 +870,13 @@ router.get('/', async (req, res, next) => {
         if (subject) {
             where.subjects = { array_contains: [subject] };
         }
-        if (importBatchId) where.importBatchId = BigInt(importBatchId);
+        if (importBatchId) {
+            where.importBatchId = BigInt(importBatchId);
+        } else if (req.query.importBatchIds) {
+            // Multi-select batch filter: ?importBatchIds=1,2,3
+            const bids = String(req.query.importBatchIds).split(',').map(s => s.trim()).filter(Boolean);
+            if (bids.length > 0) where.importBatchId = { in: bids.map(id => BigInt(id)) };
+        }
         if (source) {
             if (source === '!excel_import') {
                 where.source = { not: 'excel_import' };
@@ -895,6 +906,11 @@ router.get('/', async (req, res, next) => {
         if (req.user.role === 'STAFF' && !isTelecaller) {
             where.assignedGuideId = req.user.id;
         }
+        // Telecallers on the Data page see only records where _telecallerOwners includes their user ID
+        if (isTelecaller && where.source === 'excel_import') {
+            // We'll filter via raw SQL intersection after the cfFilter step below
+            // Store flag so we can apply it post-cf-filter
+        }
 
         // If custom field filters are present, get matching IDs via raw SQL first
         if (cfFilterEntries.length > 0) {
@@ -917,6 +933,22 @@ router.get('/', async (req, res, next) => {
                 where.id.in = where.id.in.filter(id => cfMatchingIds.includes(Number(id)));
             } else {
                 where.id = { in: cfMatchingIds.map(id => BigInt(id)) };
+            }
+        }
+
+        // Telecallers: only see excel_import records assigned to them via _telecallerOwners
+        if (isTelecaller && where.source === 'excel_import') {
+            const telecallerId = req.user.id;
+            const ownerRows = await prisma.$queryRawUnsafe(
+                `SELECT id FROM students WHERE JSON_SEARCH(JSON_EXTRACT(custom_fields, '$._telecallerOwners'), 'one', ?, NULL, '$[*].id') IS NOT NULL`,
+                String(telecallerId)
+            );
+            const ownerIds = ownerRows.map(r => BigInt(r.id));
+            if (where.id && where.id.in) {
+                const existing = new Set(where.id.in.map(id => BigInt(id).toString()));
+                where.id.in = ownerIds.filter(id => existing.has(id.toString()));
+            } else {
+                where.id = { in: ownerIds };
             }
         }
 
@@ -1300,11 +1332,7 @@ router.delete('/:id', async (req, res, next) => {
 // Promote a single imported student row to the main orders page
 router.post('/promote-import/:id', async (req, res, next) => {
     try {
-        const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
-        if (!isAdmin) {
-            return res.status(403).json({ success: false, message: 'Insufficient permissions' });
-        }
-
+        // All authenticated users can mark an imported row as an order
         const studentId = BigInt(req.params.id);
         const student = await prisma.student.findUnique({
             where: { id: studentId }
@@ -1366,6 +1394,120 @@ router.post('/promote-import-batch/:importBatchId', async (req, res, next) => {
             data: {
                 count: result.count
             }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Segregate imported students among selected team members, split by programme
+// POST /api/students/segregate
+router.post('/segregate', async (req, res, next) => {
+    try {
+        const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
+        if (!isAdmin) {
+            return res.status(403).json({ success: false, message: 'Only admins and managers can segregate data' });
+        }
+
+        const { assigneeIds, importBatchIds: batchIdsRaw, programmes: programmesFilter, customField: cfRaw, dryRun } = req.body;
+
+        if (!assigneeIds || !Array.isArray(assigneeIds) || assigneeIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'assigneeIds array is required' });
+        }
+
+        // Build where clause
+        const where = { source: 'excel_import' };
+        if (batchIdsRaw && Array.isArray(batchIdsRaw) && batchIdsRaw.length > 0) {
+            where.importBatchId = { in: batchIdsRaw.map(id => BigInt(id)) };
+        }
+
+        // Validate assignees are real active users
+        const assignees = await prisma.user.findMany({
+            where: { id: { in: assigneeIds.map(Number) }, status: 'ACTIVE' },
+            select: { id: true, fullName: true, role: true, staffRole: true },
+        });
+        if (assignees.length === 0) {
+            return res.status(400).json({ success: false, message: 'No valid assignee IDs provided' });
+        }
+
+        // Apply customField filters if provided
+        let matchingIds = null;
+        if (cfRaw && typeof cfRaw === 'object') {
+            const cfEntries = Object.entries(cfRaw).filter(([k, v]) => k && v);
+            if (cfEntries.length > 0) {
+                const cfWhereParts = cfEntries.map(([k, v]) => {
+                    const ek = k.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    const vals = String(v).split(',').map(s => s.trim()).filter(Boolean);
+                    return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${ek}"')) IN (${vals.map(() => '?').join(', ')})`;
+                });
+                const cfParams = cfEntries.flatMap(([, v]) => String(v).split(',').map(s => s.trim()).filter(Boolean));
+                const rows = await prisma.$queryRawUnsafe(
+                    `SELECT id FROM students WHERE ${cfWhereParts.join(' AND ')}`, ...cfParams
+                );
+                matchingIds = rows.map(r => BigInt(r.id));
+            }
+        }
+        if (matchingIds !== null) {
+            where.id = { in: matchingIds };
+        }
+
+        // Fetch all matching students
+        const students = await prisma.student.findMany({
+            where,
+            select: { id: true, programme: true, customFields: true },
+            orderBy: { id: 'asc' },
+        });
+
+        // Group by programme
+        const byProgramme = {};
+        for (const s of students) {
+            const cf = s.customFields && typeof s.customFields === 'object' ? s.customFields : {};
+            const prog = s.programme || cf['Programme'] || cf['PROGRAMME'] || cf['programme'] || 'Unknown';
+            if (!byProgramme[prog]) byProgramme[prog] = [];
+            byProgramme[prog].push(s.id);
+        }
+
+        // Filter to requested programmes if provided
+        if (programmesFilter && Array.isArray(programmesFilter) && programmesFilter.length > 0) {
+            for (const k of Object.keys(byProgramme)) {
+                if (!programmesFilter.includes(k)) delete byProgramme[k];
+            }
+        }
+
+        // Round-robin split per programme per assignee
+        const plan = [];
+        const ownershipUpdates = [];
+        for (const [prog, ids] of Object.entries(byProgramme)) {
+            const chunks = Array.from({ length: assignees.length }, () => []);
+            ids.forEach((id, i) => chunks[i % assignees.length].push(id));
+            chunks.forEach((chunk, i) => {
+                if (chunk.length === 0) return;
+                const a = assignees[i];
+                plan.push({ assigneeId: a.id, assigneeName: a.fullName, programme: prog, count: chunk.length, studentIds: chunk.map(id => id.toString()) });
+                chunk.forEach(id => ownershipUpdates.push({ studentId: id, assigneeId: a.id, assigneeName: a.fullName }));
+            });
+        }
+
+        if (dryRun) {
+            return res.json({ success: true, data: { plan, totalStudents: students.length } });
+        }
+
+        // Apply ownership: set _telecallerOwners in customFields for each student
+        const BATCH = 200;
+        for (let i = 0; i < ownershipUpdates.length; i += BATCH) {
+            const slice = ownershipUpdates.slice(i, i + BATCH);
+            await Promise.all(slice.map(({ studentId, assigneeId, assigneeName }) =>
+                prisma.$executeRaw`
+                    UPDATE students
+                    SET custom_fields = JSON_SET(COALESCE(custom_fields, '{}'), '$._telecallerOwners', JSON_ARRAY(JSON_OBJECT('id', ${assigneeId}, 'name', ${assigneeName})))
+                    WHERE id = ${studentId}`
+            ));
+        }
+
+        res.json({
+            success: true,
+            message: `Segregated ${students.length} records among ${assignees.length} members`,
+            data: { plan, totalStudents: students.length }
         });
     } catch (error) {
         next(error);
