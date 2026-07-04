@@ -114,11 +114,33 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
             const workbook = XLSX.readFile(req.file.path);
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            headers   = jsonData[0] || [];
-            totalRows = jsonData.length - 1;
-            previewData = XLSX.utils.sheet_to_json(worksheet).slice(0, 10);
-            previewRows = jsonData.slice(1, 6);
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
+            // Find the first row that actually has some string content (to skip blank or title rows)
+            const headerRowIndex = jsonData.findIndex(row => 
+                Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
+            );
+            
+            if (headerRowIndex !== -1) {
+                headers = jsonData[headerRowIndex] || [];
+                const dataRows = jsonData.slice(headerRowIndex + 1).filter(row => 
+                    Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
+                );
+                totalRows = dataRows.length;
+                previewRows = dataRows.slice(0, 5);
+                
+                // For previewData (Object format)
+                previewData = [];
+                previewRows.forEach(row => {
+                    const obj = {};
+                    headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
+                    previewData.push(obj);
+                });
+            } else {
+                headers = [];
+                totalRows = 0;
+                previewRows = [];
+                previewData = [];
+            }
         }
 
         // Create import history record
@@ -380,9 +402,20 @@ router.post('/process/:importId', async (req, res, next) => {
             const workbook = XLSX.readFile(filePath2);
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            headers  = jsonData[0];
-            dataRows = jsonData.slice(1);
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
+            const headerRowIndex = jsonData.findIndex(row => 
+                Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
+            );
+            
+            if (headerRowIndex !== -1) {
+                headers = jsonData[headerRowIndex] || [];
+                dataRows = jsonData.slice(headerRowIndex + 1).filter(row => 
+                    Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
+                );
+            } else {
+                headers = [];
+                dataRows = [];
+            }
         }
 
         // Get Socket.IO instance

@@ -604,6 +604,7 @@ model DailyFollowUp {
   description  String   @db.Text
   requirement  String   @db.Text
   followupDate DateTime @map("followup_date")
+  status       String   @default("PENDING") // PENDING or COMPLETED
 
   createdById  Int      @map("created_by")
   createdBy    User     @relation("CreatedFollowUps", fields: [createdById], references: [id])

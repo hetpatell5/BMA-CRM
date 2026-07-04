@@ -77,12 +77,13 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { description, requirement, followupDate } = req.body;
+        const { description, requirement, followupDate, status } = req.body;
 
         const updateData = {};
         if (description !== undefined) updateData.description = description;
         if (requirement !== undefined) updateData.requirement = requirement;
         if (followupDate !== undefined) updateData.followupDate = new Date(followupDate);
+        if (status !== undefined) updateData.status = status;
 
         const followUp = await prisma.dailyFollowUp.update({
             where: { id: BigInt(id) },

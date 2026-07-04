@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2, Trash2 } from 'lucide-react'
+import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2, Trash2, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -80,15 +80,18 @@ export default function FollowUpsPage() {
     const [followupDate, setFollowupDate] = useState('')
     const [requirement, setRequirement] = useState('')
 
+    const pendingFollowUps = useMemo(() => followUps.filter(f => f.status !== 'COMPLETED'), [followUps])
+    const completedFollowUps = useMemo(() => followUps.filter(f => f.status === 'COMPLETED'), [followUps])
+
     // Near to followup date (deadline within next 24 hours, or past due)
     const upcomingFollowUps = useMemo(() => {
         const now = new Date()
         const tomorrow = addDays(startOfDay(now), 1)
-        return followUps.filter(f => {
+        return pendingFollowUps.filter(f => {
             const fDate = new Date(f.followupDate)
             return isBefore(fDate, tomorrow)
         })
-    }, [followUps])
+    }, [pendingFollowUps])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -119,6 +122,16 @@ export default function FollowUpsPage() {
             toast({ title: 'Follow-up deleted' })
         } catch {
             toast({ title: 'Failed to delete follow-up', variant: 'destructive' })
+        }
+    }
+
+    const handleComplete = async (id: string) => {
+        if (!window.confirm("Are you sure you want to mark this follow-up as complete?")) return;
+        try {
+            await updateFollowUp(id, { status: 'COMPLETED' })
+            toast({ title: 'Follow-up marked as completed' })
+        } catch {
+            toast({ title: 'Failed to complete follow-up', variant: 'destructive' })
         }
     }
 
@@ -256,21 +269,21 @@ export default function FollowUpsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                            {isLoading && followUps.length === 0 ? (
+                            {isLoading && pendingFollowUps.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="p-16 text-center">
                                         <Loader2 className="w-8 h-8 mx-auto mb-4 text-primary animate-spin" />
                                         <p className="text-sm text-muted-foreground">Loading follow-ups...</p>
                                     </td>
                                 </tr>
-                            ) : followUps.length === 0 ? (
+                            ) : pendingFollowUps.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="p-16 text-center">
                                         <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center mx-auto mb-4">
                                             <ClipboardList className="w-8 h-8 text-muted-foreground/40" />
                                         </div>
                                         <p className="text-base font-semibold mb-1.5 text-slate-700 dark:text-white">
-                                            {searchQuery ? 'No results found' : 'No follow-ups found'}
+                                            {searchQuery ? 'No results found' : 'No pending follow-ups found'}
                                         </p>
                                         <p className="text-sm text-muted-foreground">
                                             {searchQuery ? `No follow-ups match "${searchQuery}".` : 'Start by adding a new follow-up for your daily tasks.'}
@@ -278,7 +291,7 @@ export default function FollowUpsPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                followUps.map((f) => {
+                                pendingFollowUps.map((f) => {
                                     const isUrgent = upcomingFollowUps.some(u => u.id === f.id)
                                     return (
                                         <tr key={f.id} className={`group hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-all duration-200 ${isUrgent ? 'bg-amber-50/50 dark:bg-amber-500/[0.03]' : ''}`}>
@@ -313,9 +326,14 @@ export default function FollowUpsPage() {
                                                 </span>
                                             </td>
                                             <td className="px-5 py-4">
-                                                <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all text-xs font-bold gap-1.5">
-                                                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                                                </Button>
+                                                <div className="flex gap-2">
+                                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all text-xs font-bold gap-1.5">
+                                                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-8 px-3 rounded-lg text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 transition-all text-xs font-bold gap-1.5">
+                                                        <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     )
@@ -325,6 +343,52 @@ export default function FollowUpsPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Completed Follow-ups */}
+            {completedFollowUps.length > 0 && (
+                <div className="mt-8 space-y-4">
+                    <div>
+                        <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                            Completed Follow-ups
+                        </h2>
+                        <p className="text-sm text-muted-foreground">Successfully resolved tasks.</p>
+                    </div>
+                    <div className="rounded-[20px] bg-slate-50/50 dark:bg-white/[0.01] border border-slate-200/50 dark:border-white/5 overflow-hidden transition-colors">
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[860px] border-collapse">
+                                <thead>
+                                    <tr className="text-left text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 bg-slate-100/50 dark:bg-white/[0.02]">
+                                        <th className="px-5 py-3">Date</th>
+                                        <th className="px-5 py-3">Name</th>
+                                        <th className="px-5 py-3">Number</th>
+                                        <th className="px-5 py-3">Description</th>
+                                        <th className="px-5 py-3">Requirement</th>
+                                        <th className="px-5 py-3">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-white/5 opacity-80">
+                                    {completedFollowUps.map((f) => (
+                                        <tr key={f.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
+                                            <td className="px-5 py-3 text-[13px] text-slate-500">{format(new Date(f.followupDate), 'MMM dd, yyyy')}</td>
+                                            <td className="px-5 py-3 text-[13px] font-medium text-slate-700 dark:text-slate-300">{f.name}</td>
+                                            <td className="px-5 py-3 text-[13px] font-mono text-slate-500">{f.number}</td>
+                                            <td className="px-5 py-3 text-[13px] text-slate-500 truncate max-w-[200px]">{f.description}</td>
+                                            <td className="px-5 py-3 text-[13px] text-slate-500 truncate max-w-[200px]">{f.requirement}</td>
+                                            <td className="px-5 py-3">
+                                                <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-7 px-2.5 rounded-lg text-red-500/70 hover:text-red-600 hover:bg-red-500/10 transition-all text-[11px] font-bold gap-1.5">
+                                                    <Trash2 className="w-3 h-3" /> Delete
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             {/* Follow-up Details Dialog */}
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>

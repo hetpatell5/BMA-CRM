@@ -8,6 +8,7 @@ export interface FollowUp {
     description: string;
     followupDate: string;
     requirement: string;
+    status: string;
     createdAt: string;
     updatedAt: string;
     createdById: number;
@@ -19,9 +20,10 @@ interface FollowUpState {
     isLoading: boolean;
     fetchFollowUps: (search?: string) => Promise<void>;
     addFollowUp: (followUp: { name: string; number: string; description: string; followupDate: string; requirement: string }) => Promise<void>;
-    updateFollowUp: (id: string, data: Partial<Pick<FollowUp, 'description' | 'requirement' | 'followupDate'>>) => Promise<void>;
+    updateFollowUp: (id: string, data: Partial<Pick<FollowUp, 'description' | 'requirement' | 'followupDate' | 'status'>>) => Promise<void>;
     removeFollowUp: (id: string) => Promise<void>;
 }
+
 
 export const useFollowUpStore = create<FollowUpState>()((set) => ({
     followUps: [],
