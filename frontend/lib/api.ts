@@ -292,7 +292,7 @@ export const appSettingsAPI = {
 
 // Follow-ups API
 export const followUpsAPI = {
-    getAll: (search?: string) => api.get('/follow-ups', { params: search ? { search } : {} }),
+    getAll: (params?: { search?: string, status?: string, page?: number, limit?: number }) => api.get('/follow-ups', { params }),
     create: (data: any) => api.post('/follow-ups', data),
     update: (id: string, data: any) => api.put(`/follow-ups/${id}`, data),
     remove: (id: string) => api.delete(`/follow-ups/${id}`),

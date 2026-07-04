@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2, Trash2, CheckCircle2 } from 'lucide-react'
+import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2, Trash2, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,7 +13,13 @@ import { format, isBefore, addDays, startOfDay } from 'date-fns'
 
 export default function FollowUpsPage() {
     const { user } = useAuthStore()
-    const { followUps, isLoading, fetchFollowUps, addFollowUp, updateFollowUp, removeFollowUp } = useFollowUpStore()
+    const { 
+        pendingFollowUps, completedFollowUps,
+        pendingMeta, completedMeta,
+        isLoadingPending, isLoadingCompleted,
+        fetchPendingFollowUps, fetchCompletedFollowUps,
+        addFollowUp, updateFollowUp, removeFollowUp 
+    } = useFollowUpStore()
     const { toast } = useToast()
     const [open, setOpen] = useState(false)
     const [detailsOpen, setDetailsOpen] = useState(false)
@@ -26,16 +32,18 @@ export default function FollowUpsPage() {
 
     // Fetch follow-ups from backend on mount
     useEffect(() => {
-        fetchFollowUps()
-    }, [fetchFollowUps])
+        fetchPendingFollowUps(1)
+        fetchCompletedFollowUps(1)
+    }, [fetchPendingFollowUps, fetchCompletedFollowUps])
 
     // Debounced search
     useEffect(() => {
         const timer = setTimeout(() => {
-            fetchFollowUps(searchQuery || undefined)
+            fetchPendingFollowUps(1, searchQuery || undefined)
+            fetchCompletedFollowUps(1, searchQuery || undefined)
         }, 400)
         return () => clearTimeout(timer)
-    }, [searchQuery, fetchFollowUps])
+    }, [searchQuery, fetchPendingFollowUps, fetchCompletedFollowUps])
 
     const handleNumberClick = (f: FollowUp) => {
         setSelectedFollowUp(f)
@@ -80,8 +88,7 @@ export default function FollowUpsPage() {
     const [followupDate, setFollowupDate] = useState('')
     const [requirement, setRequirement] = useState('')
 
-    const pendingFollowUps = useMemo(() => followUps.filter(f => f.status !== 'COMPLETED'), [followUps])
-    const completedFollowUps = useMemo(() => followUps.filter(f => f.status === 'COMPLETED'), [followUps])
+    // Removed local filter arrays since they are managed by the store
 
     // Near to followup date (deadline within next 24 hours, or past due)
     const upcomingFollowUps = useMemo(() => {
@@ -269,7 +276,7 @@ export default function FollowUpsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                            {isLoading && pendingFollowUps.length === 0 ? (
+                            {isLoadingPending && pendingFollowUps.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="p-16 text-center">
                                         <Loader2 className="w-8 h-8 mx-auto mb-4 text-primary animate-spin" />
@@ -341,6 +348,19 @@ export default function FollowUpsPage() {
                             )}
                         </tbody>
                     </table>
+                    {pendingMeta.totalPages > 1 && (
+                        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.01]">
+                            <p className="text-xs text-slate-500 font-medium">Page {pendingMeta.page} of {pendingMeta.totalPages}</p>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => fetchPendingFollowUps(pendingMeta.page - 1, searchQuery)} disabled={pendingMeta.page === 1}>
+                                    <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => fetchPendingFollowUps(pendingMeta.page + 1, searchQuery)} disabled={pendingMeta.page >= pendingMeta.totalPages}>
+                                    <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -384,6 +404,19 @@ export default function FollowUpsPage() {
                                     ))}
                                 </tbody>
                             </table>
+                            {completedMeta.totalPages > 1 && (
+                                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.01]">
+                                    <p className="text-xs text-slate-500 font-medium">Page {completedMeta.page} of {completedMeta.totalPages}</p>
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => fetchCompletedFollowUps(completedMeta.page - 1, searchQuery)} disabled={completedMeta.page === 1}>
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </Button>
+                                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => fetchCompletedFollowUps(completedMeta.page + 1, searchQuery)} disabled={completedMeta.page >= completedMeta.totalPages}>
+                                            <ChevronRight className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

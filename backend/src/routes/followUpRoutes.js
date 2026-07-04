@@ -6,14 +6,21 @@ const router = express.Router();
 // Helper to serialize BigInt
 BigInt.prototype.toJSON = function () { return this.toString() }
 
-// GET /api/follow-ups — List all follow-ups (with optional search)
+// GET /api/follow-ups — List follow-ups with pagination and filters
 router.get('/', async (req, res) => {
     try {
-        const { search } = req.query;
+        const { search, status, page = 1, limit = 10 } = req.query;
+        const pageNumber = parseInt(page, 10);
+        const pageSize = parseInt(limit, 10);
+        const skip = (pageNumber - 1) * pageSize;
 
         const where = { createdById: req.user.id };
 
-        // Optional search filter — search by name, number, or description
+        if (status) {
+            where.status = status;
+        }
+
+        // Optional search filter — search by name, number, description, or requirement
         if (search && search.trim()) {
             const s = search.trim();
             where.OR = [
@@ -24,17 +31,31 @@ router.get('/', async (req, res) => {
             ];
         }
 
-        const followUps = await prisma.dailyFollowUp.findMany({
-            where,
-            orderBy: { createdAt: 'desc' },
-            include: {
-                createdBy: {
-                    select: { id: true, fullName: true }
+        const [followUps, total] = await Promise.all([
+            prisma.dailyFollowUp.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: pageSize,
+                include: {
+                    createdBy: {
+                        select: { id: true, fullName: true }
+                    }
                 }
+            }),
+            prisma.dailyFollowUp.count({ where })
+        ]);
+
+        res.json({ 
+            success: true, 
+            data: followUps,
+            meta: {
+                total,
+                page: pageNumber,
+                limit: pageSize,
+                totalPages: Math.ceil(total / pageSize)
             }
         });
-
-        res.json({ success: true, data: followUps });
     } catch (error) {
         console.error('Error fetching follow-ups:', error);
         res.status(500).json({ success: false, error: error.message });
