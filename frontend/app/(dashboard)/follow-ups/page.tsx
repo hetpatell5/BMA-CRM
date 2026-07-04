@@ -522,7 +522,7 @@ export default function FollowUpsPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin">
-                                    {followUps
+                                    {[...pendingFollowUps, ...completedFollowUps]
                                         .filter(f => f.number === selectedFollowUp.number)
                                         .sort((a, b) => new Date(a.followupDate).getTime() - new Date(b.followupDate).getTime())
                                         .map(f => (
