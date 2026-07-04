@@ -213,7 +213,7 @@ export default function FollowUpsPage() {
                         onChange={e => setSearchQuery(e.target.value)}
                         className="pl-11 h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 focus:border-primary text-[14px] placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
-                    {isLoading && (
+                    {(isLoadingPending || isLoadingCompleted) && (
                         <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
                     )}
                 </div>
