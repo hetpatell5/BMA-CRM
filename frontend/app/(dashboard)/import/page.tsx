@@ -257,13 +257,20 @@ export default function ImportPage() {
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
+        onDropRejected: (files) => {
+            toast({
+                title: 'File not accepted',
+                description: files[0]?.errors?.[0]?.message || 'Only .xlsx, .xls and .csv files are allowed',
+                variant: 'destructive',
+            })
+        },
         accept: {
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
             'application/vnd.ms-excel': ['.xls'],
             'text/csv': ['.csv'],
         },
         maxFiles: 1,
-        maxSize: 100 * 1024 * 1024,
+        // No maxSize — chunked upload handles files of any size
     })
 
     // Warn user if they try to leave during processing
