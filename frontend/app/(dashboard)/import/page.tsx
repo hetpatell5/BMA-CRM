@@ -471,52 +471,47 @@ export default function ImportPage() {
                             Our smart AI has matched your columns automatically. Unknown columns are marked as <span className="text-amber-500">Custom Fields</span> so you never lose any data.
                         </p>
 
-                        <div className="space-y-3">
+                        <div className="border border-border/60 rounded-xl overflow-hidden bg-card">
                             {uploadData.mappingResults?.map((res: any) => {
                                 const state = getMappingState(res)
                                 const isCustom = columnMapping[res.index]?.startsWith('customField.')
                                 
                                 return (
-                                    <div key={res.index} className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-sm ${state.bg}`}>
-                                        <div className="flex-1 min-w-0 flex items-center gap-3">
-                                            <div className="min-w-[150px]">
-                                                <p className="text-sm font-bold truncate text-foreground" title={res.displayLabel}>
-                                                    {res.displayLabel}
-                                                </p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className={`text-[10px] uppercase font-bold tracking-wider ${state.color}`}>Match: {res.matchType}</span>
-                                                    {res.confidence > 0 && (
-                                                        <span className={`text-[10px] uppercase font-bold tracking-wider ${res.confidence >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                                                            {res.confidence}% Conf.
-                                                        </span>
-                                                    )}
-                                                </div>
+                                    <div key={res.index} className="flex items-center gap-3 p-2 border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
+                                        <div className="w-[200px] shrink-0">
+                                            <p className="text-sm font-medium truncate text-foreground" title={res.displayLabel}>
+                                                {res.displayLabel}
+                                            </p>
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <span className="text-[10px] uppercase font-medium text-muted-foreground">{res.matchType}</span>
+                                                {res.confidence > 0 && (
+                                                    <span className="text-[10px] uppercase font-medium text-muted-foreground">
+                                                        {res.confidence}% Conf.
+                                                    </span>
+                                                )}
                                             </div>
-                                            <ArrowRight className="w-4 h-4 text-muted-foreground hidden sm:block opacity-40" />
                                         </div>
-
-                                        <div className="flex-shrink-0 w-full sm:w-64">
-                                            <div className="relative">
-                                                <select
-                                                    value={columnMapping[res.index] || '__skip__'}
-                                                    onChange={(e) => setColumnMapping({ ...columnMapping, [res.index]: e.target.value })}
-                                                    className={`w-full h-10 pl-3 pr-8 rounded-lg bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all cursor-pointer font-semibold shadow-sm appearance-none ${state.color}`}
-                                                >
-                                                    <option value="__skip__" className="text-slate-500">-- Skip Column --</option>
-                                                    <optgroup label="Custom Field (No loss)" className="text-foreground">
-                                                        <option value={`customField.${res.customFieldKey || 'unknown'}`} className="text-amber-600 dark:text-amber-500">
-                                                            📦 Custom Field: {res.customFieldKey}
-                                                        </option>
-                                                    </optgroup>
-                                                    <optgroup label="CRM Fields" className="text-foreground">
-                                                        {uploadData.availableFields.map((field: string) => (
-                                                            <option key={field} value={field} className="text-foreground">✓ {field}</option>
-                                                        ))}
-                                                    </optgroup>
-                                                </select>
-                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground">
-                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                                                </div>
+                                        <ArrowRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                                        <div className="flex-1 relative">
+                                            <select
+                                                value={columnMapping[res.index] || '__skip__'}
+                                                onChange={(e) => setColumnMapping({ ...columnMapping, [res.index]: e.target.value })}
+                                                className="w-full h-8 pl-3 pr-8 rounded-md bg-transparent border-none text-sm hover:bg-muted/50 focus:ring-1 focus:ring-primary outline-none transition-colors cursor-pointer appearance-none"
+                                            >
+                                                <option value="__skip__" className="text-muted-foreground">-- Skip Column --</option>
+                                                <optgroup label="Custom Field" className="text-foreground">
+                                                    <option value={`customField.${res.customFieldKey || 'unknown'}`}>
+                                                        Custom: {res.customFieldKey}
+                                                    </option>
+                                                </optgroup>
+                                                <optgroup label="CRM Fields" className="text-foreground">
+                                                    {uploadData.availableFields.map((field: string) => (
+                                                        <option key={field} value={field}>✓ {field}</option>
+                                                    ))}
+                                                </optgroup>
+                                            </select>
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground">
+                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 9l-7 7-7-7"></path></svg>
                                             </div>
                                         </div>
                                     </div>
@@ -770,53 +765,38 @@ export default function ImportPage() {
             </div>
         </div>
 
-            {/* ── Unique Minimalist Glass Upload Modal ─────────────────── */}
+            {/* ── Professional Upload Progress Modal (Zoho/Linear Style) ── */}
             {uploadingFile && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050505]/60 backdrop-blur-md animate-in fade-in duration-500">
-                    <div className="relative w-[320px] rounded-[36px] border border-white/5 bg-white/[0.02] backdrop-blur-3xl shadow-[0_24px_80px_rgba(0,0,0,0.8)] overflow-hidden animate-in zoom-in-95 duration-500">
-                        
-                        {/* Soft inner glow */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-emerald-500/10 blur-[60px] rounded-full pointer-events-none" />
-
-                        <div className="flex flex-col items-center pt-10 pb-10 px-6 text-center relative z-10">
-                            
-                            {/* Single Clean Circular Progress */}
-                            <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
-                                <svg className="absolute inset-0 w-full h-full -rotate-90 overflow-visible" viewBox="0 0 100 100">
-                                    <circle 
-                                        cx="50" cy="50" r="47" fill="transparent" 
-                                        stroke="rgba(255,255,255,0.03)" strokeWidth="2" 
-                                    />
-                                    <circle 
-                                        cx="50" cy="50" r="47" fill="transparent" 
-                                        stroke="url(#progressGradient)" strokeWidth="4" strokeLinecap="round"
-                                        className="transition-all duration-300 ease-out" 
-                                        style={{ filter: 'drop-shadow(0 0 10px rgba(16,185,129,0.4))' }}
-                                        strokeDasharray={`${(uploadPct * 295.31) / 100} 295.31`} 
-                                    />
-                                    <defs>
-                                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#34d399" />
-                                            <stop offset="100%" stopColor="#059669" />
-                                        </linearGradient>
-                                    </defs>
-                                </svg>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 dark:bg-black/60 animate-in fade-in duration-200">
+                    <div className="w-[400px] rounded-xl border border-border bg-background shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                                {uploadPct >= 100 ? (
+                                    <Check className="w-5 h-5 text-primary" />
+                                ) : (
+                                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0 pt-0.5">
+                                <h3 className="text-[15px] font-semibold text-foreground leading-none mb-1.5">
+                                    {uploadPct >= 100 ? 'Upload complete' : uploadPct >= 50 ? 'Processing file...' : 'Uploading file...'}
+                                </h3>
+                                <p className="text-xs text-muted-foreground truncate mb-4">
+                                    {uploadingFile.name}
+                                </p>
                                 
-                                {/* Inner Content */}
-                                <div className="flex flex-col items-center justify-center gap-1">
-                                    <FileSpreadsheet className={`w-7 h-7 text-emerald-400/80 ${uploadPct >= 50 && uploadPct < 100 ? 'animate-pulse' : ''}`} />
-                                    <span className="text-xl font-bold text-white tracking-tight">
-                                        {Math.round(uploadPct)}<span className="text-xs text-white/50 ml-0.5">%</span>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                        <div 
+                                            className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
+                                            style={{ width: `${uploadPct}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-xs font-medium text-foreground w-8 text-right">
+                                        {Math.round(uploadPct)}%
                                     </span>
                                 </div>
                             </div>
-
-                            <h3 className="text-base font-semibold text-white/90 mb-1.5">
-                                {uploadPct >= 100 ? 'Upload Complete' : uploadPct >= 50 ? 'Processing Data...' : 'Uploading File...'}
-                            </h3>
-                            <p className="text-xs text-white/40 max-w-[220px] truncate">
-                                {uploadingFile.name}
-                            </p>
                         </div>
                     </div>
                 </div>
