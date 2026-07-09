@@ -29,7 +29,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+    limits: { fileSize: 300 * 1024 * 1024 }, // 300MB limit
     fileFilter: (req, file, cb) => {
         const allowedTypes = [
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -110,30 +110,43 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
                 }
             }
         } else {
-            // ── Standard XLSX/XLS path (unchanged) ───────────────────────────────
-            const workbook = XLSX.readFile(req.file.path);
+            // ── XLSX/XLS path — robust cell-by-cell reading ──────────────────────
+            const workbook = XLSX.readFile(req.file.path, {
+                cellDates: true,
+                cellNF: false,
+                cellText: false,
+                sheetStubs: true, // include empty/stub cells so sparse rows are detected
+            });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
-            // Find the first row that actually has some string content (to skip blank or title rows)
-            const headerRowIndex = jsonData.findIndex(row => 
-                Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
+
+            // Use defval:'' so every cell in sparse rows gets a value instead of being skipped
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+                header: 1,
+                defval: '',
+                blankrows: false,
+                raw: false, // format all values as strings so dates/numbers come through cleanly
+            });
+
+            // Find the first row with at least one non-empty string (skips blank/title rows)
+            const headerRowIndex = jsonData.findIndex(row =>
+                Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
             );
-            
+
             if (headerRowIndex !== -1) {
-                headers = jsonData[headerRowIndex] || [];
-                const dataRows = jsonData.slice(headerRowIndex + 1).filter(row => 
-                    Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
+                // Normalise headers — convert every value to a trimmed string
+                headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
+
+                const dataRows = jsonData.slice(headerRowIndex + 1).filter(row =>
+                    Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
                 );
                 totalRows = dataRows.length;
                 previewRows = dataRows.slice(0, 5);
-                
-                // For previewData (Object format)
-                previewData = [];
-                previewRows.forEach(row => {
+
+                previewData = previewRows.map(row => {
                     const obj = {};
                     headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
-                    previewData.push(obj);
+                    return obj;
                 });
             } else {
                 headers = [];
@@ -399,18 +412,28 @@ router.post('/process/:importId', async (req, res, next) => {
                 }
             }
         } else {
-            const workbook = XLSX.readFile(filePath2);
+            const workbook = XLSX.readFile(filePath2, {
+                cellDates: true,
+                cellNF: false,
+                cellText: false,
+                sheetStubs: true,
+            });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
-            const headerRowIndex = jsonData.findIndex(row => 
-                Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+                header: 1,
+                defval: '',
+                blankrows: false,
+                raw: false,
+            });
+            const headerRowIndex = jsonData.findIndex(row =>
+                Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
             );
-            
+
             if (headerRowIndex !== -1) {
-                headers = jsonData[headerRowIndex] || [];
-                dataRows = jsonData.slice(headerRowIndex + 1).filter(row => 
-                    Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
+                headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
+                dataRows = jsonData.slice(headerRowIndex + 1).filter(row =>
+                    Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
                 );
             } else {
                 headers = [];

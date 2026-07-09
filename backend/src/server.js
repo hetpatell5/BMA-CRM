@@ -131,8 +131,8 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // Body parsing
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '310mb' }));
+app.use(express.urlencoded({ extended: true, limit: '310mb' }));
 
 // Serve static files (like uploaded QR codes, passbooks)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
