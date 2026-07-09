@@ -195,6 +195,166 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
     }
 });
 
+// ── Chunked Upload: receive one chunk ────────────────────────────────────────
+// Each chunk is a small multipart POST (≤10 MB) — well under any Nginx limit.
+// Fields: uploadId, chunkIndex, totalChunks, importType
+// File field: chunk
+const chunkUpload = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+            const dir = `./uploads/chunks/${req.body.uploadId}`;
+            fs.mkdirSync(dir, { recursive: true });
+            cb(null, dir);
+        },
+        filename: (req, file, cb) => cb(null, `chunk-${req.body.chunkIndex}`),
+    }),
+    limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB per chunk
+});
+
+router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next) => {
+    try {
+        const { uploadId, chunkIndex, totalChunks } = req.body;
+        if (!uploadId || chunkIndex === undefined || !totalChunks) {
+            return res.status(400).json({ success: false, message: 'Missing chunk metadata' });
+        }
+        res.json({ success: true, received: Number(chunkIndex) + 1, total: Number(totalChunks) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// ── Chunked Upload: assemble all chunks and run normal preview ────────────────
+// Body (JSON): { uploadId, fileName, importType }
+router.post('/finalize-upload', async (req, res, next) => {
+    const chunkDir = `./uploads/chunks/${req.body.uploadId}`;
+    let finalPath = null;
+    try {
+        const { uploadId, fileName, importType = 'STUDENTS' } = req.body;
+        if (!uploadId || !fileName) {
+            return res.status(400).json({ success: false, message: 'Missing uploadId or fileName' });
+        }
+
+        // Count how many chunks arrived
+        const chunkFiles = fs.readdirSync(chunkDir)
+            .filter(f => f.startsWith('chunk-'))
+            .sort((a, b) => Number(a.split('-')[1]) - Number(b.split('-')[1]));
+
+        if (chunkFiles.length === 0) {
+            return res.status(400).json({ success: false, message: 'No chunks found' });
+        }
+
+        // Assemble into a single file
+        const ext = path.extname(fileName);
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        finalPath = `./uploads/import-${uniqueSuffix}${ext}`;
+        const writeStream = fs.createWriteStream(finalPath);
+
+        for (const chunkFile of chunkFiles) {
+            const chunkPath = path.join(chunkDir, chunkFile);
+            const data = fs.readFileSync(chunkPath);
+            writeStream.write(data);
+        }
+        await new Promise((resolve, reject) => {
+            writeStream.end();
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+        });
+
+        // Clean up chunk directory
+        fs.rmSync(chunkDir, { recursive: true, force: true });
+
+        const isCSV = /\.csv$/i.test(fileName);
+        let headers = [];
+        let totalRows = 0;
+        let previewData = [];
+        let previewRows = [];
+
+        if (isCSV) {
+            const parseCSVLine = (line) => {
+                const result = []; let cur = ''; let inQ = false;
+                for (let i = 0; i < line.length; i++) {
+                    const ch = line[i];
+                    if (inQ) {
+                        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+                        else if (ch === '"') { inQ = false; }
+                        else { cur += ch; }
+                    } else {
+                        if (ch === '"') { inQ = true; }
+                        else if (ch === ',') { result.push(cur); cur = ''; }
+                        else { cur += ch; }
+                    }
+                }
+                result.push(cur);
+                return result;
+            };
+            const rl = readline.createInterface({ input: fs.createReadStream(finalPath, { encoding: 'utf8' }), crlfDelay: Infinity });
+            let headerParsed = false;
+            for await (const line of rl) {
+                const cleanLine = headerParsed ? line : line.replace(/^\uFEFF/, '');
+                if (!cleanLine.trim()) continue;
+                if (!headerParsed) { headers = parseCSVLine(cleanLine); headerParsed = true; }
+                else {
+                    totalRows++;
+                    if (totalRows <= 10) {
+                        const vals = parseCSVLine(line);
+                        const obj = {};
+                        headers.forEach((h, i) => { obj[h] = vals[i] !== undefined ? vals[i] : ''; });
+                        previewData.push(obj);
+                    }
+                    if (totalRows <= 5) previewRows.push(parseCSVLine(line));
+                }
+            }
+        } else {
+            const workbook = XLSX.readFile(finalPath, { cellDates: true, cellNF: false, cellText: false, sheetStubs: true });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', blankrows: false, raw: false });
+            const headerRowIndex = jsonData.findIndex(row => Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== ''));
+            if (headerRowIndex !== -1) {
+                headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
+                const dataRows = jsonData.slice(headerRowIndex + 1).filter(row => Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== ''));
+                totalRows = dataRows.length;
+                previewRows = dataRows.slice(0, 5);
+                previewData = previewRows.map(row => {
+                    const obj = {};
+                    headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
+                    return obj;
+                });
+            }
+        }
+
+        const fileSize = fs.statSync(finalPath).size;
+        const importHistory = await prisma.importHistory.create({
+            data: { fileName, filePath: finalPath, fileSize: BigInt(fileSize), importType, totalRecords: totalRows, status: 'PENDING', importedById: req.user.id },
+        });
+
+        const mappingResults = mapHeaders(headers, previewRows, importType);
+        const suggestedMappings = resultsToSuggestedMappings(mappingResults);
+
+        res.json({
+            success: true,
+            message: 'File assembled successfully',
+            data: {
+                importId: importHistory.id.toString(),
+                fileName,
+                filePath: finalPath,
+                totalRows,
+                headers,
+                previewData,
+                suggestedMappings,
+                mappingResults,
+                availableFields: importType === 'STUDENTS'
+                    ? ['controlNumber', 'enrollmentNo', 'fullName', 'email', 'alternateEmail', 'phone', 'alternatePhone', 'programme', 'course', 'specialization', 'regionalCenter', 'batchYear', 'semester', 'subjects', 'address', 'city', 'state', 'pincode', 'gender', 'dateOfBirth', 'admissionDate']
+                    : ['fullName', 'email', 'phone', 'alternatePhone', 'interestedCourse', 'source', 'priority', 'sourceDetails'],
+            },
+        });
+    } catch (err) {
+        // Clean up on error
+        if (finalPath && fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
+        if (fs.existsSync(chunkDir)) fs.rmSync(chunkDir, { recursive: true, force: true });
+        next(err);
+    }
+});
+
 // Resume pending import
 router.get('/resume/:importId', async (req, res, next) => {
     try {

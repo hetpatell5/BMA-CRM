@@ -128,43 +128,60 @@ export default function ImportPage() {
         },
     })
 
-    // Upload mutation
+    // Upload mutation — uses chunked upload for files > 90 MB to bypass Nginx limits
     const uploadMutation = useMutation({
         mutationFn: async (file: File) => {
             setUploadingFile({ name: file.name, size: file.size })
             setUploadPct(0)
-            
-            let simInterval: NodeJS.Timeout
 
-            const response = await importAPI.upload(file, importType, (pct) => {
-                if (pct < 100) {
-                    // Phase 1: Network Upload (0% -> 50%)
-                    setUploadPct(Math.round(pct * 0.5))
-                } else if (pct === 100) {
-                    // Phase 2: Server Processing (50% -> 95%)
-                    setUploadPct(prev => {
-                        // Prevent starting multiple intervals
-                        if (prev > 50) return prev;
-                        
-                        simInterval = setInterval(() => {
-                            setUploadPct(curr => {
-                                const next = curr + (Math.random() * 1.5)
-                                return next >= 95 ? 95 : next // Cap at 95% until complete
-                            })
-                        }, 600)
-                        return 50
-                    })
+            const CHUNK_SIZE = 10 * 1024 * 1024 // 10 MB per chunk
+            const useChunked = file.size > 90 * 1024 * 1024 // use chunked if > 90 MB
+
+            if (useChunked) {
+                // ── Chunked upload path ──────────────────────────────────────
+                const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+                const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+                for (let i = 0; i < totalChunks; i++) {
+                    const start = i * CHUNK_SIZE
+                    const end = Math.min(start + CHUNK_SIZE, file.size)
+                    const chunk = file.slice(start, end)
+                    await importAPI.uploadChunk(uploadId, i, totalChunks, chunk, file.name)
+                    // Real progress: uploading phase = 0-85%
+                    setUploadPct(Math.round(((i + 1) / totalChunks) * 85))
                 }
-            })
-            
-            // Phase 3: Complete!
-            if (simInterval!) clearInterval(simInterval!)
-            setUploadPct(100)
-            
-            // Brief pause to let user see 100% before transitioning
-            await new Promise(r => setTimeout(r, 600))
 
-            return response.data.data
+                // Assembling phase: 85-95% simulated
+                setUploadPct(88)
+                const response = await importAPI.finalizeUpload(uploadId, file.name, importType)
+                setUploadPct(100)
+                await new Promise(r => setTimeout(r, 600))
+                return response.data.data
+
+            } else {
+                // ── Normal single upload path ────────────────────────────────
+                let simInterval: NodeJS.Timeout
+                const response = await importAPI.upload(file, importType, (pct) => {
+                    if (pct < 100) {
+                        setUploadPct(Math.round(pct * 0.5))
+                    } else if (pct === 100) {
+                        setUploadPct(prev => {
+                            if (prev > 50) return prev
+                            simInterval = setInterval(() => {
+                                setUploadPct(curr => {
+                                    const next = curr + (Math.random() * 1.5)
+                                    return next >= 95 ? 95 : next
+                                })
+                            }, 600)
+                            return 50
+                        })
+                    }
+                })
+                if (simInterval!) clearInterval(simInterval!)
+                setUploadPct(100)
+                await new Promise(r => setTimeout(r, 600))
+                return response.data.data
+            }
         },
         onSuccess: (data) => {
             setUploadingFile(null)

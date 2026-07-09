@@ -185,6 +185,16 @@ export const importAPI = {
     resume: (importId: string) => api.get(`/import/resume/${importId}`),
     getDetails: (importId: string) => api.get(`/import/history/${importId}`),
     saveMapping: (confirmedMappings: Record<string, string>) => api.post('/import/save-mapping', { confirmedMappings }),
+    uploadChunk: (uploadId: string, chunkIndex: number, totalChunks: number, chunk: Blob, fileName: string) => {
+        const fd = new FormData()
+        fd.append('uploadId', uploadId)
+        fd.append('chunkIndex', String(chunkIndex))
+        fd.append('totalChunks', String(totalChunks))
+        fd.append('chunk', chunk, fileName)
+        return api.post('/import/upload-chunk', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    },
+    finalizeUpload: (uploadId: string, fileName: string, importType: string) =>
+        api.post('/import/finalize-upload', { uploadId, fileName, importType }),
 }
 
 // Tasks API
