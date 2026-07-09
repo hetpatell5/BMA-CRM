@@ -110,38 +110,37 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
                 }
             }
         } else {
-            // ── XLSX/XLS path — robust cell-by-cell reading ──────────────────────
+            // ── XLSX/XLS — fast path: only read first 15 rows for preview ───────────
+            // sheetRows:15 makes even 500K-row files parse in milliseconds.
+            // The total row count comes from !ref (sheet dimension XML at the top of the file).
             const workbook = XLSX.readFile(req.file.path, {
-                cellDates: true,
-                cellNF: false,
-                cellText: false,
-                sheetStubs: true, // include empty/stub cells so sparse rows are detected
+                cellDates: true, cellNF: false, cellText: false,
+                sheetStubs: true,
+                sheetRows: 15, // only parse first 15 rows into memory
             });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
 
-            // Use defval:'' so every cell in sparse rows gets a value instead of being skipped
             const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-                header: 1,
-                defval: '',
-                blankrows: false,
-                raw: false, // format all values as strings so dates/numbers come through cleanly
+                header: 1, defval: '', blankrows: false, raw: false,
             });
 
-            // Find the first row with at least one non-empty string (skips blank/title rows)
             const headerRowIndex = jsonData.findIndex(row =>
                 Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
             );
 
             if (headerRowIndex !== -1) {
-                // Normalise headers — convert every value to a trimmed string
                 headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
 
-                const dataRows = jsonData.slice(headerRowIndex + 1).filter(row =>
+                // Get total row count from sheet !ref (e.g. "A1:Q498101") — no full scan needed
+                if (worksheet['!ref']) {
+                    const range = XLSX.utils.decode_range(worksheet['!ref']);
+                    totalRows = Math.max(0, range.e.r - headerRowIndex); // subtract header rows
+                }
+
+                previewRows = jsonData.slice(headerRowIndex + 1).filter(row =>
                     Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
-                );
-                totalRows = dataRows.length;
-                previewRows = dataRows.slice(0, 5);
+                ).slice(0, 5);
 
                 previewData = previewRows.map(row => {
                     const obj = {};
@@ -287,33 +286,65 @@ router.post('/finalize-upload', async (req, res, next) => {
                 result.push(cur);
                 return result;
             };
+
+            // Phase 1: fast preview — read only first 12 lines
             const rl = readline.createInterface({ input: fs.createReadStream(finalPath, { encoding: 'utf8' }), crlfDelay: Infinity });
             let headerParsed = false;
+            let previewCount = 0;
             for await (const line of rl) {
                 const cleanLine = headerParsed ? line : line.replace(/^\uFEFF/, '');
                 if (!cleanLine.trim()) continue;
                 if (!headerParsed) { headers = parseCSVLine(cleanLine); headerParsed = true; }
                 else {
-                    totalRows++;
-                    if (totalRows <= 10) {
-                        const vals = parseCSVLine(line);
-                        const obj = {};
-                        headers.forEach((h, i) => { obj[h] = vals[i] !== undefined ? vals[i] : ''; });
-                        previewData.push(obj);
-                    }
-                    if (totalRows <= 5) previewRows.push(parseCSVLine(line));
+                    previewCount++;
+                    const vals = parseCSVLine(line);
+                    const obj = {};
+                    headers.forEach((h, i) => { obj[h] = vals[i] !== undefined ? vals[i] : ''; });
+                    previewData.push(obj);
+                    if (previewCount <= 5) previewRows.push(vals);
+                    if (previewCount >= 10) { rl.close(); break; }
                 }
             }
+
+            // Phase 2: fast byte-level line count (counts \n chars in raw bytes)
+            await new Promise((resolve, reject) => {
+                let count = 0;
+                const NL = '\n'.charCodeAt(0);
+                fs.createReadStream(finalPath)
+                    .on('data', (buf) => { for (let i = 0; i < buf.length; i++) if (buf[i] === NL) count++; })
+                    .on('end', () => { totalRows = Math.max(0, count - 1); resolve(null); }) // subtract header line
+                    .on('error', reject);
+            });
         } else {
-            const workbook = XLSX.readFile(finalPath, { cellDates: true, cellNF: false, cellText: false, sheetStubs: true });
+            // ── XLSX/XLS — fast path: only read first 15 rows for preview ───────────
+            const workbook = XLSX.readFile(finalPath, {
+                cellDates: true, cellNF: false, cellText: false,
+                sheetStubs: true,
+                sheetRows: 15,
+            });
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', blankrows: false, raw: false });
-            const headerRowIndex = jsonData.findIndex(row => Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== ''));
+
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+                header: 1, defval: '', blankrows: false, raw: false,
+            });
+
+            const headerRowIndex = jsonData.findIndex(row =>
+                Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
+            );
+
             if (headerRowIndex !== -1) {
                 headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
-                const dataRows = jsonData.slice(headerRowIndex + 1).filter(row => Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== ''));
-                totalRows = dataRows.length;
-                previewRows = dataRows.slice(0, 5);
+
+                // Total row count from !ref — no full file scan
+                if (worksheet['!ref']) {
+                    const range = XLSX.utils.decode_range(worksheet['!ref']);
+                    totalRows = Math.max(0, range.e.r - headerRowIndex);
+                }
+
+                previewRows = jsonData.slice(headerRowIndex + 1).filter(row =>
+                    Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
+                ).slice(0, 5);
+
                 previewData = previewRows.map(row => {
                     const obj = {};
                     headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
