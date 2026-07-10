@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -61,7 +61,7 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
         let previewRows = [];   // first 5 rows as arrays (for smart mapper)
 
         if (isCSV) {
-            // Ã¢â€â‚¬Ã¢â€â‚¬ Streaming CSV parse Ã¢â‚¬â€ O(1) memory regardless of file size Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+            // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Streaming CSV parse ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â O(1) memory regardless of file size ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
             // Parse a single RFC-4180 CSV line into an array of strings
             const parseCSVLine = (line) => {
                 const result = [];
@@ -111,7 +111,7 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
                 }
             }
         } else {
-            // Ã¢â€â‚¬Ã¢â€â‚¬ XLSX/XLS Ã¢â‚¬â€ fast path: read first 15 rows for preview Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+            // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ XLSX/XLS ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â fast path: read first 15 rows for preview ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
             const workbook = XLSX.readFile(req.file.path, {
                 cellDates: true, cellNF: false, cellText: false,
                 sheetStubs: true,
@@ -170,7 +170,7 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
             },
         });
 
-        // Ã¢â€â‚¬Ã¢â€â‚¬ Smart auto-mapping Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+        // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Smart auto-mapping ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
         const mappingResults = mapHeaders(headers, previewRows, importType);
         const suggestedMappings = resultsToSuggestedMappings(mappingResults);
 
@@ -196,8 +196,8 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
     }
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Chunked Upload: receive one chunk Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-// Each chunk is a small multipart POST (Ã¢â€°Â¤10 MB) Ã¢â‚¬â€ well under any Nginx limit.
+// ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Chunked Upload: receive one chunk ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+// Each chunk is a small multipart POST (ÃƒÂ¢Ã¢â‚¬Â°Ã‚Â¤10 MB) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â well under any Nginx limit.
 // Fields: uploadId, chunkIndex, totalChunks, importType
 // File field: chunk
 const chunkUpload = multer({
@@ -224,7 +224,7 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
     }
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Chunked Upload: assemble all chunks and run normal preview Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Chunked Upload: assemble all chunks and run normal preview ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 // Body (JSON): { uploadId, fileName, importType }
 router.post('/finalize-upload', async (req, res, next) => {
     const chunkDir = `./uploads/chunks/${req.body.uploadId}`;
@@ -289,7 +289,7 @@ router.post('/finalize-upload', async (req, res, next) => {
                 return result;
             };
 
-            // Phase 1: fast preview Ã¢â‚¬â€ read only first 12 lines
+            // Phase 1: fast preview ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â read only first 12 lines
             const rl = readline.createInterface({ input: fs.createReadStream(finalPath, { encoding: 'utf8' }), crlfDelay: Infinity });
             let headerParsed = false;
             let previewCount = 0;
@@ -318,7 +318,7 @@ router.post('/finalize-upload', async (req, res, next) => {
                     .on('error', reject);
             });
         } else {
-            // Ã¢â€â‚¬Ã¢â€â‚¬ XLSX/XLS Ã¢â‚¬â€ fast path: read first 15 rows for preview Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+            // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ XLSX/XLS ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â fast path: read first 15 rows for preview ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
             const workbook = XLSX.readFile(finalPath, {
                 cellDates: true, cellNF: false, cellText: false,
                 sheetStubs: true,
@@ -337,7 +337,7 @@ router.post('/finalize-upload', async (req, res, next) => {
             if (headerRowIndex !== -1) {
                 headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
 
-                // Count rows using ExcelJS streaming Ã¢â‚¬â€ accurate, no full RAM load
+                // Count rows using ExcelJS streaming ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â accurate, no full RAM load
                 let rowCount = 0;
                 const wbCount = new ExcelJS.stream.xlsx.WorkbookReader(finalPath, { worksheets: 'emit' });
                 for await (const ws of wbCount) {
@@ -558,12 +558,12 @@ router.post('/process/:importId', async (req, res, next) => {
         const isCSVFile = /\.csv$/i.test(filePath2) || /\.csv$/i.test(importRecord.fileName || '');
         const BATCH_SIZE = 500;
 
-        // â”€â”€ processBatch helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── processBatch: insert rows into DB with sub-batching & error logging ──
         async function processBatch(rows, hdrs, colMapping, dupHandling, record, impId, userId, accumulate) {
             const studentsToCreate = [];
-            const leadsToCreate = [];
-            const batchErrors = [];
-            let batchFailed = 0;
+            const leadsToCreate   = [];
+            const batchErrors     = [];
+            let   batchFailed     = 0;
 
             for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
                 const row = rows[rowIdx];
@@ -572,23 +572,21 @@ router.post('/process/:importId', async (req, res, next) => {
                     const subjectsArray = [];
                     const importedCustomFields = {};
 
+                    // Store every cell value as a custom field (raw data preservation)
+                    // _columnOrder is NOT stored per-row to save payload size
                     hdrs.forEach((header, index) => {
                         const value = row[index];
-                        if (value !== undefined && value !== null && String(value).trim() !== '' && header) {
-                            importedCustomFields[String(header).trim()] = String(value).trim();
+                        if (value !== undefined && value !== null && String(value).trim() !== '' && header && String(header).trim()) {
+                            importedCustomFields[String(header).trim()] = String(value).trim().slice(0, 500);
                         }
                     });
 
-                    const validHeaders = hdrs.filter(h => h && String(h).trim());
-                    if (validHeaders.length > 0) {
-                        importedCustomFields['_columnOrder'] = validHeaders.map(h => String(h).trim());
-                    }
-
+                    // Apply column mapping to extract structured fields
                     Object.entries(colMapping).forEach(([colIndex, fieldName]) => {
                         const value = row[parseInt(colIndex)];
                         if (value !== undefined && value !== null && String(value).trim() !== '') {
                             if (fieldName && fieldName.startsWith('customField.')) {
-                                importedCustomFields[fieldName.replace('customField.', '')] = String(value).trim();
+                                importedCustomFields[fieldName.replace('customField.', '')] = String(value).trim().slice(0, 500);
                             } else if (fieldName === 'subjects') {
                                 subjectsArray.push(String(value).trim());
                             } else {
@@ -598,9 +596,18 @@ router.post('/process/:importId', async (req, res, next) => {
                     });
 
                     if (subjectsArray.length > 0) mappedData.subjects = subjectsArray.filter(s => s);
-                    if (Object.keys(importedCustomFields).length > 0) mappedData.customFields = importedCustomFields;
+                    // Limit customFields to 30 keys max to prevent oversized JSON
+                    if (Object.keys(importedCustomFields).length > 0) {
+                        const cfKeys = Object.keys(importedCustomFields).slice(0, 30);
+                        const cf = {};
+                        cfKeys.forEach(k => { cf[k] = importedCustomFields[k]; });
+                        mappedData.customFields = cf;
+                    }
+
+                    // Skip entirely empty rows
                     if (Object.keys(mappedData).length === 0) { accumulate(0, 0, 1, 0, []); continue; }
 
+                    // Fallback fullName
                     if (!mappedData.fullName) {
                         mappedData.fullName = mappedData.enrollmentNo ? `Student-${mappedData.enrollmentNo}`
                             : mappedData.controlNumber ? `Student-${mappedData.controlNumber}`
@@ -609,6 +616,7 @@ router.post('/process/:importId', async (req, res, next) => {
                             : `Student-Row${rowIdx + 2}`;
                     }
 
+                    // Normalise string fields
                     ['enrollmentNo', 'controlNumber', 'phone', 'email', 'alternateEmail', 'alternatePhone',
                         'fullName', 'programme', 'course', 'regionalCenter', 'city', 'state', 'address', 'pincode', 'gender']
                         .forEach(k => {
@@ -624,7 +632,7 @@ router.post('/process/:importId', async (req, res, next) => {
                     if (mappedData.admissionDate) { const d = new Date(mappedData.admissionDate); mappedData.admissionDate = isNaN(d.getTime()) ? null : d; }
 
                     Object.keys(mappedData).forEach(k => {
-                        if (k !== 'subjects' && (mappedData[k] === null || mappedData[k] === undefined || mappedData[k] === '')) delete mappedData[k];
+                        if (k !== 'subjects' && k !== 'customFields' && (mappedData[k] === null || mappedData[k] === undefined || mappedData[k] === '')) delete mappedData[k];
                     });
                     if (mappedData.subjects && Array.isArray(mappedData.subjects)) {
                         mappedData.subjects = mappedData.subjects.filter(s => s && s.trim());
@@ -644,7 +652,7 @@ router.post('/process/:importId', async (req, res, next) => {
                         if (!skipUnique && mappedData.phone)        studentData.phone        = mappedData.phone;
                         ['controlNumber', 'alternateEmail', 'alternatePhone', 'programme', 'course', 'regionalCenter',
                             'city', 'state', 'address', 'pincode', 'gender', 'batchYear', 'semester', 'dateOfBirth', 'admissionDate']
-                            .forEach(k => { if (mappedData[k]) studentData[k] = mappedData[k]; });
+                            .forEach(k => { if (mappedData[k] != null) studentData[k] = mappedData[k]; });
                         if (mappedData.subjects && mappedData.subjects.length > 0) studentData.subjects = mappedData.subjects;
                         if (mappedData.customFields && Object.keys(mappedData.customFields).length > 0) studentData.customFields = mappedData.customFields;
                         studentsToCreate.push(studentData);
@@ -652,11 +660,16 @@ router.post('/process/:importId', async (req, res, next) => {
                         const srcMap = { website: 'WEBSITE', referral: 'REFERRAL', 'social media': 'SOCIAL_MEDIA', socialmedia: 'SOCIAL_MEDIA', 'walk in': 'WALK_IN', walkin: 'WALK_IN', 'phone inquiry': 'PHONE_INQUIRY', phoneinquiry: 'PHONE_INQUIRY', phone: 'PHONE_INQUIRY', manual: 'MANUAL', 'excel import': 'EXCEL_IMPORT', other: 'OTHER' };
                         const prMap  = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH', urgent: 'URGENT' };
                         leadsToCreate.push({
-                            fullName: mappedData.fullName, email: mappedData.email || null, phone: mappedData.phone || null,
-                            alternatePhone: mappedData.alternatePhone || null, interestedCourse: mappedData.interestedCourse || null,
+                            fullName: mappedData.fullName || 'Unknown',
+                            email: mappedData.email || null,
+                            phone: mappedData.phone || null,
+                            alternatePhone: mappedData.alternatePhone || null,
+                            interestedCourse: mappedData.interestedCourse || null,
                             source: (mappedData.source && srcMap[mappedData.source.toString().toLowerCase().trim()]) || 'MANUAL',
                             priority: (mappedData.priority && prMap[mappedData.priority.toString().toLowerCase().trim()]) || 'MEDIUM',
-                            sourceDetails: mappedData.sourceDetails || null, createdById: userId, importBatchId: BigInt(impId),
+                            sourceDetails: mappedData.sourceDetails || null,
+                            createdById: userId,
+                            importBatchId: BigInt(impId),
                         });
                     }
                 } catch (err) {
@@ -665,47 +678,55 @@ router.post('/process/:importId', async (req, res, next) => {
                 }
             }
 
+            // ── Insert in sub-batches of 200 to avoid DB payload limits ──────────
             let imp = 0, skp = 0;
+            const SUB = 200;
             if (studentsToCreate.length > 0) {
-                try {
-                    const r = await prisma.student.createMany({ data: studentsToCreate, skipDuplicates: dupHandling === 'skip' });
-                    imp += r.count; skp += studentsToCreate.length - r.count;
-                } catch (e) {
-                    for (const sd of studentsToCreate) {
-                        try { await prisma.student.create({ data: sd }); imp++; }
-                        catch (ce) { ce.code === 'P2002' ? skp++ : batchFailed++; }
+                for (let i = 0; i < studentsToCreate.length; i += SUB) {
+                    const sub = studentsToCreate.slice(i, i + SUB);
+                    try {
+                        const r = await prisma.student.createMany({ data: sub, skipDuplicates: dupHandling === 'skip' });
+                        imp += r.count; skp += sub.length - r.count;
+                    } catch (e) {
+                        // Log one error per sub-batch, count all rows as failed
+                        batchErrors.push({ rows: `${i}-${i + sub.length}`, error: e.message });
+                        batchFailed += sub.length;
                     }
                 }
             }
             if (leadsToCreate.length > 0) {
-                try {
-                    const r = await prisma.lead.createMany({ data: leadsToCreate, skipDuplicates: dupHandling === 'skip' });
-                    imp += r.count; skp += leadsToCreate.length - r.count;
-                } catch (e) {
-                    for (const ld of leadsToCreate) {
-                        try { await prisma.lead.create({ data: ld }); imp++; }
-                        catch (ce) { ce.code === 'P2002' ? skp++ : batchFailed++; }
+                for (let i = 0; i < leadsToCreate.length; i += SUB) {
+                    const sub = leadsToCreate.slice(i, i + SUB);
+                    try {
+                        const r = await prisma.lead.createMany({ data: sub, skipDuplicates: dupHandling === 'skip' });
+                        imp += r.count; skp += sub.length - r.count;
+                    } catch (e) {
+                        batchErrors.push({ rows: `${i}-${i + sub.length}`, error: e.message });
+                        batchFailed += sub.length;
                     }
                 }
             }
-            accumulate(imp, 0, skp, batchFailed, batchErrors);
+            accumulate(imp, 0, skp, batchFailed, batchErrors.slice(0, 3));
         }
 
-        // â”€â”€ Fire background processing after response is flushed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Background processing: stream file & insert in batches ────────────
         setImmediate(async () => {
             let imported = 0, updated = 0, skipped = 0, failed = 0;
             const errors = [];
 
             const emitProgress = () => {
                 const total = Number(importRecord.totalRecords) || 1;
-                const done = imported + failed + skipped;
-                const pct = Math.min(99, Math.round((done / total) * 100));
-                io?.to(importId).emit('import-progress', { progress: pct, imported, failed, updated });
+                const done  = imported + failed + skipped;
+                const pct   = Math.min(99, Math.round((done / total) * 100));
+                io?.to(importId).emit('import-progress', { progress: pct, imported, failed, skipped, updated });
             };
+
+            // Heartbeat: emit progress every 3s even while reading large XLSX header
+            const heartbeat = setInterval(emitProgress, 3000);
 
             try {
                 if (isCSVFile) {
-                    // â”€â”€ Streaming CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // ── Streaming CSV ────────────────────────────────────────────
                     const parseCSVLine = (line) => {
                         const result = []; let cur = ''; let inQ = false;
                         for (let i = 0; i < line.length; i++) {
@@ -744,13 +765,10 @@ router.post('/process/:importId', async (req, res, next) => {
                     if (batch.length > 0) await flushCSV(batch, csvHeaders);
 
                 } else {
-                    // â”€â”€ ExcelJS Streaming XLSX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // ── ExcelJS Streaming XLSX ───────────────────────────────────
                     const wbReader = new ExcelJS.stream.xlsx.WorkbookReader(filePath2, {
-                        worksheets: 'emit',
-                        sharedStrings: 'cache',
-                        hyperlinks: 'ignore',
-                        styles: 'ignore',
-                        entries: 'emit',
+                        worksheets: 'emit', sharedStrings: 'cache',
+                        hyperlinks: 'ignore', styles: 'ignore', entries: 'emit',
                     });
 
                     let xlsHeaders = null;
@@ -772,16 +790,13 @@ router.post('/process/:importId', async (req, res, next) => {
                                 if (typeof v === 'object' && v.result !== undefined) return String(v.result);
                                 return String(v);
                             });
-
                             if (xlsHeaders === null) {
                                 if (rowArr.some(c => String(c ?? '').trim() !== '')) {
                                     xlsHeaders = rowArr.map(h => String(h ?? '').trim());
                                 }
                                 continue;
                             }
-
                             if (!rowArr.some(c => String(c ?? '').trim() !== '')) continue;
-
                             batch.push(rowArr);
                             if (batch.length >= BATCH_SIZE) { await flushXLS(batch, xlsHeaders); batch = []; }
                         }
@@ -790,33 +805,40 @@ router.post('/process/:importId', async (req, res, next) => {
                     if (batch.length > 0 && xlsHeaders) await flushXLS(batch, xlsHeaders);
                 }
 
-                // â”€â”€ Finalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // ── Finalization ─────────────────────────────────────────────────
+                clearInterval(heartbeat);
+
+                // Signal completion to frontend FIRST (before slow DB update)
+                io?.to(importId).emit('import-complete', { importId, imported, updated, skipped, failed });
+
+                // Update DB status
                 await prisma.importHistory.update({
                     where: { id: BigInt(importId) },
                     data: {
                         status: 'COMPLETED', completedAt: new Date(),
                         importedCount: imported, updatedCount: updated,
                         skippedCount: skipped, failedCount: failed,
-                        errorLog: errors.length > 0 ? errors.slice(0, 100) : null,
+                        errorLog: errors.length > 0 ? errors.slice(0, 20) : null,
                     },
-                });
-
-                io?.to(importId).emit('import-complete', { importId, imported, updated, skipped, failed });
-
-                const adminIds = await getAdminIds();
-                const notifyIds = [...new Set([importRecord.importedById, ...adminIds].filter(Boolean))];
-                const typeName = importRecord.importType === 'STUDENTS' ? 'Orders' : 'Leads';
-                await notify(io, {
-                    userIds: notifyIds, type: 'IMPORT_DONE',
-                    title: `${typeName} Import Completed`,
-                    message: `${imported} ${typeName.toLowerCase()} imported, ${skipped} skipped, ${failed} failed.`,
-                    link: importRecord.importType === 'STUDENTS' ? '/orders' : '/leads',
                 });
 
                 try { fs.unlinkSync(filePath2); } catch (e) { /* already gone */ }
 
+                // Fire-and-forget notifications (don't block completion)
+                getAdminIds().then(adminIds => {
+                    const notifyIds = [...new Set([importRecord.importedById, ...adminIds].filter(Boolean))];
+                    const typeName  = importRecord.importType === 'STUDENTS' ? 'Orders' : 'Leads';
+                    return notify(io, {
+                        userIds: notifyIds, type: 'IMPORT_DONE',
+                        title: `${typeName} Import Completed`,
+                        message: `${imported} imported, ${skipped} skipped, ${failed} failed.`,
+                        link: importRecord.importType === 'STUDENTS' ? '/orders' : '/leads',
+                    });
+                }).catch(e => console.error('[Import notify]', e.message));
+
             } catch (bgError) {
-                console.error(`[Import ${importId}] background processing error:`, bgError);
+                clearInterval(heartbeat);
+                console.error(`[Import ${importId}] error:`, bgError);
                 try {
                     await prisma.importHistory.update({ where: { id: BigInt(importId) }, data: { status: 'FAILED', errorLog: [{ error: bgError.message }] } });
                     io?.to(importId).emit('import-error', { importId, error: bgError.message });
@@ -831,7 +853,7 @@ router.post('/process/:importId', async (req, res, next) => {
 
 
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Save confirmed column mappings to learning memory Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Save confirmed column mappings to learning memory ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 router.post('/save-mapping', async (req, res, next) => {
     try {
         const { confirmedMappings } = req.body;
@@ -907,9 +929,9 @@ router.delete('/history/:id', async (req, res, next) => {
         }
 
         if (deleteRecords === 'true' && importRecord.status === 'COMPLETED') {
-            // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Fire-and-forget background deletion Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-            // Response is sent immediately Ã¢â‚¬â€ deletion runs fully in background.
-            // Single DELETE with no LIMIT Ã¢â‚¬â€ removes every row for this batch.
+            // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Fire-and-forget background deletion ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+            // Response is sent immediately ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â deletion runs fully in background.
+            // Single DELETE with no LIMIT ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â removes every row for this batch.
 
             // Security: ensure batchId is a safe integer before using in raw SQL
             const batchIdNum = parseInt(id, 10);
@@ -952,7 +974,7 @@ router.delete('/history/:id', async (req, res, next) => {
             });
         }
 
-        // deleteRecords=false on a COMPLETED import Ã¢â‚¬â€ not allowed
+        // deleteRecords=false on a COMPLETED import ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â not allowed
         return res.status(400).json({
             success: false,
             message: 'To delete a completed import, confirm deletion of all imported records.',
