@@ -204,51 +204,52 @@ export default function FollowUpsPage() {
 
 
             {/* Search Bar */}
-            <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 shadow-lg dark:shadow-none transition-colors">
-                <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 dark:text-slate-500" />
-                    <Input
-                        placeholder="Search by name, number, description or requirement..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="pl-11 h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 focus:border-primary text-[14px] placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    />
-                    {(isLoadingPending || isLoadingCompleted) && (
-                        <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
-                    )}
-                </div>
+            <div className="relative max-w-full">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 dark:text-slate-500" />
+                <Input
+                    placeholder="Search by name, number, description or requirement..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="pl-11 h-11 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 focus:border-primary text-[14px] placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-sm"
+                />
+                {(isLoadingPending || isLoadingCompleted) && (
+                    <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
+                )}
             </div>
 
             {/* Alert for upcoming follow-ups */}
             {upcomingFollowUps.length > 0 && (
-                <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-amber-300/50 dark:border-amber-500/20 p-5 md:p-6 shadow-lg dark:shadow-none transition-colors">
-                    <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-amber-300/50 dark:border-amber-500/20 p-4 md:p-5 shadow-sm transition-colors">
+                    <div className="flex items-start gap-3 md:gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
                             <BellRing className="w-5 h-5 text-amber-500 dark:text-amber-400 animate-pulse" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="font-bold text-amber-700 dark:text-amber-400 text-base mb-3">
+                            <h3 className="font-bold text-amber-700 dark:text-amber-400 text-base mb-2 mt-1">
                                 Attention Needed — {upcomingFollowUps.length} follow-up{upcomingFollowUps.length > 1 ? 's' : ''} due
                             </h3>
-                            <div className="grid gap-2">
+                            <div className="flex flex-col gap-1.5 mt-3">
                                 {upcomingFollowUps.map(f => (
-                                    <div key={f.id} className="flex items-center justify-between bg-slate-50 dark:bg-white/[0.03] hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-200 p-3.5 rounded-xl text-sm border border-slate-200/60 dark:border-white/5">
+                                    <div key={f.id} className="flex items-center justify-between bg-slate-50 dark:bg-white/[0.03] hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-200 px-3.5 py-2.5 rounded-xl text-sm border border-slate-200/60 dark:border-white/5">
                                         <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-600 dark:text-amber-400 shrink-0">
+                                            <div className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-[11px] font-bold text-amber-600 dark:text-amber-400 shrink-0">
                                                 {f.name.charAt(0).toUpperCase()}
                                             </div>
-                                            <span className="font-semibold text-slate-800 dark:text-amber-400 text-[14px]">{f.name}</span>
+                                            <span className="font-semibold text-slate-800 dark:text-amber-400 text-[13px]">{f.name}</span>
                                             <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
-                                            <span onClick={() => handleNumberClick(f)} className="font-semibold text-primary hover:text-primary/80 font-mono text-sm cursor-pointer underline decoration-primary/30 underline-offset-2 transition-colors">{f.number}</span>
+                                            <span onClick={() => handleNumberClick(f)} className="font-semibold text-primary hover:text-primary/80 font-mono text-[13px] cursor-pointer underline decoration-primary/30 underline-offset-2 transition-colors">{f.number}</span>
                                             <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
                                             <span className="text-slate-600 dark:text-slate-400 truncate max-w-[200px] sm:max-w-[300px] text-[13px]">{f.description}</span>
                                         </div>
-                                        <div className="flex items-center gap-3 shrink-0">
-                                            <span className="text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-1 rounded-lg border border-amber-500/20">
                                                 {format(new Date(f.followupDate), 'MMM dd, yyyy')}
                                             </span>
-                                            <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors shrink-0 text-xs font-bold gap-1.5">
-                                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-7 px-2.5 rounded-lg text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 transition-colors shrink-0 text-[11px] font-bold gap-1.5">
+                                                <CheckCircle2 className="w-3 h-3" /> Done
+                                            </Button>
+                                            <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-7 px-2.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors shrink-0 text-[11px] font-bold gap-1.5">
+                                                <Trash2 className="w-3 h-3" /> Delete
                                             </Button>
                                         </div>
                                     </div>
@@ -372,37 +373,30 @@ export default function FollowUpsPage() {
             {/* Completed Follow-ups */}
             {activeTab === 'completed' && completedFollowUps.length > 0 && (
                 <div className="space-y-4">
-                    <div>
-                        <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
-                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                            Completed Follow-ups
-                        </h2>
-                        <p className="text-sm text-muted-foreground">Successfully resolved tasks.</p>
-                    </div>
-                    <div className="rounded-[20px] bg-slate-50/50 dark:bg-white/[0.01] border border-slate-200/50 dark:border-white/5 overflow-hidden transition-colors">
+                    <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm transition-colors">
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[860px] border-collapse">
                                 <thead>
-                                    <tr className="text-left text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 bg-slate-100/50 dark:bg-white/[0.02]">
-                                        <th className="px-5 py-3">Date</th>
-                                        <th className="px-5 py-3">Name</th>
-                                        <th className="px-5 py-3">Number</th>
-                                        <th className="px-5 py-3">Description</th>
-                                        <th className="px-5 py-3">Requirement</th>
-                                        <th className="px-5 py-3">Actions</th>
+                                    <tr className="text-left text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
+                                        <th className="px-5 py-4">Date</th>
+                                        <th className="px-5 py-4">Name</th>
+                                        <th className="px-5 py-4">Number</th>
+                                        <th className="px-5 py-4">Description</th>
+                                        <th className="px-5 py-4">Requirement</th>
+                                        <th className="px-5 py-4">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-white/5 opacity-80">
+                                <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                                     {completedFollowUps.map((f) => (
-                                        <tr key={f.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                            <td className="px-5 py-3 text-[13px] text-slate-500">{format(new Date(f.followupDate), 'MMM dd, yyyy')}</td>
-                                            <td className="px-5 py-3 text-[13px] font-medium text-slate-700 dark:text-slate-300">{f.name}</td>
-                                            <td className="px-5 py-3 text-[13px] font-mono text-slate-500">{f.number}</td>
-                                            <td className="px-5 py-3 text-[13px] text-slate-500 truncate max-w-[200px]">{f.description}</td>
-                                            <td className="px-5 py-3 text-[13px] text-slate-500 truncate max-w-[200px]">{f.requirement}</td>
-                                            <td className="px-5 py-3">
-                                                <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-7 px-2.5 rounded-lg text-red-500/70 hover:text-red-600 hover:bg-red-500/10 transition-all text-[11px] font-bold gap-1.5">
-                                                    <Trash2 className="w-3 h-3" /> Delete
+                                        <tr key={f.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors">
+                                            <td className="px-5 py-4 text-[13px] font-medium text-slate-600 dark:text-slate-400">{format(new Date(f.followupDate), 'MMM dd, yyyy')}</td>
+                                            <td className="px-5 py-4 text-[13px] font-semibold text-slate-800 dark:text-slate-200">{f.name}</td>
+                                            <td className="px-5 py-4 text-[13px] font-mono font-medium text-slate-600 dark:text-slate-400">{f.number}</td>
+                                            <td className="px-5 py-4 text-[13px] text-slate-600 dark:text-slate-400 truncate max-w-[200px]">{f.description}</td>
+                                            <td className="px-5 py-4 text-[13px] text-slate-600 dark:text-slate-400 truncate max-w-[200px]">{f.requirement}</td>
+                                            <td className="px-5 py-4">
+                                                <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all text-xs font-bold gap-1.5">
+                                                    <Trash2 className="w-3.5 h-3.5" /> Delete
                                                 </Button>
                                             </td>
                                         </tr>
