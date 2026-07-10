@@ -348,19 +348,6 @@ export default function FollowUpsPage() {
                             )}
                         </tbody>
                     </table>
-                    {pendingMeta.totalPages > 1 && (
-                        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.01]">
-                            <p className="text-xs text-slate-500 font-medium">Page {pendingMeta.page} of {pendingMeta.totalPages}</p>
-                            <div className="flex gap-2">
-                                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => fetchPendingFollowUps(pendingMeta.page - 1, searchQuery)} disabled={pendingMeta.page === 1}>
-                                    <ChevronLeft className="w-4 h-4" />
-                                </Button>
-                                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => fetchPendingFollowUps(pendingMeta.page + 1, searchQuery)} disabled={pendingMeta.page >= pendingMeta.totalPages}>
-                                    <ChevronRight className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -404,19 +391,6 @@ export default function FollowUpsPage() {
                                     ))}
                                 </tbody>
                             </table>
-                            {completedMeta.totalPages > 1 && (
-                                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.01]">
-                                    <p className="text-xs text-slate-500 font-medium">Page {completedMeta.page} of {completedMeta.totalPages}</p>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => fetchCompletedFollowUps(completedMeta.page - 1, searchQuery)} disabled={completedMeta.page === 1}>
-                                            <ChevronLeft className="w-4 h-4" />
-                                        </Button>
-                                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => fetchCompletedFollowUps(completedMeta.page + 1, searchQuery)} disabled={completedMeta.page >= completedMeta.totalPages}>
-                                            <ChevronRight className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>

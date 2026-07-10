@@ -49,7 +49,7 @@ export const useFollowUpStore = create<FollowUpState>()((set, get) => ({
     fetchPendingFollowUps: async (page = 1, search = '') => {
         set({ isLoadingPending: true });
         try {
-            const response = await followUpsAPI.getAll({ page, limit: 10, search, status: 'PENDING' });
+            const response = await followUpsAPI.getAll({ page, limit: 1000, search, status: 'PENDING' });
             const data = response.data.data || [];
             const meta = response.data.meta || defaultMeta;
             
@@ -70,7 +70,7 @@ export const useFollowUpStore = create<FollowUpState>()((set, get) => ({
     fetchCompletedFollowUps: async (page = 1, search = '') => {
         set({ isLoadingCompleted: true });
         try {
-            const response = await followUpsAPI.getAll({ page, limit: 10, search, status: 'COMPLETED' });
+            const response = await followUpsAPI.getAll({ page, limit: 1000, search, status: 'COMPLETED' });
             const data = response.data.data || [];
             const meta = response.data.meta || defaultMeta;
 
