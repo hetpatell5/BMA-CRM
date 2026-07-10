@@ -1,9 +1,10 @@
-import express from 'express';
+﻿import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import readline from 'readline';
 import XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import prisma from '../config/database.js';
 import { mapHeaders, learnMappings, resultsToSuggestedMappings } from '../services/smartMapper.js';
 import { notify, getAdminIds } from '../services/notificationService.js';
@@ -60,7 +61,7 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
         let previewRows = [];   // first 5 rows as arrays (for smart mapper)
 
         if (isCSV) {
-            // ── Streaming CSV parse — O(1) memory regardless of file size ──────────
+            // â”€â”€ Streaming CSV parse â€” O(1) memory regardless of file size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             // Parse a single RFC-4180 CSV line into an array of strings
             const parseCSVLine = (line) => {
                 const result = [];
@@ -110,13 +111,11 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
                 }
             }
         } else {
-            // ── XLSX/XLS — fast path: only read first 15 rows for preview ───────────
-            // sheetRows:15 makes even 500K-row files parse in milliseconds.
-            // The total row count comes from !ref (sheet dimension XML at the top of the file).
+            // â”€â”€ XLSX/XLS â€” fast path: read first 15 rows for preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const workbook = XLSX.readFile(req.file.path, {
                 cellDates: true, cellNF: false, cellText: false,
                 sheetStubs: true,
-                sheetRows: 15, // only parse first 15 rows into memory
+                sheetRows: 15,
             });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
@@ -132,11 +131,14 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
             if (headerRowIndex !== -1) {
                 headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
 
-                // Get total row count from sheet !ref (e.g. "A1:Q498101") — no full scan needed
-                if (worksheet['!ref']) {
-                    const range = XLSX.utils.decode_range(worksheet['!ref']);
-                    totalRows = Math.max(0, range.e.r - headerRowIndex); // subtract header rows
+                // Count rows using ExcelJS streaming (doesn't load all data into RAM)
+                let rowCount = 0;
+                const wbCount = new ExcelJS.stream.xlsx.WorkbookReader(req.file.path, { worksheets: 'emit' });
+                for await (const ws of wbCount) {
+                    for await (const row of ws) { rowCount++; }
+                    break;
                 }
+                totalRows = Math.max(0, rowCount - 1 - headerRowIndex); // subtract header rows
 
                 previewRows = jsonData.slice(headerRowIndex + 1).filter(row =>
                     Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
@@ -168,7 +170,7 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
             },
         });
 
-        // ── Smart auto-mapping ────────────────────────────────────────────────────
+        // â”€â”€ Smart auto-mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         const mappingResults = mapHeaders(headers, previewRows, importType);
         const suggestedMappings = resultsToSuggestedMappings(mappingResults);
 
@@ -194,8 +196,8 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
     }
 });
 
-// ── Chunked Upload: receive one chunk ────────────────────────────────────────
-// Each chunk is a small multipart POST (≤10 MB) — well under any Nginx limit.
+// â”€â”€ Chunked Upload: receive one chunk â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Each chunk is a small multipart POST (â‰¤10 MB) â€” well under any Nginx limit.
 // Fields: uploadId, chunkIndex, totalChunks, importType
 // File field: chunk
 const chunkUpload = multer({
@@ -222,7 +224,7 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
     }
 });
 
-// ── Chunked Upload: assemble all chunks and run normal preview ────────────────
+// â”€â”€ Chunked Upload: assemble all chunks and run normal preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Body (JSON): { uploadId, fileName, importType }
 router.post('/finalize-upload', async (req, res, next) => {
     const chunkDir = `./uploads/chunks/${req.body.uploadId}`;
@@ -287,7 +289,7 @@ router.post('/finalize-upload', async (req, res, next) => {
                 return result;
             };
 
-            // Phase 1: fast preview — read only first 12 lines
+            // Phase 1: fast preview â€” read only first 12 lines
             const rl = readline.createInterface({ input: fs.createReadStream(finalPath, { encoding: 'utf8' }), crlfDelay: Infinity });
             let headerParsed = false;
             let previewCount = 0;
@@ -316,7 +318,7 @@ router.post('/finalize-upload', async (req, res, next) => {
                     .on('error', reject);
             });
         } else {
-            // ── XLSX/XLS — fast path: only read first 15 rows for preview ───────────
+            // â”€â”€ XLSX/XLS â€” fast path: read first 15 rows for preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const workbook = XLSX.readFile(finalPath, {
                 cellDates: true, cellNF: false, cellText: false,
                 sheetStubs: true,
@@ -335,11 +337,14 @@ router.post('/finalize-upload', async (req, res, next) => {
             if (headerRowIndex !== -1) {
                 headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
 
-                // Total row count from !ref — no full file scan
-                if (worksheet['!ref']) {
-                    const range = XLSX.utils.decode_range(worksheet['!ref']);
-                    totalRows = Math.max(0, range.e.r - headerRowIndex);
+                // Count rows using ExcelJS streaming â€” accurate, no full RAM load
+                let rowCount = 0;
+                const wbCount = new ExcelJS.stream.xlsx.WorkbookReader(finalPath, { worksheets: 'emit' });
+                for await (const ws of wbCount) {
+                    for await (const row of ws) { rowCount++; }
+                    break;
                 }
+                totalRows = Math.max(0, rowCount - 1 - headerRowIndex);
 
                 previewRows = jsonData.slice(headerRowIndex + 1).filter(row =>
                     Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
@@ -559,17 +564,34 @@ router.post('/process/:importId', async (req, res, next) => {
             },
         });
 
-        // Read file — use streaming CSV parser for .csv files to avoid OOM
+        // Read file â€” XLSX uses ExcelJS streaming (no RAM spike), CSV uses readline
         const filePath2 = filePath;
-        const isCSVFile = /\.csv$/i.test(filePath2);
-        let headers;
-        let dataRows;
+        const isCSVFile = /\.csv$/i.test(filePath2) || /\.csv$/i.test(importRecord.fileName || '');
 
+        // Respond immediately â€” processing runs in background
+        res.json({ success: true, message: 'Processing started' });
+
+        const io = req.app.get('io');
+        let imported = 0;
+        let updated = 0;
+        let skipped = 0;
+        let failed = 0;
+        const errors = [];
+        const BATCH_SIZE = 500;
+
+        // Helper: emit progress
+        const emitProgress = () => {
+            const total = importRecord.totalRecords || 1;
+            const done = imported + failed + skipped;
+            const pct = Math.min(99, Math.round((done / total) * 100));
+            io?.to(importId).emit('import-progress', { progress: pct, imported, failed, updated });
+        };
+
+        try {
         if (isCSVFile) {
+            // â”€â”€ Streaming CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const parseCSVLine = (line) => {
-                const result = [];
-                let cur = '';
-                let inQ = false;
+                const result = []; let cur = ''; let inQ = false;
                 for (let i = 0; i < line.length; i++) {
                     const ch = line[i];
                     if (inQ) {
@@ -586,459 +608,229 @@ router.post('/process/:importId', async (req, res, next) => {
                 return result;
             };
 
-            const rl = readline.createInterface({
-                input: fs.createReadStream(filePath2, { encoding: 'utf8' }),
-                crlfDelay: Infinity,
-            });
+            const rl = readline.createInterface({ input: fs.createReadStream(filePath2, { encoding: 'utf8' }), crlfDelay: Infinity });
+            let csvHeaders = null;
+            let batch = [];
 
-            headers = null;
-            dataRows = [];
+            const flushBatch = async (b, hdrs) => {
+                await processBatch(b, hdrs, columnMapping, duplicateHandling, importRecord, importId, req.user.id,
+                    (imp, upd, skp, fail, errs) => { imported += imp; updated += upd; skipped += skp; failed += fail; errors.push(...errs); });
+                emitProgress();
+            };
+
             for await (const line of rl) {
-                const cleanLine = headers ? line : line.replace(/^\uFEFF/, '');
+                const cleanLine = csvHeaders ? line : line.replace(/^\uFEFF/, '');
                 if (!cleanLine.trim()) continue;
-                if (!headers) {
-                    headers = parseCSVLine(cleanLine);
-                } else {
-                    dataRows.push(parseCSVLine(line));
-                }
+                if (!csvHeaders) { csvHeaders = parseCSVLine(cleanLine); continue; }
+                batch.push(parseCSVLine(line));
+                if (batch.length >= BATCH_SIZE) { await flushBatch(batch, csvHeaders); batch = []; }
             }
+            if (batch.length > 0) await flushBatch(batch, csvHeaders);
+
         } else {
-            const workbook = XLSX.readFile(filePath2, {
-                cellDates: true,
-                cellNF: false,
-                cellText: false,
-                sheetStubs: true,
+            // â”€â”€ ExcelJS Streaming XLSX â€” no RAM spike for 500K rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            const wbReader = new ExcelJS.stream.xlsx.WorkbookReader(filePath2, {
+                worksheets: 'emit',
+                sharedStrings: 'cache',
+                hyperlinks: 'ignore',
+                styles: 'ignore',
+                entries: 'emit',
             });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-                header: 1,
-                defval: '',
-                blankrows: false,
-                raw: false,
-            });
-            const headerRowIndex = jsonData.findIndex(row =>
-                Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
-            );
 
-            if (headerRowIndex !== -1) {
-                headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
-                dataRows = jsonData.slice(headerRowIndex + 1).filter(row =>
-                    Array.isArray(row) && row.some(cell => String(cell ?? '').trim() !== '')
-                );
-            } else {
-                headers = [];
-                dataRows = [];
+            let xlsHeaders = null;
+            let headerRowIndex = -1;
+            let excelRowNum = 0;
+            let batch = [];
+
+            const flushBatch = async (b, hdrs) => {
+                await processBatch(b, hdrs, columnMapping, duplicateHandling, importRecord, importId, req.user.id,
+                    (imp, upd, skp, fail, errs) => { imported += imp; updated += upd; skipped += skp; failed += fail; errors.push(...errs); });
+                emitProgress();
+            };
+
+            for await (const worksheet of wbReader) {
+                for await (const row of worksheet) {
+                    excelRowNum++;
+                    const values = row.values ? row.values.slice(1) : []; // slice(1) removes 1-based index offset
+                    const rowArr = values.map(v => {
+                        if (v === null || v === undefined) return '';
+                        if (typeof v === 'object' && v.text) return String(v.text); // rich text
+                        if (typeof v === 'object' && v instanceof Date) return v.toISOString().split('T')[0];
+                        if (typeof v === 'object' && v.result !== undefined) return String(v.result); // formula
+                        return String(v);
+                    });
+
+                    // Find header row (first non-empty row)
+                    if (xlsHeaders === null) {
+                        if (rowArr.some(c => String(c ?? '').trim() !== '')) {
+                            xlsHeaders = rowArr.map(h => String(h ?? '').trim());
+                            headerRowIndex = excelRowNum;
+                        }
+                        continue;
+                    }
+
+                    // Skip empty rows
+                    if (!rowArr.some(c => String(c ?? '').trim() !== '')) continue;
+
+                    batch.push(rowArr);
+                    if (batch.length >= BATCH_SIZE) { await flushBatch(batch, xlsHeaders); batch = []; }
+                }
+                break; // only process first sheet
             }
+            if (batch.length > 0 && xlsHeaders) await flushBatch(batch, xlsHeaders);
         }
-
-        // Get Socket.IO instance
-        const io = req.app.get('io');
-
-        let imported = 0;
-        let updated = 0;
-        let skipped = 0;
-        let failed = 0;
-        const errors = [];
-        const BATCH_SIZE = 500; // Smaller batches to avoid starving the DB connection pool
-
-        // Process in batches - prepare data first, then bulk insert
-        for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
-            const batch = dataRows.slice(i, i + BATCH_SIZE);
+        // â”€â”€ processBatch helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        async function processBatch(rows, hdrs, colMapping, dupHandling, record, impId, userId, accumulate) {
             const studentsToCreate = [];
             const leadsToCreate = [];
+            const batchErrors = [];
+            let batchFailed = 0;
 
-            for (let rowIdx = 0; rowIdx < batch.length; rowIdx++) {
-                const row = batch[rowIdx];
-                const absoluteRowIdx = i + rowIdx;
-
+            for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+                const row = rows[rowIdx];
                 try {
-                    // Map columns to data
                     const mappedData = {};
-                    const subjectsArray = []; // Collect all subject values
-                    const importedCustomFields = {}; // Collect customField.* columns
+                    const subjectsArray = [];
+                    const importedCustomFields = {};
 
-                    // Store all original columns as customFields to retain exact sheet layout
-                    headers.forEach((header, index) => {
+                    hdrs.forEach((header, index) => {
                         const value = row[index];
-                        if (value !== undefined && value !== null && value !== '' && header) {
-                            importedCustomFields[String(header).trim()] = value.toString().trim();
+                        if (value !== undefined && value !== null && String(value).trim() !== '' && header) {
+                            importedCustomFields[String(header).trim()] = String(value).trim();
                         }
                     });
 
-                    // Preserve the original column order as an array so the UI can
-                    // reconstruct the exact sheet order even after MySQL JSON key reordering
-                    const validHeaders = headers.filter(h => h && String(h).trim());
+                    const validHeaders = hdrs.filter(h => h && String(h).trim());
                     if (validHeaders.length > 0) {
                         importedCustomFields['_columnOrder'] = validHeaders.map(h => String(h).trim());
                     }
 
-                    Object.entries(columnMapping).forEach(([colIndex, fieldName]) => {
+                    Object.entries(colMapping).forEach(([colIndex, fieldName]) => {
                         const value = row[parseInt(colIndex)];
-                        if (value !== undefined && value !== null && value !== '') {
-                            // customField.* — store in importedCustomFields object
+                        if (value !== undefined && value !== null && String(value).trim() !== '') {
                             if (fieldName && fieldName.startsWith('customField.')) {
-                                const cfKey = fieldName.replace('customField.', '');
-                                importedCustomFields[cfKey] = value.toString().trim();
+                                importedCustomFields[fieldName.replace('customField.', '')] = String(value).trim();
                             } else if (fieldName === 'subjects') {
-                                subjectsArray.push(value.toString().trim());
+                                subjectsArray.push(String(value).trim());
                             } else {
                                 mappedData[fieldName] = value;
                             }
                         }
                     });
 
-                    // Add subjects array if any were collected
-                    if (subjectsArray.length > 0) {
-                        mappedData.subjects = subjectsArray.filter(s => s);
-                    }
+                    if (subjectsArray.length > 0) mappedData.subjects = subjectsArray.filter(s => s);
+                    if (Object.keys(importedCustomFields).length > 0) mappedData.customFields = importedCustomFields;
+                    if (Object.keys(mappedData).length === 0) { accumulate(0,0,1,0,[]); continue; }
 
-                    // Merge any custom fields into mappedData
-                    if (Object.keys(importedCustomFields).length > 0) {
-                        mappedData.customFields = importedCustomFields;
-                    }
-
-                    // Skip empty rows
-                    if (Object.keys(mappedData).length === 0) {
-                        skipped++;
-                        continue;
-                    }
-
-                    // Auto-generate name fallback — never fail a row just because
-                    // the name cell is empty. Use the best available identifier.
                     if (!mappedData.fullName) {
-                        const fallback =
-                            mappedData.enrollmentNo   ? `Student-${mappedData.enrollmentNo}` :
-                            mappedData.controlNumber  ? `Student-${mappedData.controlNumber}` :
-                            mappedData.phone          ? `Student-${mappedData.phone}` :
-                            mappedData.email          ? `Student-${mappedData.email.split('@')[0]}` :
-                            `Student-Row${absoluteRowIdx + 2}`;
-                        mappedData.fullName = fallback;
+                        mappedData.fullName = mappedData.enrollmentNo ? `Student-${mappedData.enrollmentNo}`
+                            : mappedData.controlNumber ? `Student-${mappedData.controlNumber}`
+                            : mappedData.phone ? `Student-${mappedData.phone}`
+                            : mappedData.email ? `Student-${mappedData.email.split('@')[0]}`
+                            : `Student-Row${rowIdx + 2}`;
                     }
 
+                    // Normalise string fields
+                    ['enrollmentNo','controlNumber','phone','email','alternateEmail','alternatePhone',
+                     'fullName','programme','course','regionalCenter','city','state','address','pincode','gender']
+                        .forEach(k => { if (mappedData[k] !== undefined) { const v = String(mappedData[k]).trim(); mappedData[k] = (v && v !== 'undefined' && v !== 'null') ? v : null; } });
 
-                    // Convert string fields (in case they come as numbers from Excel)
-                    if (mappedData.enrollmentNo !== undefined) {
-                        const val = String(mappedData.enrollmentNo).trim();
-                        mappedData.enrollmentNo = val && val !== 'undefined' && val !== 'null' ? val : null;
-                    }
-                    if (mappedData.controlNumber !== undefined) {
-                        const val = String(mappedData.controlNumber).trim();
-                        mappedData.controlNumber = val && val !== 'undefined' && val !== 'null' ? val : null;
-                    }
-                    if (mappedData.phone !== undefined) {
-                        const val = String(mappedData.phone).trim();
-                        mappedData.phone = val && val !== 'undefined' && val !== 'null' ? val : null;
-                    }
-                    if (mappedData.email !== undefined) {
-                        const val = String(mappedData.email).trim();
-                        mappedData.email = val && val !== 'undefined' && val !== 'null' ? val : null;
-                    }
-                    if (mappedData.alternateEmail !== undefined) {
-                        const val = String(mappedData.alternateEmail).trim();
-                        mappedData.alternateEmail = val && val !== 'undefined' && val !== 'null' ? val : null;
-                    }
-                    if (mappedData.alternatePhone !== undefined) {
-                        const val = String(mappedData.alternatePhone).trim();
-                        mappedData.alternatePhone = val && val !== 'undefined' && val !== 'null' ? val : null;
-                    }
-                    if (mappedData.fullName !== undefined) {
-                        mappedData.fullName = String(mappedData.fullName).trim();
-                    }
-                    if (mappedData.programme !== undefined) {
-                        mappedData.programme = String(mappedData.programme).trim();
-                    }
-                    if (mappedData.course !== undefined) {
-                        mappedData.course = String(mappedData.course).trim();
-                    }
-                    if (mappedData.regionalCenter !== undefined) {
-                        mappedData.regionalCenter = String(mappedData.regionalCenter).trim();
-                    }
-                    if (mappedData.city !== undefined) {
-                        mappedData.city = String(mappedData.city).trim();
-                    }
-                    if (mappedData.state !== undefined) {
-                        mappedData.state = String(mappedData.state).trim();
-                    }
-                    if (mappedData.address !== undefined) {
-                        mappedData.address = String(mappedData.address).trim();
-                    }
-                    if (mappedData.pincode !== undefined) {
-                        mappedData.pincode = String(mappedData.pincode).trim();
-                    }
-                    if (mappedData.gender !== undefined) {
-                        mappedData.gender = String(mappedData.gender).trim();
-                    }
+                    if (mappedData.batchYear) mappedData.batchYear = parseInt(mappedData.batchYear) || null;
+                    if (mappedData.semester)  mappedData.semester  = parseInt(mappedData.semester)  || null;
+                    if (mappedData.dateOfBirth)   { const d = new Date(mappedData.dateOfBirth);   mappedData.dateOfBirth   = isNaN(d.getTime()) ? null : d; }
+                    if (mappedData.admissionDate) { const d = new Date(mappedData.admissionDate); mappedData.admissionDate = isNaN(d.getTime()) ? null : d; }
 
-                    // Convert data types
-                    if (mappedData.batchYear) {
-                        mappedData.batchYear = parseInt(mappedData.batchYear) || null;
-                    }
-                    if (mappedData.semester) {
-                        mappedData.semester = parseInt(mappedData.semester) || null;
-                    }
-                    if (mappedData.dateOfBirth) {
-                        const date = new Date(mappedData.dateOfBirth);
-                        mappedData.dateOfBirth = isNaN(date.getTime()) ? null : date;
-                    }
-                    if (mappedData.admissionDate) {
-                        const date = new Date(mappedData.admissionDate);
-                        mappedData.admissionDate = isNaN(date.getTime()) ? null : date;
-                    }
-
-                    // Remove null/undefined values
-                    Object.keys(mappedData).forEach(key => {
-                        const val = mappedData[key];
-                        if (val === null || val === undefined || val === '') {
-                            if (key !== 'subjects') {
-                                delete mappedData[key];
-                            }
-                        }
-                    });
-
-                    // Ensure subjects is stored properly as JSON
+                    Object.keys(mappedData).forEach(k => { if (k !== 'subjects' && (mappedData[k] === null || mappedData[k] === undefined || mappedData[k] === '')) delete mappedData[k]; });
                     if (mappedData.subjects && Array.isArray(mappedData.subjects)) {
                         mappedData.subjects = mappedData.subjects.filter(s => s && s.trim());
-                        if (mappedData.subjects.length === 0) {
-                            delete mappedData.subjects;
-                        }
+                        if (mappedData.subjects.length === 0) delete mappedData.subjects;
                     }
 
-                    if (importRecord.importType === 'STUDENTS') {
-                        // Prepare student data
-                        const studentData = {
-                            fullName: mappedData.fullName || 'Unknown',
-                            source: 'excel_import',
-                            importBatchId: BigInt(importId),
-                            createdById: req.user.id,
-                        };
-
-                        // Add optional standard fields
-                        // When duplicateHandling === 'force', skip unique-indexed fields
-                        // (enrollmentNo, email, phone) to avoid DB unique-constraint errors.
-                        // These values are still fully preserved in customFields.
-                        const skipUnique = duplicateHandling === 'force';
+                    if (record.importType === 'STUDENTS') {
+                        const skipUnique = dupHandling === 'force';
+                        const studentData = { fullName: mappedData.fullName || 'Unknown', source: 'excel_import', importBatchId: BigInt(impId), createdById: userId };
                         if (!skipUnique && mappedData.enrollmentNo) studentData.enrollmentNo = mappedData.enrollmentNo;
-                        if (!skipUnique && mappedData.email)        studentData.email = mappedData.email;
-                        if (!skipUnique && mappedData.phone)        studentData.phone = mappedData.phone;
-                        if (mappedData.controlNumber) studentData.controlNumber = mappedData.controlNumber;
-                        if (mappedData.alternateEmail) studentData.alternateEmail = mappedData.alternateEmail;
-                        if (mappedData.alternatePhone) studentData.alternatePhone = mappedData.alternatePhone;
-                        if (mappedData.programme) studentData.programme = mappedData.programme;
-                        if (mappedData.course) studentData.course = mappedData.course;
-                        if (mappedData.regionalCenter) studentData.regionalCenter = mappedData.regionalCenter;
-                        if (mappedData.city) studentData.city = mappedData.city;
-                        if (mappedData.state) studentData.state = mappedData.state;
-                        if (mappedData.address) studentData.address = mappedData.address;
-                        if (mappedData.pincode) studentData.pincode = mappedData.pincode;
-                        if (mappedData.gender) studentData.gender = mappedData.gender;
-                        if (mappedData.batchYear) studentData.batchYear = mappedData.batchYear;
-                        if (mappedData.semester) studentData.semester = mappedData.semester;
-                        if (mappedData.dateOfBirth) studentData.dateOfBirth = mappedData.dateOfBirth;
+                        if (!skipUnique && mappedData.email)        studentData.email        = mappedData.email;
+                        if (!skipUnique && mappedData.phone)        studentData.phone        = mappedData.phone;
+                        ['controlNumber','alternateEmail','alternatePhone','programme','course','regionalCenter',
+                         'city','state','address','pincode','gender','batchYear','semester','dateOfBirth','admissionDate']
+                            .forEach(k => { if (mappedData[k]) studentData[k] = mappedData[k]; });
                         if (mappedData.subjects && mappedData.subjects.length > 0) studentData.subjects = mappedData.subjects;
-
-                        // Merge custom fields (from customField.* mapped columns)
-                        if (mappedData.customFields && Object.keys(mappedData.customFields).length > 0) {
-                            studentData.customFields = mappedData.customFields;
-                        }
-
+                        if (mappedData.customFields && Object.keys(mappedData.customFields).length > 0) studentData.customFields = mappedData.customFields;
                         studentsToCreate.push(studentData);
                     } else {
-                        // Import leads - Convert source to enum format
-                        const sourceMap = {
-                            'website': 'WEBSITE',
-                            'referral': 'REFERRAL',
-                            'social media': 'SOCIAL_MEDIA',
-                            'socialmedia': 'SOCIAL_MEDIA',
-                            'walk in': 'WALK_IN',
-                            'walkin': 'WALK_IN',
-                            'phone inquiry': 'PHONE_INQUIRY',
-                            'phoneinquiry': 'PHONE_INQUIRY',
-                            'phone': 'PHONE_INQUIRY',
-                            'manual': 'MANUAL',
-                            'excel import': 'EXCEL_IMPORT',
-                            'other': 'OTHER',
-                        };
-
-                        const priorityMap = {
-                            'low': 'LOW',
-                            'medium': 'MEDIUM',
-                            'high': 'HIGH',
-                            'urgent': 'URGENT',
-                        };
-
-                        let sourceValue = 'MANUAL';
-                        if (mappedData.source) {
-                            const normalizedSource = mappedData.source.toString().toLowerCase().trim();
-                            sourceValue = sourceMap[normalizedSource] || 'MANUAL';
-                        }
-
-                        let priorityValue = 'MEDIUM';
-                        if (mappedData.priority) {
-                            const normalizedPriority = mappedData.priority.toString().toLowerCase().trim();
-                            priorityValue = priorityMap[normalizedPriority] || 'MEDIUM';
-                        }
-
-                        const leadData = {
-                            fullName: mappedData.fullName,
-                            email: mappedData.email || null,
-                            phone: mappedData.phone || null,
-                            alternatePhone: mappedData.alternatePhone || null,
-                            interestedCourse: mappedData.interestedCourse || null,
-                            source: sourceValue,
-                            priority: priorityValue,
-                            sourceDetails: mappedData.sourceDetails || null,
-                            createdById: req.user.id,
-                            importBatchId: BigInt(importId), // Add importBatchId for leads as well
-                        };
-
-                        leadsToCreate.push(leadData);
+                        const srcMap = { website:'WEBSITE', referral:'REFERRAL', 'social media':'SOCIAL_MEDIA', socialmedia:'SOCIAL_MEDIA', 'walk in':'WALK_IN', walkin:'WALK_IN', 'phone inquiry':'PHONE_INQUIRY', phoneinquiry:'PHONE_INQUIRY', phone:'PHONE_INQUIRY', manual:'MANUAL', 'excel import':'EXCEL_IMPORT', other:'OTHER' };
+                        const prMap  = { low:'LOW', medium:'MEDIUM', high:'HIGH', urgent:'URGENT' };
+                        leadsToCreate.push({
+                            fullName: mappedData.fullName, email: mappedData.email || null, phone: mappedData.phone || null,
+                            alternatePhone: mappedData.alternatePhone || null, interestedCourse: mappedData.interestedCourse || null,
+                            source: (mappedData.source && srcMap[mappedData.source.toString().toLowerCase().trim()]) || 'MANUAL',
+                            priority: (mappedData.priority && prMap[mappedData.priority.toString().toLowerCase().trim()]) || 'MEDIUM',
+                            sourceDetails: mappedData.sourceDetails || null, createdById: userId, importBatchId: BigInt(impId),
+                        });
                     }
-                } catch (error) {
-                    errors.push({ row: absoluteRowIdx + 2, error: error.message });
-                    failed++;
+                } catch (err) {
+                    batchErrors.push({ row: rowIdx + 2, error: err.message });
+                    batchFailed++;
                 }
             }
 
-            // Bulk insert students
+            let imp = 0, upd = 0, skp = 0;
             if (studentsToCreate.length > 0) {
                 try {
-                    const result = await prisma.student.createMany({
-                        data: studentsToCreate,
-                        skipDuplicates: duplicateHandling === 'skip',
-                    });
-                    imported += result.count;
-                    skipped += studentsToCreate.length - result.count; // Difference is skipped duplicates
-                } catch (bulkError) {
-                    // If bulk insert fails, try individually (slower fallback)
-                    console.log('Bulk insert failed, falling back to individual inserts:', bulkError.message);
-                    for (const studentData of studentsToCreate) {
-                        try {
-                            await prisma.student.create({ data: studentData });
-                            imported++;
-                        } catch (createError) {
-                            if (createError.code === 'P2002') {
-                                skipped++;
-                            } else {
-                                failed++;
-                            }
-                        }
+                    const r = await prisma.student.createMany({ data: studentsToCreate, skipDuplicates: dupHandling === 'skip' });
+                    imp += r.count; skp += studentsToCreate.length - r.count;
+                } catch (e) {
+                    for (const sd of studentsToCreate) {
+                        try { await prisma.student.create({ data: sd }); imp++; }
+                        catch (ce) { ce.code === 'P2002' ? skp++ : batchFailed++; }
                     }
                 }
             }
-
-            // Bulk insert leads
             if (leadsToCreate.length > 0) {
                 try {
-                    const result = await prisma.lead.createMany({
-                        data: leadsToCreate,
-                        skipDuplicates: duplicateHandling === 'skip',
-                    });
-                    imported += result.count;
-                    skipped += leadsToCreate.length - result.count;
-                } catch (bulkError) {
-                    console.log('Bulk lead insert failed:', bulkError.message);
-                    for (const leadData of leadsToCreate) {
-                        try {
-                            await prisma.lead.create({ data: leadData });
-                            imported++;
-                        } catch (createError) {
-                            if (createError.code === 'P2002') {
-                                skipped++;
-                            } else {
-                                failed++;
-                            }
-                        }
+                    const r = await prisma.lead.createMany({ data: leadsToCreate, skipDuplicates: dupHandling === 'skip' });
+                    imp += r.count; skp += leadsToCreate.length - r.count;
+                } catch (e) {
+                    for (const ld of leadsToCreate) {
+                        try { await prisma.lead.create({ data: ld }); imp++; }
+                        catch (ce) { ce.code === 'P2002' ? skp++ : batchFailed++; }
                     }
                 }
             }
-
-            // Emit progress update via Socket.IO
-            const progressPercent = Math.round(((i + batch.length) / dataRows.length) * 100);
-            console.log(`Import ${importId} progress: ${progressPercent}% (imported: ${imported}, skipped: ${skipped}, failed: ${failed})`);
-
-            io.to(`import-${importId}`).emit('import-progress', {
-                importId,
-                progress: progressPercent,
-                imported,
-                updated,
-                skipped,
-                failed,
-            });
-
-            // Update database periodically (every 2 batches or last batch) for polling fallback
-            if (i % (BATCH_SIZE * 2) === 0 || i + batch.length >= dataRows.length) {
-                await prisma.importHistory.update({
-                    where: { id: BigInt(importId) },
-                    data: {
-                        importedCount: imported,
-                        updatedCount: updated,
-                        skippedCount: skipped,
-                        failedCount: failed,
-                    },
-                });
-            }
+            accumulate(imp, upd, skp, batchFailed, batchErrors);
         }
 
-        // Update import record
+        // â”€â”€ Finalization (runs after CSV or XLSX streaming loop above) â”€â”€â”€â”€â”€â”€â”€â”€
         await prisma.importHistory.update({
             where: { id: BigInt(importId) },
-            data: {
-                status: 'COMPLETED',
-                completedAt: new Date(),
-                importedCount: imported,
-                updatedCount: updated,
-                skippedCount: skipped,
-                failedCount: failed,
-                errorLog: errors.length > 0 ? errors.slice(0, 100) : null, // Store first 100 errors
-            },
+            data: { status: 'COMPLETED', completedAt: new Date(), importedCount: imported, updatedCount: updated, skippedCount: skipped, failedCount: failed, errorLog: errors.length > 0 ? errors.slice(0, 100) : null },
         });
 
-        // Emit completion
-        io.to(`import-${importId}`).emit('import-complete', {
-            importId,
-            imported,
-            updated,
-            skipped,
-            failed,
-        });
+        io?.to(importId).emit('import-complete', { importId, imported, updated, skipped, failed });
 
-        // Notify uploader + all admins
         const adminIds = await getAdminIds();
         const notifyIds = [...new Set([importRecord.importedById, ...adminIds].filter(Boolean))];
         const typeName = importRecord.importType === 'STUDENTS' ? 'Orders' : 'Leads';
-        await notify(io, {
-            userIds: notifyIds,
-            type: 'IMPORT_DONE',
-            title: `${typeName} Import Completed`,
-            message: `${imported} ${typeName.toLowerCase()} imported, ${skipped} skipped, ${failed} failed.`,
-            link: importRecord.importType === 'STUDENTS' ? '/orders' : '/leads',
-        });
+        await notify(io, { userIds: notifyIds, type: 'IMPORT_DONE', title: `${typeName} Import Completed`, message: `${imported} ${typeName.toLowerCase()} imported, ${skipped} skipped, ${failed} failed.`, link: importRecord.importType === 'STUDENTS' ? '/orders' : '/leads' });
 
-        // Clean up file
-        try {
-            fs.unlinkSync(filePath);
-        } catch (e) {
-            console.error('Error deleting file:', e);
+        try { fs.unlinkSync(filePath); } catch (e) { /* already gone */ }
+
+        } catch (bgError) {
+            console.error(`[Import ${importId}] background processing error:`, bgError);
+            try {
+                await prisma.importHistory.update({ where: { id: BigInt(importId) }, data: { status: 'FAILED', errorLog: [{ error: bgError.message }] } });
+                io?.to(importId).emit('import-error', { importId, error: bgError.message });
+            } catch (_) {}
         }
-
-        res.json({
-            success: true,
-            message: 'Import completed',
-            data: {
-                imported,
-                updated,
-                skipped,
-                failed,
-                errors: errors.slice(0, 20), // Return first 20 errors
-            },
-        });
     } catch (error) {
         next(error);
     }
 });
 
-// ── Save confirmed column mappings to learning memory ─────────────────────────
+
+
+// â”€â”€ Save confirmed column mappings to learning memory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.post('/save-mapping', async (req, res, next) => {
     try {
         const { confirmedMappings } = req.body;
@@ -1114,9 +906,9 @@ router.delete('/history/:id', async (req, res, next) => {
         }
 
         if (deleteRecords === 'true' && importRecord.status === 'COMPLETED') {
-            // ─── Fire-and-forget background deletion ────────────────────────────────
-            // Response is sent immediately — deletion runs fully in background.
-            // Single DELETE with no LIMIT — removes every row for this batch.
+            // â”€â”€â”€ Fire-and-forget background deletion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Response is sent immediately â€” deletion runs fully in background.
+            // Single DELETE with no LIMIT â€” removes every row for this batch.
 
             // Security: ensure batchId is a safe integer before using in raw SQL
             const batchIdNum = parseInt(id, 10);
@@ -1159,7 +951,7 @@ router.delete('/history/:id', async (req, res, next) => {
             });
         }
 
-        // deleteRecords=false on a COMPLETED import — not allowed
+        // deleteRecords=false on a COMPLETED import â€” not allowed
         return res.status(400).json({
             success: false,
             message: 'To delete a completed import, confirm deletion of all imported records.',
