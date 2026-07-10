@@ -92,10 +92,10 @@ const ACCENTS = [
     { check: 'accent-indigo-500',  active: 'bg-indigo-50 dark:bg-indigo-500/10' },
 ]
 
-// ─── FilterColumn component: loads values lazily when section opens ────────
+// ─── FilterColumn component: loads values lazily when section opens ──────────
 
 function FilterColumn({
-    colKey, accentIdx, batchIds, selectedVals, filterSearch, onToggle, openSections, toggleSection,
+    colKey, accentIdx, batchIds, selectedVals, filterSearch, onToggle, openSections, toggleSection, onValuesLoaded,
 }: {
     colKey: string
     accentIdx: number
@@ -105,6 +105,7 @@ function FilterColumn({
     onToggle: (key: string, val: string) => void
     openSections: Record<string, boolean>
     toggleSection: (key: string) => void
+    onValuesLoaded?: (key: string, count: number) => void
 }) {
     const sectionKey = `col_${colKey}`
     const isOpen = !!openSections[sectionKey]
@@ -116,6 +117,15 @@ function FilterColumn({
         enabled: isOpen,
         staleTime: 5 * 60 * 1000,
     })
+
+    // Notify parent of the total value count so it can detect "all selected"
+    const prevCountRef = React.useRef(0)
+    React.useEffect(() => {
+        if (vals && vals.length > 0 && vals.length !== prevCountRef.current) {
+            prevCountRef.current = vals.length
+            onValuesLoaded?.(colKey, vals.length)
+        }
+    }, [vals, colKey, onValuesLoaded])
 
     const displayed = useMemo(() => {
         if (!vals) return []
@@ -138,7 +148,7 @@ function FilterColumn({
                     <span className="truncate">{colKey}</span>
                     {selectedVals.size > 0 && (
                         <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold shrink-0">
-                            {selectedVals.size}
+                            {selectedVals.size === vals?.length ? 'All' : selectedVals.size}
                         </span>
                     )}
                 </span>
@@ -194,6 +204,7 @@ function FilterColumn({
     )
 }
 
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ImportPreviewPage() {
@@ -229,6 +240,12 @@ export default function ImportPreviewPage() {
 
     // Compatibility shim: single batch ID for IGNOU / old helpers
     const importBatchId = importBatchIds.size === 1 ? Array.from(importBatchIds)[0] : ''
+
+    // Track total value count per column (populated by FilterColumn when it loads values)
+    const colTotalValuesRef = React.useRef<Record<string, number>>({})
+    const handleValuesLoaded = useCallback((key: string, count: number) => {
+        colTotalValuesRef.current[key] = count
+    }, [])
 
     // ── IGNOU state ────────────────────────────────────────────────────────
     const [ignouProgress, setIgnouProgress] = useState<{ done: number; total: number; percent: number } | null>(null)
@@ -276,15 +293,21 @@ export default function ImportPreviewPage() {
             p.importBatchIds = Array.from(importBatchIds).join(',')
         }
 
-        // Pass as a NESTED object so axios serializes correctly
+        // Pass customField filters — skip when all values for a column are selected
+        // (all selected = no filter; also prevents massive IN() causing MySQL timeouts)
         const cfParams: Record<string, string> = {}
         for (const [k, vals] of Object.entries(activeFilters)) {
-            if (vals.size > 0) cfParams[k] = Array.from(vals).join(',')
+            if (vals.size === 0) continue
+            const totalForCol = colTotalValuesRef.current[k] ?? Infinity
+            const isAllSelected = vals.size >= totalForCol
+            if (!isAllSelected) cfParams[k] = Array.from(vals).join(',')
         }
         if (Object.keys(cfParams).length > 0) p.customField = cfParams
 
         return p
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, debouncedSearch, importBatchIds, activeFilters])
+
 
     // ── Main data query (server-side pagination) ───────────────────────────
     const { data, isLoading, refetch } = useQuery({
@@ -765,20 +788,25 @@ export default function ImportPreviewPage() {
                     )}
                 </div>
 
-                {/* Active filter chips */}
-                {Object.entries(activeFilters).flatMap(([col, vals]) =>
-                    Array.from(vals).map(val => (
+                {/* Active filter chips — show compact grouped chips to avoid UI overflow */}
+                {Object.entries(activeFilters)
+                    .filter(([, vals]) => vals.size > 0)
+                    .map(([col, vals]) => (
                         <span
-                            key={`${col}:${val}`}
-                            className="inline-flex items-center gap-1 px-2 h-9 rounded-lg bg-primary/10 text-primary text-xs font-medium border border-primary/20 shrink-0 max-w-[200px]"
+                            key={col}
+                            className="inline-flex items-center gap-1 px-2 h-9 rounded-lg bg-primary/10 text-primary text-xs font-medium border border-primary/20 shrink-0 max-w-[220px]"
                         >
-                            <span className="truncate">{col}: {val}</span>
-                            <button onClick={() => toggleFilterValue(col, val)} className="shrink-0 hover:opacity-70 ml-0.5">
+                            <span className="truncate">
+                                {col}:
+                                {vals.size === 1
+                                    ? ` ${Array.from(vals)[0]}`
+                                    : ` ${vals.size} selected`}
+                            </span>
+                            <button onClick={() => setActiveFilters(prev => { const n = { ...prev }; delete n[col]; return n })} className="shrink-0 hover:opacity-70 ml-0.5">
                                 <X className="w-3 h-3" />
                             </button>
                         </span>
-                    ))
-                )}
+                    ))}
 
                 <div className="flex items-center shrink-0">
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
@@ -851,14 +879,17 @@ export default function ImportPreviewPage() {
                                             <button onClick={() => toggleBatchId(bid)} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
                                         </span>
                                     ))}
-                                    {Object.entries(activeFilters).flatMap(([col, vals]) =>
-                                        Array.from(vals).map(val => (
-                                            <span key={`${col}:${val}`} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium border border-primary/20">
-                                                <span className="truncate max-w-[120px]" title={`${col}: ${val}`}>{val}</span>
-                                                <button onClick={() => toggleFilterValue(col, val)} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
+                                    {Object.entries(activeFilters)
+                                        .filter(([, vals]) => vals.size > 0)
+                                        .map(([col, vals]) => (
+                                            <span key={col} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium border border-primary/20">
+                                                <span className="truncate max-w-[120px]" title={`${col}: ${Array.from(vals).join(', ')}`}>
+                                                    {col}: {vals.size === 1 ? Array.from(vals)[0] : `${vals.size} selected`}
+                                                </span>
+                                                <button onClick={() => setActiveFilters(prev => { const n = { ...prev }; delete n[col]; return n })} className="hover:opacity-70 shrink-0"><X className="w-2.5 h-2.5" /></button>
                                             </span>
-                                        ))
-                                    )}
+                                        ))}
+
                                     <button onClick={clearAllFilters} className="text-[10px] text-red-500 hover:text-red-600 font-medium underline underline-offset-1 ml-0.5">
                                         Clear all
                                     </button>
@@ -945,8 +976,10 @@ export default function ImportPreviewPage() {
                                     onToggle={toggleFilterValue}
                                     openSections={openSections}
                                     toggleSection={toggleSection}
+                                    onValuesLoaded={handleValuesLoaded}
                                 />
                             ))}
+
                         </div>
                     </div>
                 )}
