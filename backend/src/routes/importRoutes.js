@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -524,28 +524,25 @@ router.get('/resume/:importId', async (req, res, next) => {
 router.post('/process/:importId', async (req, res, next) => {
     try {
         const { importId } = req.params;
-        const { columnMapping, duplicateHandling = 'force', filePath } = req.body;
+        const { columnMapping, duplicateHandling = 'force' } = req.body;
 
         if (!columnMapping || Object.keys(columnMapping).length === 0) {
             return res.status(400).json({ success: false, message: 'Column mapping is required' });
         }
 
-        // Security: ensure filePath is inside the uploads directory
-        const resolvedPath = path.resolve(filePath || '');
-        const uploadsDir = path.resolve('./uploads');
-        if (!filePath || !resolvedPath.startsWith(uploadsDir)) {
-            return res.status(400).json({ success: false, message: 'Invalid file path' });
-        }
-
-        // Verify file actually exists
-        if (!fs.existsSync(filePath)) {
-            return res.status(400).json({ success: false, message: 'File not found on server. Please re-upload.' });
-        }
-
-        // Get import record
+        // Get import record - use DB-stored filePath (never trust client-sent path for security)
         const importRecord = await prisma.importHistory.findUnique({ where: { id: BigInt(importId) } });
         if (!importRecord) {
             return res.status(404).json({ success: false, message: 'Import record not found' });
+        }
+
+        const filePath2 = importRecord.filePath;
+        if (!filePath2 || !fs.existsSync(filePath2)) {
+            await prisma.importHistory.update({
+                where: { id: BigInt(importId) },
+                data: { status: 'FAILED', errorLog: [{ error: 'File not found on server - please re-upload' }] },
+            });
+            return res.status(400).json({ success: false, message: 'File not found on server. Please re-upload.' });
         }
 
         // Update status to processing
@@ -554,11 +551,10 @@ router.post('/process/:importId', async (req, res, next) => {
             data: { status: 'PROCESSING', startedAt: new Date(), columnMapping },
         });
 
-        // Respond immediately â€“ processing runs in background
+        // Respond immediately - processing runs in background
         res.json({ success: true, message: 'Processing started' });
 
         const io = req.app.get('io');
-        const filePath2 = filePath;
         const isCSVFile = /\.csv$/i.test(filePath2) || /\.csv$/i.test(importRecord.fileName || '');
         const BATCH_SIZE = 500;
 

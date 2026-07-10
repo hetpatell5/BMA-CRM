@@ -219,9 +219,9 @@ export default function ImportPage() {
                 duplicateHandling,
                 filePath: uploadData.filePath,
             })
-            return response.data.data
+            return response.data
         },
-        onSuccess: (data) => {
+        onSuccess: () => {
             // Save successful mappings for learning
             importAPI.saveMapping(
                 Object.fromEntries(
@@ -230,12 +230,11 @@ export default function ImportPage() {
                 )
             ).catch(err => console.error('Failed to save mapping memory', err));
 
-            setResult(data)
-            setStep('complete')
-            refetchHistory()
+            // Move to processing step — Socket.IO events will handle completion
+            setStep('processing')
             toast({
-                title: 'Import complete!',
-                description: `${data.imported} records imported`,
+                title: 'Import started!',
+                description: `Processing ${uploadData.totalRows?.toLocaleString() || ''} rows in the background...`,
                 variant: 'success',
             })
         },
@@ -363,7 +362,6 @@ export default function ImportPage() {
     }, [step, uploadData?.importId])
 
     const handleStartProcessing = () => {
-        setStep('processing')
         processMutation.mutate()
     }
 
