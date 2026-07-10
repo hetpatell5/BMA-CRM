@@ -61,7 +61,7 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
         let previewRows = [];   // first 5 rows as arrays (for smart mapper)
 
         if (isCSV) {
-            // â”€â”€ Streaming CSV parse â€” O(1) memory regardless of file size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Ã¢â€â‚¬Ã¢â€â‚¬ Streaming CSV parse Ã¢â‚¬â€ O(1) memory regardless of file size Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
             // Parse a single RFC-4180 CSV line into an array of strings
             const parseCSVLine = (line) => {
                 const result = [];
@@ -111,7 +111,7 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
                 }
             }
         } else {
-            // â”€â”€ XLSX/XLS â€” fast path: read first 15 rows for preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Ã¢â€â‚¬Ã¢â€â‚¬ XLSX/XLS Ã¢â‚¬â€ fast path: read first 15 rows for preview Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
             const workbook = XLSX.readFile(req.file.path, {
                 cellDates: true, cellNF: false, cellText: false,
                 sheetStubs: true,
@@ -170,7 +170,7 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
             },
         });
 
-        // â”€â”€ Smart auto-mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Ã¢â€â‚¬Ã¢â€â‚¬ Smart auto-mapping Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         const mappingResults = mapHeaders(headers, previewRows, importType);
         const suggestedMappings = resultsToSuggestedMappings(mappingResults);
 
@@ -196,8 +196,8 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
     }
 });
 
-// â”€â”€ Chunked Upload: receive one chunk â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Each chunk is a small multipart POST (â‰¤10 MB) â€” well under any Nginx limit.
+// Ã¢â€â‚¬Ã¢â€â‚¬ Chunked Upload: receive one chunk Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// Each chunk is a small multipart POST (Ã¢â€°Â¤10 MB) Ã¢â‚¬â€ well under any Nginx limit.
 // Fields: uploadId, chunkIndex, totalChunks, importType
 // File field: chunk
 const chunkUpload = multer({
@@ -224,7 +224,7 @@ router.post('/upload-chunk', chunkUpload.single('chunk'), async (req, res, next)
     }
 });
 
-// â”€â”€ Chunked Upload: assemble all chunks and run normal preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Chunked Upload: assemble all chunks and run normal preview Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Body (JSON): { uploadId, fileName, importType }
 router.post('/finalize-upload', async (req, res, next) => {
     const chunkDir = `./uploads/chunks/${req.body.uploadId}`;
@@ -289,7 +289,7 @@ router.post('/finalize-upload', async (req, res, next) => {
                 return result;
             };
 
-            // Phase 1: fast preview â€” read only first 12 lines
+            // Phase 1: fast preview Ã¢â‚¬â€ read only first 12 lines
             const rl = readline.createInterface({ input: fs.createReadStream(finalPath, { encoding: 'utf8' }), crlfDelay: Infinity });
             let headerParsed = false;
             let previewCount = 0;
@@ -318,7 +318,7 @@ router.post('/finalize-upload', async (req, res, next) => {
                     .on('error', reject);
             });
         } else {
-            // â”€â”€ XLSX/XLS â€” fast path: read first 15 rows for preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Ã¢â€â‚¬Ã¢â€â‚¬ XLSX/XLS Ã¢â‚¬â€ fast path: read first 15 rows for preview Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
             const workbook = XLSX.readFile(finalPath, {
                 cellDates: true, cellNF: false, cellText: false,
                 sheetStubs: true,
@@ -337,7 +337,7 @@ router.post('/finalize-upload', async (req, res, next) => {
             if (headerRowIndex !== -1) {
                 headers = (jsonData[headerRowIndex] || []).map(h => String(h ?? '').trim());
 
-                // Count rows using ExcelJS streaming â€” accurate, no full RAM load
+                // Count rows using ExcelJS streaming Ã¢â‚¬â€ accurate, no full RAM load
                 let rowCount = 0;
                 const wbCount = new ExcelJS.stream.xlsx.WorkbookReader(finalPath, { worksheets: 'emit' });
                 for await (const ws of wbCount) {
@@ -519,6 +519,7 @@ router.get('/resume/:importId', async (req, res, next) => {
     }
 });
 
+
 // Process import with column mapping
 router.post('/process/:importId', async (req, res, next) => {
     try {
@@ -526,160 +527,42 @@ router.post('/process/:importId', async (req, res, next) => {
         const { columnMapping, duplicateHandling = 'force', filePath } = req.body;
 
         if (!columnMapping || Object.keys(columnMapping).length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Column mapping is required',
-            });
+            return res.status(400).json({ success: false, message: 'Column mapping is required' });
         }
 
-        // Security: ensure filePath is inside the uploads directory (prevent path traversal)
+        // Security: ensure filePath is inside the uploads directory
         const resolvedPath = path.resolve(filePath || '');
         const uploadsDir = path.resolve('./uploads');
         if (!filePath || !resolvedPath.startsWith(uploadsDir)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid file path',
-            });
+            return res.status(400).json({ success: false, message: 'Invalid file path' });
+        }
+
+        // Verify file actually exists
+        if (!fs.existsSync(filePath)) {
+            return res.status(400).json({ success: false, message: 'File not found on server. Please re-upload.' });
         }
 
         // Get import record
-        const importRecord = await prisma.importHistory.findUnique({
-            where: { id: BigInt(importId) },
-        });
-
+        const importRecord = await prisma.importHistory.findUnique({ where: { id: BigInt(importId) } });
         if (!importRecord) {
-            return res.status(404).json({
-                success: false,
-                message: 'Import record not found',
-            });
+            return res.status(404).json({ success: false, message: 'Import record not found' });
         }
 
         // Update status to processing
         await prisma.importHistory.update({
             where: { id: BigInt(importId) },
-            data: {
-                status: 'PROCESSING',
-                startedAt: new Date(),
-                columnMapping,
-            },
+            data: { status: 'PROCESSING', startedAt: new Date(), columnMapping },
         });
 
-        // Read file â€” XLSX uses ExcelJS streaming (no RAM spike), CSV uses readline
-        const filePath2 = filePath;
-        const isCSVFile = /\.csv$/i.test(filePath2) || /\.csv$/i.test(importRecord.fileName || '');
-
-        // Respond immediately â€” processing runs in background
+        // Respond immediately â€“ processing runs in background
         res.json({ success: true, message: 'Processing started' });
 
         const io = req.app.get('io');
-        let imported = 0;
-        let updated = 0;
-        let skipped = 0;
-        let failed = 0;
-        const errors = [];
+        const filePath2 = filePath;
+        const isCSVFile = /\.csv$/i.test(filePath2) || /\.csv$/i.test(importRecord.fileName || '');
         const BATCH_SIZE = 500;
 
-        // Helper: emit progress
-        const emitProgress = () => {
-            const total = importRecord.totalRecords || 1;
-            const done = imported + failed + skipped;
-            const pct = Math.min(99, Math.round((done / total) * 100));
-            io?.to(importId).emit('import-progress', { progress: pct, imported, failed, updated });
-        };
-
-        try {
-        if (isCSVFile) {
-            // â”€â”€ Streaming CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            const parseCSVLine = (line) => {
-                const result = []; let cur = ''; let inQ = false;
-                for (let i = 0; i < line.length; i++) {
-                    const ch = line[i];
-                    if (inQ) {
-                        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-                        else if (ch === '"') { inQ = false; }
-                        else { cur += ch; }
-                    } else {
-                        if (ch === '"') { inQ = true; }
-                        else if (ch === ',') { result.push(cur); cur = ''; }
-                        else { cur += ch; }
-                    }
-                }
-                result.push(cur);
-                return result;
-            };
-
-            const rl = readline.createInterface({ input: fs.createReadStream(filePath2, { encoding: 'utf8' }), crlfDelay: Infinity });
-            let csvHeaders = null;
-            let batch = [];
-
-            const flushBatch = async (b, hdrs) => {
-                await processBatch(b, hdrs, columnMapping, duplicateHandling, importRecord, importId, req.user.id,
-                    (imp, upd, skp, fail, errs) => { imported += imp; updated += upd; skipped += skp; failed += fail; errors.push(...errs); });
-                emitProgress();
-            };
-
-            for await (const line of rl) {
-                const cleanLine = csvHeaders ? line : line.replace(/^\uFEFF/, '');
-                if (!cleanLine.trim()) continue;
-                if (!csvHeaders) { csvHeaders = parseCSVLine(cleanLine); continue; }
-                batch.push(parseCSVLine(line));
-                if (batch.length >= BATCH_SIZE) { await flushBatch(batch, csvHeaders); batch = []; }
-            }
-            if (batch.length > 0) await flushBatch(batch, csvHeaders);
-
-        } else {
-            // â”€â”€ ExcelJS Streaming XLSX â€” no RAM spike for 500K rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            const wbReader = new ExcelJS.stream.xlsx.WorkbookReader(filePath2, {
-                worksheets: 'emit',
-                sharedStrings: 'cache',
-                hyperlinks: 'ignore',
-                styles: 'ignore',
-                entries: 'emit',
-            });
-
-            let xlsHeaders = null;
-            let headerRowIndex = -1;
-            let excelRowNum = 0;
-            let batch = [];
-
-            const flushBatch = async (b, hdrs) => {
-                await processBatch(b, hdrs, columnMapping, duplicateHandling, importRecord, importId, req.user.id,
-                    (imp, upd, skp, fail, errs) => { imported += imp; updated += upd; skipped += skp; failed += fail; errors.push(...errs); });
-                emitProgress();
-            };
-
-            for await (const worksheet of wbReader) {
-                for await (const row of worksheet) {
-                    excelRowNum++;
-                    const values = row.values ? row.values.slice(1) : []; // slice(1) removes 1-based index offset
-                    const rowArr = values.map(v => {
-                        if (v === null || v === undefined) return '';
-                        if (typeof v === 'object' && v.text) return String(v.text); // rich text
-                        if (typeof v === 'object' && v instanceof Date) return v.toISOString().split('T')[0];
-                        if (typeof v === 'object' && v.result !== undefined) return String(v.result); // formula
-                        return String(v);
-                    });
-
-                    // Find header row (first non-empty row)
-                    if (xlsHeaders === null) {
-                        if (rowArr.some(c => String(c ?? '').trim() !== '')) {
-                            xlsHeaders = rowArr.map(h => String(h ?? '').trim());
-                            headerRowIndex = excelRowNum;
-                        }
-                        continue;
-                    }
-
-                    // Skip empty rows
-                    if (!rowArr.some(c => String(c ?? '').trim() !== '')) continue;
-
-                    batch.push(rowArr);
-                    if (batch.length >= BATCH_SIZE) { await flushBatch(batch, xlsHeaders); batch = []; }
-                }
-                break; // only process first sheet
-            }
-            if (batch.length > 0 && xlsHeaders) await flushBatch(batch, xlsHeaders);
-        }
-        // â”€â”€ processBatch helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // â”€â”€ processBatch helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         async function processBatch(rows, hdrs, colMapping, dupHandling, record, impId, userId, accumulate) {
             const studentsToCreate = [];
             const leadsToCreate = [];
@@ -720,7 +603,7 @@ router.post('/process/:importId', async (req, res, next) => {
 
                     if (subjectsArray.length > 0) mappedData.subjects = subjectsArray.filter(s => s);
                     if (Object.keys(importedCustomFields).length > 0) mappedData.customFields = importedCustomFields;
-                    if (Object.keys(mappedData).length === 0) { accumulate(0,0,1,0,[]); continue; }
+                    if (Object.keys(mappedData).length === 0) { accumulate(0, 0, 1, 0, []); continue; }
 
                     if (!mappedData.fullName) {
                         mappedData.fullName = mappedData.enrollmentNo ? `Student-${mappedData.enrollmentNo}`
@@ -730,17 +613,23 @@ router.post('/process/:importId', async (req, res, next) => {
                             : `Student-Row${rowIdx + 2}`;
                     }
 
-                    // Normalise string fields
-                    ['enrollmentNo','controlNumber','phone','email','alternateEmail','alternatePhone',
-                     'fullName','programme','course','regionalCenter','city','state','address','pincode','gender']
-                        .forEach(k => { if (mappedData[k] !== undefined) { const v = String(mappedData[k]).trim(); mappedData[k] = (v && v !== 'undefined' && v !== 'null') ? v : null; } });
+                    ['enrollmentNo', 'controlNumber', 'phone', 'email', 'alternateEmail', 'alternatePhone',
+                        'fullName', 'programme', 'course', 'regionalCenter', 'city', 'state', 'address', 'pincode', 'gender']
+                        .forEach(k => {
+                            if (mappedData[k] !== undefined) {
+                                const v = String(mappedData[k]).trim();
+                                mappedData[k] = (v && v !== 'undefined' && v !== 'null') ? v : null;
+                            }
+                        });
 
                     if (mappedData.batchYear) mappedData.batchYear = parseInt(mappedData.batchYear) || null;
                     if (mappedData.semester)  mappedData.semester  = parseInt(mappedData.semester)  || null;
                     if (mappedData.dateOfBirth)   { const d = new Date(mappedData.dateOfBirth);   mappedData.dateOfBirth   = isNaN(d.getTime()) ? null : d; }
                     if (mappedData.admissionDate) { const d = new Date(mappedData.admissionDate); mappedData.admissionDate = isNaN(d.getTime()) ? null : d; }
 
-                    Object.keys(mappedData).forEach(k => { if (k !== 'subjects' && (mappedData[k] === null || mappedData[k] === undefined || mappedData[k] === '')) delete mappedData[k]; });
+                    Object.keys(mappedData).forEach(k => {
+                        if (k !== 'subjects' && (mappedData[k] === null || mappedData[k] === undefined || mappedData[k] === '')) delete mappedData[k];
+                    });
                     if (mappedData.subjects && Array.isArray(mappedData.subjects)) {
                         mappedData.subjects = mappedData.subjects.filter(s => s && s.trim());
                         if (mappedData.subjects.length === 0) delete mappedData.subjects;
@@ -748,19 +637,24 @@ router.post('/process/:importId', async (req, res, next) => {
 
                     if (record.importType === 'STUDENTS') {
                         const skipUnique = dupHandling === 'force';
-                        const studentData = { fullName: mappedData.fullName || 'Unknown', source: 'excel_import', importBatchId: BigInt(impId), createdById: userId };
+                        const studentData = {
+                            fullName: mappedData.fullName || 'Unknown',
+                            source: 'excel_import',
+                            importBatchId: BigInt(impId),
+                            createdById: userId,
+                        };
                         if (!skipUnique && mappedData.enrollmentNo) studentData.enrollmentNo = mappedData.enrollmentNo;
                         if (!skipUnique && mappedData.email)        studentData.email        = mappedData.email;
                         if (!skipUnique && mappedData.phone)        studentData.phone        = mappedData.phone;
-                        ['controlNumber','alternateEmail','alternatePhone','programme','course','regionalCenter',
-                         'city','state','address','pincode','gender','batchYear','semester','dateOfBirth','admissionDate']
+                        ['controlNumber', 'alternateEmail', 'alternatePhone', 'programme', 'course', 'regionalCenter',
+                            'city', 'state', 'address', 'pincode', 'gender', 'batchYear', 'semester', 'dateOfBirth', 'admissionDate']
                             .forEach(k => { if (mappedData[k]) studentData[k] = mappedData[k]; });
                         if (mappedData.subjects && mappedData.subjects.length > 0) studentData.subjects = mappedData.subjects;
                         if (mappedData.customFields && Object.keys(mappedData.customFields).length > 0) studentData.customFields = mappedData.customFields;
                         studentsToCreate.push(studentData);
                     } else {
-                        const srcMap = { website:'WEBSITE', referral:'REFERRAL', 'social media':'SOCIAL_MEDIA', socialmedia:'SOCIAL_MEDIA', 'walk in':'WALK_IN', walkin:'WALK_IN', 'phone inquiry':'PHONE_INQUIRY', phoneinquiry:'PHONE_INQUIRY', phone:'PHONE_INQUIRY', manual:'MANUAL', 'excel import':'EXCEL_IMPORT', other:'OTHER' };
-                        const prMap  = { low:'LOW', medium:'MEDIUM', high:'HIGH', urgent:'URGENT' };
+                        const srcMap = { website: 'WEBSITE', referral: 'REFERRAL', 'social media': 'SOCIAL_MEDIA', socialmedia: 'SOCIAL_MEDIA', 'walk in': 'WALK_IN', walkin: 'WALK_IN', 'phone inquiry': 'PHONE_INQUIRY', phoneinquiry: 'PHONE_INQUIRY', phone: 'PHONE_INQUIRY', manual: 'MANUAL', 'excel import': 'EXCEL_IMPORT', other: 'OTHER' };
+                        const prMap  = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH', urgent: 'URGENT' };
                         leadsToCreate.push({
                             fullName: mappedData.fullName, email: mappedData.email || null, phone: mappedData.phone || null,
                             alternatePhone: mappedData.alternatePhone || null, interestedCourse: mappedData.interestedCourse || null,
@@ -775,7 +669,7 @@ router.post('/process/:importId', async (req, res, next) => {
                 }
             }
 
-            let imp = 0, upd = 0, skp = 0;
+            let imp = 0, skp = 0;
             if (studentsToCreate.length > 0) {
                 try {
                     const r = await prisma.student.createMany({ data: studentsToCreate, skipDuplicates: dupHandling === 'skip' });
@@ -798,31 +692,142 @@ router.post('/process/:importId', async (req, res, next) => {
                     }
                 }
             }
-            accumulate(imp, upd, skp, batchFailed, batchErrors);
+            accumulate(imp, 0, skp, batchFailed, batchErrors);
         }
 
-        // â”€â”€ Finalization (runs after CSV or XLSX streaming loop above) â”€â”€â”€â”€â”€â”€â”€â”€
-        await prisma.importHistory.update({
-            where: { id: BigInt(importId) },
-            data: { status: 'COMPLETED', completedAt: new Date(), importedCount: imported, updatedCount: updated, skippedCount: skipped, failedCount: failed, errorLog: errors.length > 0 ? errors.slice(0, 100) : null },
+        // â”€â”€ Fire background processing after response is flushed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        setImmediate(async () => {
+            let imported = 0, updated = 0, skipped = 0, failed = 0;
+            const errors = [];
+
+            const emitProgress = () => {
+                const total = Number(importRecord.totalRecords) || 1;
+                const done = imported + failed + skipped;
+                const pct = Math.min(99, Math.round((done / total) * 100));
+                io?.to(importId).emit('import-progress', { progress: pct, imported, failed, updated });
+            };
+
+            try {
+                if (isCSVFile) {
+                    // â”€â”€ Streaming CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    const parseCSVLine = (line) => {
+                        const result = []; let cur = ''; let inQ = false;
+                        for (let i = 0; i < line.length; i++) {
+                            const ch = line[i];
+                            if (inQ) {
+                                if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+                                else if (ch === '"') { inQ = false; }
+                                else { cur += ch; }
+                            } else {
+                                if (ch === '"') { inQ = true; }
+                                else if (ch === ',') { result.push(cur); cur = ''; }
+                                else { cur += ch; }
+                            }
+                        }
+                        result.push(cur);
+                        return result;
+                    };
+
+                    const rl = readline.createInterface({ input: fs.createReadStream(filePath2, { encoding: 'utf8' }), crlfDelay: Infinity });
+                    let csvHeaders = null;
+                    let batch = [];
+
+                    const flushCSV = async (b, hdrs) => {
+                        await processBatch(b, hdrs, columnMapping, duplicateHandling, importRecord, importId, req.user.id,
+                            (imp, upd, skp, fail, errs) => { imported += imp; updated += upd; skipped += skp; failed += fail; errors.push(...errs); });
+                        emitProgress();
+                    };
+
+                    for await (const line of rl) {
+                        const cleanLine = csvHeaders ? line : line.replace(/^\uFEFF/, '');
+                        if (!cleanLine.trim()) continue;
+                        if (!csvHeaders) { csvHeaders = parseCSVLine(cleanLine); continue; }
+                        batch.push(parseCSVLine(line));
+                        if (batch.length >= BATCH_SIZE) { await flushCSV(batch, csvHeaders); batch = []; }
+                    }
+                    if (batch.length > 0) await flushCSV(batch, csvHeaders);
+
+                } else {
+                    // â”€â”€ ExcelJS Streaming XLSX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    const wbReader = new ExcelJS.stream.xlsx.WorkbookReader(filePath2, {
+                        worksheets: 'emit',
+                        sharedStrings: 'cache',
+                        hyperlinks: 'ignore',
+                        styles: 'ignore',
+                        entries: 'emit',
+                    });
+
+                    let xlsHeaders = null;
+                    let batch = [];
+
+                    const flushXLS = async (b, hdrs) => {
+                        await processBatch(b, hdrs, columnMapping, duplicateHandling, importRecord, importId, req.user.id,
+                            (imp, upd, skp, fail, errs) => { imported += imp; updated += upd; skipped += skp; failed += fail; errors.push(...errs); });
+                        emitProgress();
+                    };
+
+                    for await (const worksheet of wbReader) {
+                        for await (const row of worksheet) {
+                            const values = row.values ? row.values.slice(1) : [];
+                            const rowArr = values.map(v => {
+                                if (v === null || v === undefined) return '';
+                                if (typeof v === 'object' && v.text) return String(v.text);
+                                if (v instanceof Date) return v.toISOString().split('T')[0];
+                                if (typeof v === 'object' && v.result !== undefined) return String(v.result);
+                                return String(v);
+                            });
+
+                            if (xlsHeaders === null) {
+                                if (rowArr.some(c => String(c ?? '').trim() !== '')) {
+                                    xlsHeaders = rowArr.map(h => String(h ?? '').trim());
+                                }
+                                continue;
+                            }
+
+                            if (!rowArr.some(c => String(c ?? '').trim() !== '')) continue;
+
+                            batch.push(rowArr);
+                            if (batch.length >= BATCH_SIZE) { await flushXLS(batch, xlsHeaders); batch = []; }
+                        }
+                        break; // first sheet only
+                    }
+                    if (batch.length > 0 && xlsHeaders) await flushXLS(batch, xlsHeaders);
+                }
+
+                // â”€â”€ Finalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                await prisma.importHistory.update({
+                    where: { id: BigInt(importId) },
+                    data: {
+                        status: 'COMPLETED', completedAt: new Date(),
+                        importedCount: imported, updatedCount: updated,
+                        skippedCount: skipped, failedCount: failed,
+                        errorLog: errors.length > 0 ? errors.slice(0, 100) : null,
+                    },
+                });
+
+                io?.to(importId).emit('import-complete', { importId, imported, updated, skipped, failed });
+
+                const adminIds = await getAdminIds();
+                const notifyIds = [...new Set([importRecord.importedById, ...adminIds].filter(Boolean))];
+                const typeName = importRecord.importType === 'STUDENTS' ? 'Orders' : 'Leads';
+                await notify(io, {
+                    userIds: notifyIds, type: 'IMPORT_DONE',
+                    title: `${typeName} Import Completed`,
+                    message: `${imported} ${typeName.toLowerCase()} imported, ${skipped} skipped, ${failed} failed.`,
+                    link: importRecord.importType === 'STUDENTS' ? '/orders' : '/leads',
+                });
+
+                try { fs.unlinkSync(filePath2); } catch (e) { /* already gone */ }
+
+            } catch (bgError) {
+                console.error(`[Import ${importId}] background processing error:`, bgError);
+                try {
+                    await prisma.importHistory.update({ where: { id: BigInt(importId) }, data: { status: 'FAILED', errorLog: [{ error: bgError.message }] } });
+                    io?.to(importId).emit('import-error', { importId, error: bgError.message });
+                } catch (_) {}
+            }
         });
 
-        io?.to(importId).emit('import-complete', { importId, imported, updated, skipped, failed });
-
-        const adminIds = await getAdminIds();
-        const notifyIds = [...new Set([importRecord.importedById, ...adminIds].filter(Boolean))];
-        const typeName = importRecord.importType === 'STUDENTS' ? 'Orders' : 'Leads';
-        await notify(io, { userIds: notifyIds, type: 'IMPORT_DONE', title: `${typeName} Import Completed`, message: `${imported} ${typeName.toLowerCase()} imported, ${skipped} skipped, ${failed} failed.`, link: importRecord.importType === 'STUDENTS' ? '/orders' : '/leads' });
-
-        try { fs.unlinkSync(filePath); } catch (e) { /* already gone */ }
-
-        } catch (bgError) {
-            console.error(`[Import ${importId}] background processing error:`, bgError);
-            try {
-                await prisma.importHistory.update({ where: { id: BigInt(importId) }, data: { status: 'FAILED', errorLog: [{ error: bgError.message }] } });
-                io?.to(importId).emit('import-error', { importId, error: bgError.message });
-            } catch (_) {}
-        }
     } catch (error) {
         next(error);
     }
@@ -830,7 +835,7 @@ router.post('/process/:importId', async (req, res, next) => {
 
 
 
-// â”€â”€ Save confirmed column mappings to learning memory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Save confirmed column mappings to learning memory Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 router.post('/save-mapping', async (req, res, next) => {
     try {
         const { confirmedMappings } = req.body;
@@ -906,9 +911,9 @@ router.delete('/history/:id', async (req, res, next) => {
         }
 
         if (deleteRecords === 'true' && importRecord.status === 'COMPLETED') {
-            // â”€â”€â”€ Fire-and-forget background deletion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            // Response is sent immediately â€” deletion runs fully in background.
-            // Single DELETE with no LIMIT â€” removes every row for this batch.
+            // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Fire-and-forget background deletion Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+            // Response is sent immediately Ã¢â‚¬â€ deletion runs fully in background.
+            // Single DELETE with no LIMIT Ã¢â‚¬â€ removes every row for this batch.
 
             // Security: ensure batchId is a safe integer before using in raw SQL
             const batchIdNum = parseInt(id, 10);
@@ -951,7 +956,7 @@ router.delete('/history/:id', async (req, res, next) => {
             });
         }
 
-        // deleteRecords=false on a COMPLETED import â€” not allowed
+        // deleteRecords=false on a COMPLETED import Ã¢â‚¬â€ not allowed
         return res.status(400).json({
             success: false,
             message: 'To delete a completed import, confirm deletion of all imported records.',
