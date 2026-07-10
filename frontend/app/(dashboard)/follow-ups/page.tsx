@@ -29,7 +29,7 @@ export default function FollowUpsPage() {
     const [editRequirement, setEditRequirement] = useState('')
     const [editFollowupDate, setEditFollowupDate] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
-
+    const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending')
     // Fetch follow-ups from backend on mount
     useEffect(() => {
         fetchPendingFollowUps(1)
@@ -259,7 +259,24 @@ export default function FollowUpsPage() {
                 </div>
             )}
 
-            {/* Table */}
+            {/* Tabs */}
+            <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl w-fit">
+                <button 
+                    onClick={() => setActiveTab('pending')}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'pending' ? 'bg-white dark:bg-[#0d1117] text-primary shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                >
+                    Pending ({pendingFollowUps.length})
+                </button>
+                <button 
+                    onClick={() => setActiveTab('completed')}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'completed' ? 'bg-white dark:bg-[#0d1117] text-primary shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                >
+                    Completed ({completedFollowUps.length})
+                </button>
+            </div>
+
+            {/* Pending Table */}
+            {activeTab === 'pending' && (
             <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 overflow-hidden shadow-lg dark:shadow-none transition-colors">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[860px] border-collapse">
@@ -350,10 +367,11 @@ export default function FollowUpsPage() {
                     </table>
                 </div>
             </div>
+            )}
 
             {/* Completed Follow-ups */}
-            {completedFollowUps.length > 0 && (
-                <div className="mt-8 space-y-4">
+            {activeTab === 'completed' && completedFollowUps.length > 0 && (
+                <div className="space-y-4">
                     <div>
                         <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
                             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
