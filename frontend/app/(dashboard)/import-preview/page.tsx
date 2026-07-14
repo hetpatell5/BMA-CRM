@@ -495,29 +495,33 @@ export default function ImportPreviewPage() {
     const [isExporting, setIsExporting] = useState(false)
     const handleExport = () => {
         try {
-            // Build filename: collect all active filter VALUES (not keys) as the name
-            // Priority: custom-field filter values > search term > 'export'
+            // Build filename: collect active filter values and batch filenames
             const nameParts: string[] = []
 
-            // Active custom-field filter values, e.g. activeFilters = { Programme: Set(["ACE"]) } → "ACE"
+            // Active custom-field filter values, e.g. Programme
             for (const vals of Object.values(activeFilters)) {
                 const arr = Array.from(vals as Set<string>).filter(Boolean)
                 if (arr.length > 0) nameParts.push(arr.join('-'))
             }
 
-            // Batch label as fallback when no field-filters are set
-            if (nameParts.length === 0 && importBatchId) {
-                const batch = filterOptions?.importBatches?.find((b: any) => String(b.id) === String(importBatchId))
-                const label = batch?.fileName?.split('.')?.[0] || batch?.batchName || ''
-                if (label) nameParts.push(label)
+            // Batch labels
+            if (importBatchIds.size > 0) {
+                const batchLabels = Array.from(importBatchIds).map(id => {
+                    const batch = filterOptions?.importBatches?.find((b: any) => String(b.id) === String(id))
+                    return batch?.fileName?.split('.')?.[0] || batch?.batchName || ''
+                }).filter(Boolean)
+                
+                if (batchLabels.length > 0) {
+                    nameParts.push(batchLabels.join('-'))
+                }
             }
 
             // Search term as last fallback
             if (nameParts.length === 0 && debouncedSearch) {
-                nameParts.push(debouncedSearch.trim().replace(/\s+/g, '_'))
+                nameParts.push(debouncedSearch.trim().replace(/\s+/g, '-'))
             }
 
-            const namePart = nameParts.length > 0 ? nameParts.join('_') : 'export'
+            const namePart = nameParts.length > 0 ? nameParts.join('-') : 'export'
 
             // Pass filename to backend so Content-Disposition header is correct
             const p: Record<string, any> = { source: 'excel_import', filename: namePart }
