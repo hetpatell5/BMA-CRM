@@ -473,10 +473,16 @@ export default function ImportPreviewPage() {
         if (selectedAssignees.length === 0) {
             toast({ title: 'Select team members first', variant: 'destructive' }); return
         }
+        // Pass ALL active column filters as customField so segregation respects the
+        // exact column keys from the imported Excel (e.g. "Programme", "Program Name", etc.)
+        const cfFilters: Record<string, string> = {}
+        for (const [k, vals] of Object.entries(activeFilters)) {
+            if (vals.size > 0) cfFilters[k] = Array.from(vals).join(',')
+        }
         const payload = {
             assigneeIds: selectedAssignees,
             importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
-            programmes: Object.keys(activeFilters).includes('Programme') ? Array.from(activeFilters['Programme'] || []) : undefined,
+            ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
             dryRun: true,
         }
         const res = await studentsAPI.segregate(payload)
@@ -484,10 +490,14 @@ export default function ImportPreviewPage() {
     }
 
     const handleSegregateApply = () => {
+        const cfFilters: Record<string, string> = {}
+        for (const [k, vals] of Object.entries(activeFilters)) {
+            if (vals.size > 0) cfFilters[k] = Array.from(vals).join(',')
+        }
         segregateMutation.mutate({
             assigneeIds: selectedAssignees,
             importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
-            programmes: Object.keys(activeFilters).includes('Programme') ? Array.from(activeFilters['Programme'] || []) : undefined,
+            ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
         })
     }
 

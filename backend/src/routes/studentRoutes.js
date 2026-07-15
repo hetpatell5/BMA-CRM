@@ -194,24 +194,34 @@ async function backfillOrderIdsForAllStudents() {
 }
 
 // Get distinct values of a specific customField key for imported records
-// GET /students/meta/import-field-values?field=Regional+Center&batchId=123
+// GET /students/meta/import-field-values?field=Programme&batchIds=1,2,3
 router.get('/meta/import-field-values', async (req, res, next) => {
     try {
-        const { field, batchId } = req.query;
+        const { field, batchId, batchIds } = req.query;
         if (!field) return res.json({ success: true, data: [] });
 
         const escapedField = String(field).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+        // Collect all batch IDs from both batchId (single) and batchIds (comma-sep)
+        const rawIds = [
+            ...(batchId ? [String(batchId)] : []),
+            ...(batchIds ? String(batchIds).split(',').map(s => s.trim()).filter(Boolean) : []),
+        ];
+        const uniqueIds = [...new Set(rawIds)];
+
         let rows;
-        if (batchId) {
+        if (uniqueIds.length > 0) {
+            // Build IN clause dynamically with BigInt placeholders
+            const placeholders = uniqueIds.map(() => '?').join(', ');
             rows = await prisma.$queryRawUnsafe(
                 `SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) AS val
                  FROM students
                  WHERE source = 'excel_import'
-                   AND import_batch_id = ?
+                   AND import_batch_id IN (${placeholders})
                    AND JSON_EXTRACT(custom_fields, '$."${escapedField}"') IS NOT NULL
                    AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) NOT IN ('null','')
                  ORDER BY val ASC LIMIT 300`,
-                BigInt(batchId)
+                ...uniqueIds.map(id => BigInt(id))
             );
         } else {
             rows = await prisma.$queryRawUnsafe(
