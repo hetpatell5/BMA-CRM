@@ -95,7 +95,7 @@ const ACCENTS = [
 // ─── FilterColumn component: loads values lazily when section opens ──────────
 
 function FilterColumn({
-    colKey, accentIdx, batchIds, selectedVals, filterSearch, onToggle, openSections, toggleSection, onValuesLoaded,
+    colKey, accentIdx, batchIds, selectedVals, filterSearch, onToggle, openSections, toggleSection, onValuesLoaded, mixedBatches,
 }: {
     colKey: string
     accentIdx: number
@@ -106,16 +106,18 @@ function FilterColumn({
     openSections: Record<string, boolean>
     toggleSection: (key: string) => void
     onValuesLoaded?: (key: string, count: number) => void
+    mixedBatches?: boolean
 }) {
     const sectionKey = `col_${colKey}`
     const isOpen = !!openSections[sectionKey]
     const accent = ACCENTS[accentIdx % ACCENTS.length]
 
     const { data: vals, isLoading } = useQuery({
-        queryKey: ['import-field-values', colKey, batchIds],
+        queryKey: ['import-field-values', colKey, batchIds.join(',')],
         queryFn: async () => (await studentsAPI.getImportFieldValues(colKey, batchIds.length > 0 ? batchIds : undefined)).data.data as string[],
         enabled: isOpen,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,        // always re-fetch when section is opened so batches never bleed stale values
+        gcTime: 60 * 1000,   // keep in GC cache for 1 min
     })
 
     // Notify parent of the total value count so it can detect "all selected"
@@ -157,6 +159,15 @@ function FilterColumn({
 
             {isOpen && (
                 <div className="space-y-0.5 mb-3 max-h-48 overflow-y-auto">
+                    {/* Warning when multiple batches are selected */}
+                    {mixedBatches && (
+                        <div className="mx-2 mb-2 px-2 py-1.5 rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 flex items-start gap-1.5">
+                            <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-tight">
+                                Values from multiple files may be mixed. Select <strong>one file</strong> for clean filtering.
+                            </p>
+                        </div>
+                    )}
                     {isLoading ? (
                         <div className="px-2 py-3 text-xs text-muted-foreground text-center">Loading…</div>
                     ) : displayed.length === 0 && hasBeenFetched ? (
@@ -991,6 +1002,7 @@ export default function ImportPreviewPage() {
                                     openSections={openSections}
                                     toggleSection={toggleSection}
                                     onValuesLoaded={handleValuesLoaded}
+                                    mixedBatches={importBatchIds.size > 1}
                                 />
                             ))}
 
