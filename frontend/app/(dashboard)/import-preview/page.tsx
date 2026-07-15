@@ -488,7 +488,15 @@ export default function ImportPreviewPage() {
         // exact column keys from the imported Excel (e.g. "Programme", "Program Name", etc.)
         const cfFilters: Record<string, string> = {}
         for (const [k, vals] of Object.entries(activeFilters)) {
-            if (vals.size > 0) cfFilters[k] = Array.from(vals).join(',')
+            const filterCount = vals.size
+            if (filterCount > 0) {
+                const totalDistinct = filterValuesCounts.current[k]
+                if (totalDistinct !== undefined && filterCount >= totalDistinct) {
+                    // skip sending this filter if all options are selected
+                } else {
+                    cfFilters[k] = Array.from(vals).join(',')
+                }
+            }
         }
         const payload = {
             assigneeIds: selectedAssignees,
@@ -503,7 +511,15 @@ export default function ImportPreviewPage() {
     const handleSegregateApply = () => {
         const cfFilters: Record<string, string> = {}
         for (const [k, vals] of Object.entries(activeFilters)) {
-            if (vals.size > 0) cfFilters[k] = Array.from(vals).join(',')
+            const filterCount = vals.size
+            if (filterCount > 0) {
+                const totalDistinct = filterValuesCounts.current[k]
+                if (totalDistinct !== undefined && filterCount >= totalDistinct) {
+                    // skip sending this filter if all options are selected
+                } else {
+                    cfFilters[k] = Array.from(vals).join(',')
+                }
+            }
         }
         segregateMutation.mutate({
             assigneeIds: selectedAssignees,
@@ -1516,11 +1532,12 @@ export default function ImportPreviewPage() {
                                 <Button variant="outline" className="gap-2" onClick={handleSegregatePreview} disabled={selectedAssignees.length === 0}>
                                     <RefreshCw className="w-4 h-4" />Preview
                                 </Button>
-                                <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleSegregateApply} disabled={!segregatePlan || segregatePlan.length === 0 || segregateMutation.isPending}>
+                                <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleSegregateApply} disabled={selectedAssignees.length === 0 || segregateMutation.isPending}>
                                     {segregateMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
                                     Apply Segregation
                                 </Button>
                             </div>
+
                         </div>
                     </div>
                 </div>
