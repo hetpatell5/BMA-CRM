@@ -490,7 +490,7 @@ export default function ImportPreviewPage() {
         for (const [k, vals] of Object.entries(activeFilters)) {
             const filterCount = vals.size
             if (filterCount > 0) {
-                const totalDistinct = filterValuesCounts.current[k]
+                const totalDistinct = colTotalValuesRef.current[k]
                 if (totalDistinct !== undefined && filterCount >= totalDistinct) {
                     // skip sending this filter if all options are selected
                 } else {
@@ -513,7 +513,7 @@ export default function ImportPreviewPage() {
         for (const [k, vals] of Object.entries(activeFilters)) {
             const filterCount = vals.size
             if (filterCount > 0) {
-                const totalDistinct = filterValuesCounts.current[k]
+                const totalDistinct = colTotalValuesRef.current[k]
                 if (totalDistinct !== undefined && filterCount >= totalDistinct) {
                     // skip sending this filter if all options are selected
                 } else {
