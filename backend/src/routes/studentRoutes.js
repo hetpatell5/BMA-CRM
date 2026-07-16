@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { randomUUID } from 'crypto';
+import ExcelJS from 'exceljs';
 
 // Temp directory for storing segregation plan files (expire after 24h)
 const SEG_PLANS_DIR = path.join(os.tmpdir(), 'bma-seg-plans');
@@ -1485,33 +1486,30 @@ router.post('/segregate', async (req, res, next) => {
             ...queryParams
         );
 
-        // Group by programme
-        const byProgramme = {};
-        for (const r of rows) {
-            const prog = r.prog || 'Unknown';
-            if (!byProgramme[prog]) byProgramme[prog] = [];
-            byProgramme[prog].push(r.id);
-        }
-        if (programmesFilter && Array.isArray(programmesFilter) && programmesFilter.length > 0) {
-            for (const k of Object.keys(byProgramme)) {
-                if (!programmesFilter.includes(k)) delete byProgramme[k];
-            }
-        }
-
-        // Round-robin split per programme per assignee, flatten to per-assignee ID lists
+        // ── Flat equal split: floor(total/n) each, remainder → random members ──
         const perAssignee = {}; // assigneeId → {name, ids[]}
         for (const a of assignees) perAssignee[a.id] = { name: a.fullName, ids: [] };
 
-        const planRows = []; // for dryRun preview
-        for (const [prog, ids] of Object.entries(byProgramme)) {
-            const chunks = Array.from({ length: assignees.length }, () => []);
-            ids.forEach((id, i) => chunks[i % assignees.length].push(id));
-            chunks.forEach((chunk, i) => {
-                if (!chunk.length) return;
-                const a = assignees[i];
-                perAssignee[a.id].ids.push(...chunk);
-                planRows.push({ assigneeName: a.fullName, programme: prog, count: chunk.length });
-            });
+        const n = assignees.length;
+        const total = rows.length;
+        const base = Math.floor(total / n);   // records each member gets
+        const remainder = total % n;           // leftover records
+
+        // Assign base records sequentially
+        for (let i = 0; i < n; i++) {
+            const a = assignees[i];
+            const start = i * base;
+            perAssignee[a.id].ids = rows.slice(start, start + base).map(r => r.id);
+        }
+
+        // Distribute remainder records randomly (pick unique random members)
+        const remainderStart = base * n;
+        const remainderPool = [...Array(n).keys()]; // indices 0..n-1
+        for (let r = 0; r < remainder; r++) {
+            // Pick a random remaining index from the pool
+            const pick = Math.floor(Math.random() * remainderPool.length);
+            const idx = remainderPool.splice(pick, 1)[0];
+            perAssignee[assignees[idx].id].ids.push(rows[remainderStart + r].id);
         }
 
         if (dryRun) {
@@ -1541,7 +1539,7 @@ router.post('/segregate', async (req, res, next) => {
             assigneeId: a.id,
             assigneeName: a.fullName,
             count: perAssignee[a.id].ids.length,
-            downloadUrl: `/api/students/segregate/csv/${planId}/${a.id}`,
+            downloadUrl: `/api/students/segregate/xlsx/${planId}/${a.id}`,
         }));
         res.json({
             success: true,
@@ -1550,9 +1548,9 @@ router.post('/segregate', async (req, res, next) => {
     } catch (error) { next(error); }
 });
 
-// ── Stream CSV for a specific member from a saved plan ─────────────────────────
-// GET /api/students/segregate/csv/:planId/:assigneeId
-router.get('/segregate/csv/:planId/:assigneeId', async (req, res, next) => {
+// ── Stream XLSX for a specific member from a saved plan ──────────────────────
+// GET /api/students/segregate/xlsx/:planId/:assigneeId
+router.get('/segregate/xlsx/:planId/:assigneeId', async (req, res, next) => {
     try {
         const planFile = path.join(SEG_PLANS_DIR, `${req.params.planId}.json`);
         if (!fs.existsSync(planFile)) {
@@ -1569,12 +1567,12 @@ router.get('/segregate/csv/:planId/:assigneeId', async (req, res, next) => {
         const { name, ids } = assigneeData;
         const safeName = name.replace(/[^a-z0-9]/gi, '_');
 
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="${safeName}_segregated.csv"`);
+        // Build XLSX in memory using ExcelJS (stream-friendly)
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Data');
 
-        // Stream records in batches of 2000 to keep memory low
         const BATCH = 2000;
-        let headers = null;
+        let headersSet = false;
 
         for (let i = 0; i < ids.length; i += BATCH) {
             const batchIds = ids.slice(i, i + BATCH).map(id => BigInt(id));
@@ -1584,8 +1582,8 @@ router.get('/segregate/csv/:planId/:assigneeId', async (req, res, next) => {
                 orderBy: { id: 'asc' },
             });
 
-            // Determine headers from the first batch that has _columnOrder
-            if (!headers) {
+            if (!headersSet) {
+                let headers = null;
                 for (const r of records) {
                     const cf = r.customFields || {};
                     if (Array.isArray(cf._columnOrder) && cf._columnOrder.length > 0) {
@@ -1594,25 +1592,27 @@ router.get('/segregate/csv/:planId/:assigneeId', async (req, res, next) => {
                     }
                 }
                 if (!headers) {
-                    // Fallback: collect all non-internal keys from the batch
                     const keySet = new Set();
                     for (const r of records) {
                         Object.keys(r.customFields || {}).forEach(k => { if (!cfIsInternal(k)) keySet.add(k); });
                     }
                     headers = [...keySet];
                 }
-                // Write CSV header row
-                res.write(headers.map(h => toCSVCell(h)).join(',') + '\r\n');
+                sheet.columns = headers.map(h => ({ header: h, key: h, width: 20 }));
+                headersSet = true;
             }
 
-            // Write data rows
             for (const r of records) {
                 const cf = r.customFields || {};
-                const row = headers.map(h => toCSVCell(cf[h]));
-                res.write(row.join(',') + '\r\n');
+                const row = {};
+                sheet.columns.forEach(col => { row[col.key] = cf[col.key] ?? ''; });
+                sheet.addRow(row);
             }
         }
 
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}_segregated.xlsx"`);
+        await workbook.xlsx.write(res);
         res.end();
     } catch (error) { next(error); }
 });

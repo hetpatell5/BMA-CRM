@@ -511,7 +511,7 @@ export default function ImportPreviewPage() {
             })
             const d = res.data.data
             setCsvPlanResult({ planId: d.planId, totalStudents: d.totalStudents, members: d.members })
-            toast({ title: 'CSVs Ready!', description: `${Number(d.totalStudents).toLocaleString()} records split across ${d.members.length} members.`, variant: 'success' })
+            toast({ title: 'XLSXs Ready!', description: `${Number(d.totalStudents).toLocaleString()} records split across ${d.members.length} members.`, variant: 'success' })
         } catch (err: any) {
             toast({ title: 'Generation Failed', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' })
         } finally { setSegregateLoading(false) }
@@ -522,15 +522,15 @@ export default function ImportPreviewPage() {
             setDownloadingId(member.assigneeId)
             const { default: apiInst } = await import('@/lib/api')
             const res = await (apiInst as any).get(member.downloadUrl.replace('/api/', '/'), { responseType: 'blob' })
-            const blob = new Blob([res.data], { type: 'text/csv' })
+            const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
             const blobUrl = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = blobUrl
-            a.download = `${member.assigneeName.replace(/[^a-z0-9]/gi, '_')}_segregated.csv`
+            a.download = `${member.assigneeName.replace(/[^a-z0-9]/gi, '_')}_segregated.xlsx`
             document.body.appendChild(a); a.click(); document.body.removeChild(a)
             URL.revokeObjectURL(blobUrl)
         } catch (err: any) {
-            toast({ title: 'Download Failed', description: err?.response?.data?.message || 'Could not download CSV.', variant: 'destructive' })
+            toast({ title: 'Download Failed', description: err?.response?.data?.message || 'Could not download file.', variant: 'destructive' })
         } finally { setDownloadingId(null) }
     }
 
@@ -1538,7 +1538,7 @@ export default function ImportPreviewPage() {
                             {csvPlanResult && (
                                 <div>
                                     <p className="font-semibold text-sm mb-1 text-emerald-600 dark:text-emerald-400">
-                                        CSVs ready — {Number(csvPlanResult.totalStudents).toLocaleString()} records split across {csvPlanResult.members.length} members
+                                        XLSXs ready — {Number(csvPlanResult.totalStudents).toLocaleString()} records split across {csvPlanResult.members.length} members
                                     </p>
                                     <p className="text-xs text-muted-foreground mb-3">Plans expire after 6 hours. Download before closing.</p>
                                     <div className="space-y-2">
@@ -1556,7 +1556,7 @@ export default function ImportPreviewPage() {
                                                 >
                                                     {downloadingId === m.assigneeId
                                                         ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Downloading…</>
-                                                        : <><Download className="w-3.5 h-3.5" />{m.assigneeName.split(' ')[0]}.csv</>
+                                                        : <><Download className="w-3.5 h-3.5" />{m.assigneeName.split(' ')[0]}.xlsx</>
                                                     }
                                                 </Button>
                                             </div>
@@ -1575,7 +1575,7 @@ export default function ImportPreviewPage() {
                                 </Button>
                                 <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleGenerateCSVs} disabled={selectedAssignees.length === 0 || segregateLoading}>
                                     {segregateLoading && csvPlanResult === null && segregatePreview !== null ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                    Generate CSVs
+                                    Generate XLSXs
                                 </Button>
                             </div>
 
