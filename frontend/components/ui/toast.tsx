@@ -28,11 +28,11 @@ const toastVariants = cva(
     {
         variants: {
             variant: {
-                default: 'glass-dropdown text-foreground shadow-2xl',
+                default: 'glass text-foreground shadow-2xl',
                 destructive:
-                    'glass-dropdown group border-red-500/30 text-red-600 dark:text-red-400 shadow-2xl',
+                    'glass group border-red-500/30 text-red-600 dark:text-red-400 shadow-2xl',
                 success:
-                    'glass-dropdown group border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-2xl',
+                    'glass group border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-2xl',
             },
         },
         defaultVariants: {
