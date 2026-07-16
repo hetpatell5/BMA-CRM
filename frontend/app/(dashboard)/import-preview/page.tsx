@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { studentsAPI, ignouAPI, teamAPI } from '@/lib/api'
 import { formatNumber, debounce } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ui/confirm-provider'
 import { useAuthStore } from '@/stores/authStore'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -222,6 +223,7 @@ export default function ImportPreviewPage() {
     const searchParams = useSearchParams()
     const queryClient = useQueryClient()
     const { toast } = useToast()
+    const { confirm } = useConfirm()
     const { user: currentUser } = useAuthStore()
 
     const isAdminManager = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
@@ -691,7 +693,7 @@ export default function ImportPreviewPage() {
                         <Button
                             size="sm"
                             className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => { if (window.confirm(`Mark ${selectedIds.length} selected record(s) as Order?`)) promoteSelectionMutation.mutate(selectedIds) }}
+                            onClick={async () => { if (await confirm(`Mark ${selectedIds.length} selected record(s) as Order?`)) promoteSelectionMutation.mutate(selectedIds) }}
                             disabled={promoteSelectionMutation.isPending}
                         >
                             {promoteSelectionMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowUpCircle className="w-4 h-4" />}
@@ -702,7 +704,7 @@ export default function ImportPreviewPage() {
                         <Button
                             size="sm"
                             className="gap-2 gradient-primary text-white"
-                            onClick={() => { if (window.confirm('Mark ALL records in this batch as Orders?')) promoteBatchMutation.mutate(importBatchId) }}
+                            onClick={async () => { if (await confirm('Mark ALL records in this batch as Orders?')) promoteBatchMutation.mutate(importBatchId) }}
                             disabled={promoteBatchMutation.isPending}
                         >
                             {promoteBatchMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowUpCircle className="w-4 h-4" />}
@@ -873,7 +875,7 @@ export default function ImportPreviewPage() {
                     <Button
                         size="sm"
                         className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-8"
-                        onClick={() => { if (window.confirm(`Mark ${selectedIds.length} selected record(s) as Order?`)) promoteSelectionMutation.mutate(selectedIds) }}
+                        onClick={async () => { if (await confirm(`Mark ${selectedIds.length} selected record(s) as Order?`)) promoteSelectionMutation.mutate(selectedIds) }}
                         disabled={promoteSelectionMutation.isPending}
                     >
                         {promoteSelectionMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
@@ -1149,7 +1151,10 @@ export default function ImportPreviewPage() {
                                                     <Button
                                                         variant="outline" size="sm"
                                                         className="h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 whitespace-nowrap gap-1"
-                                                        onClick={() => { if (window.confirm('Mark this record as an Order?')) promoteRowMutation.mutate(student.id) }}
+                                                        onClick={async (e) => { 
+                                                            e.stopPropagation()
+                                                            if (await confirm('Mark this record as an Order?')) promoteRowMutation.mutate(student.id) 
+                                                        }}
                                                         disabled={isPromoting || promoteSelectionMutation.isPending}
                                                     >
                                                         {isPromoting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}

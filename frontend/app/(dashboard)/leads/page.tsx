@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { leadsAPI, teamAPI } from '@/lib/api'
 import { formatNumber, formatDate, getPriorityColor, getInitials } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ui/confirm-provider'
 import { useAuthStore } from '@/stores/authStore' 
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -39,6 +40,7 @@ const STAGE_BADGE: Record<string, string> = {
 export default function LeadsPage() {
     const queryClient = useQueryClient()
     const { toast }   = useToast()
+    const { confirm } = useConfirm()
     const { user }    = useAuthStore()
 
     const isTelecaller  = user?.role === 'STAFF' && user?.staffRole === 'TELECALLER'
@@ -174,8 +176,12 @@ export default function LeadsPage() {
                     {selectedLeads.length > 0 && hasFullAccess && (
                         <Button
                             variant="destructive" size="sm"
-                            onClick={() => {
-                                if (window.confirm(`Are you sure you want to delete ${selectedLeads.length} selected leads?`)) {
+                            onClick={async () => {
+                                if (await confirm({
+                                    message: `Are you sure you want to delete ${selectedLeads.length} selected leads?`,
+                                    variant: 'destructive',
+                                    title: 'Delete Leads'
+                                })) {
                                     bulkDeleteMutation.mutate(selectedLeads)
                                 }
                             }}

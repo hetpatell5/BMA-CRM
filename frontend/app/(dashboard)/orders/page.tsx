@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { appSettingsAPI, studentsAPI, teamAPI, shiprocketAPI } from '@/lib/api'
 import { formatNumber, formatDate, getStatusColor, debounce } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useConfirm } from '@/components/ui/confirm-provider'
 import { useAuthStore } from '@/stores/authStore'
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -263,6 +264,7 @@ export default function StudentsPage() {
     const searchParams = useSearchParams()
     const queryClient = useQueryClient()
     const { toast } = useToast()
+    const { confirm } = useConfirm()
     const { user: currentUser } = useAuthStore()
     const isAdminManager = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
     const isTelecaller = currentUser?.role === 'STAFF' && currentUser?.staffRole === 'TELECALLER'
@@ -620,10 +622,11 @@ export default function StudentsPage() {
                 warning?.code === 'DUPLICATE_ASSIGNMENT_WARNING' &&
                 !variables.forceDuplicate
             ) {
-                const shouldContinue = window.confirm(warning.message || 'This member already has 5 matching orders. Now go ahead?')
-                if (shouldContinue) {
-                    assignMutation.mutate({ ...variables, forceDuplicate: true })
-                }
+                confirm(warning.message || 'This member already has 5 matching orders. Now go ahead?').then(shouldContinue => {
+                    if (shouldContinue) {
+                        assignMutation.mutate({ ...variables, forceDuplicate: true })
+                    }
+                })
                 return
             }
 
@@ -815,9 +818,9 @@ export default function StudentsPage() {
         return `This order has the same RC (${studentRow.regionalCenter}) and same Program (${studentRow.programme}) already assigned to ${guide.fullName} ${duplicateCount} times. Now go ahead?`
     }
 
-    function handleRequirementTargetAssign(studentRow: ReturnType<typeof getStudentRow>, guide: any) {
+    async function handleRequirementTargetAssign(studentRow: ReturnType<typeof getStudentRow>, guide: any) {
         const warning = getLoadedDuplicateAssignmentWarning(studentRow, guide)
-        if (warning && !window.confirm(warning)) {
+        if (warning && !(await confirm(warning))) {
             return
         }
 

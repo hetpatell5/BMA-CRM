@@ -10,6 +10,7 @@ import { useFollowUpStore, FollowUp } from '@/stores/followUpStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/hooks/use-toast'
 import { format, isBefore, addDays, startOfDay } from 'date-fns'
+import { useConfirm } from '@/components/ui/confirm-provider'
 
 export default function FollowUpsPage() {
     const { user } = useAuthStore()
@@ -21,6 +22,7 @@ export default function FollowUpsPage() {
         addFollowUp, updateFollowUp, removeFollowUp 
     } = useFollowUpStore()
     const { toast } = useToast()
+    const { confirm } = useConfirm()
     const [open, setOpen] = useState(false)
     const [detailsOpen, setDetailsOpen] = useState(false)
     const [selectedFollowUp, setSelectedFollowUp] = useState<FollowUp | null>(null)
@@ -123,7 +125,7 @@ export default function FollowUpsPage() {
     }
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm("Are you sure you want to delete this follow-up?")) return;
+        if (!(await confirm({ message: "Are you sure you want to delete this follow-up?", variant: 'destructive', title: 'Delete Follow-up' }))) return;
         try {
             await removeFollowUp(id)
             toast({ title: 'Follow-up deleted' })
@@ -133,7 +135,7 @@ export default function FollowUpsPage() {
     }
 
     const handleComplete = async (id: string) => {
-        if (!window.confirm("Are you sure you want to mark this follow-up as complete?")) return;
+        if (!(await confirm("Are you sure you want to mark this follow-up as complete?"))) return;
         try {
             await updateFollowUp(id, { status: 'COMPLETED' })
             toast({ title: 'Follow-up marked as completed' })
