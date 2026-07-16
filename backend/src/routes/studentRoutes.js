@@ -4,6 +4,29 @@ import { Prisma } from '@prisma/client';
 import { notify, getAdminIds } from '../services/notificationService.js';
 import { ensureOrderIdForCustomFields } from '../services/orderIdService.js';
 import { readSettings } from './appSettingsRoutes.js';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { randomUUID } from 'crypto';
+
+// Temp directory for storing segregation plan files (expire after 24h)
+const SEG_PLANS_DIR = path.join(os.tmpdir(), 'bma-seg-plans');
+try { fs.mkdirSync(SEG_PLANS_DIR, { recursive: true }); } catch (_) {}
+
+// Internal customField keys to exclude from CSV exports
+const CF_INTERNAL_KEYS = new Set([
+    'requirementassignments', 'telecallerowners', 'orderidprefix',
+    'orderidrequirement', 'orderidgenerated', 'orderidsignature', 'columnorder'
+]);
+function cfIsInternal(key) {
+    if (!key) return true;
+    if (key.startsWith('_')) return true;
+    return CF_INTERNAL_KEYS.has(key.toLowerCase().replace(/[^a-z0-9]/g, ''));
+}
+function toCSVCell(val) {
+    if (val === null || val === undefined) return '';
+    return '"' + String(val).replace(/"/g, '""') + '"';
+}
 
 const router = express.Router();
 
@@ -1410,61 +1433,43 @@ router.post('/promote-import-batch/:importBatchId', async (req, res, next) => {
     }
 });
 
-// Segregate imported students among selected team members, split by programme
+// ── Segregate: compute split and save a plan file — NO DB writes ──────────────
 // POST /api/students/segregate
 router.post('/segregate', async (req, res, next) => {
     try {
         const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
-        if (!isAdmin) {
-            return res.status(403).json({ success: false, message: 'Only admins and managers can segregate data' });
-        }
+        if (!isAdmin) return res.status(403).json({ success: false, message: 'Only admins and managers can segregate data' });
 
         const { assigneeIds, importBatchIds: batchIdsRaw, programmes: programmesFilter, customField: cfRaw, dryRun } = req.body;
-
         if (!assigneeIds || !Array.isArray(assigneeIds) || assigneeIds.length === 0) {
             return res.status(400).json({ success: false, message: 'assigneeIds array is required' });
         }
 
-        // Validate assignees are real active users
+        // Validate assignees
         const assignees = await prisma.user.findMany({
             where: { id: { in: assigneeIds.map(Number) }, status: 'ACTIVE' },
-            select: { id: true, fullName: true, role: true, staffRole: true },
+            select: { id: true, fullName: true },
         });
-        if (assignees.length === 0) {
-            return res.status(400).json({ success: false, message: 'No valid assignee IDs provided' });
-        }
+        if (assignees.length === 0) return res.status(400).json({ success: false, message: 'No valid assignee IDs provided' });
 
-        // ── Single raw SQL approach ────────────────────────────────────────────────
-        // The old approach (Prisma findMany with matchingIds BigInt IN-clause) crashes
-        // Prisma's napi binding when there are 100k+ matching records.
-        // Instead: build one raw SQL with all filters, fetching only (id, prog).
+        // Build WHERE clause for the raw SQL query
         const whereParts = [`source = 'excel_import'`];
         const queryParams = [];
-
-        // Batch filter
         if (batchIdsRaw && Array.isArray(batchIdsRaw) && batchIdsRaw.length > 0) {
-            const placeholders = batchIdsRaw.map(() => '?').join(', ');
-            whereParts.push(`import_batch_id IN (${placeholders})`);
+            whereParts.push(`import_batch_id IN (${batchIdsRaw.map(() => '?').join(', ')})`);
             batchIdsRaw.forEach(id => queryParams.push(BigInt(id)));
         }
-
-        // customField filters
-        const cfEntries = cfRaw && typeof cfRaw === 'object'
-            ? Object.entries(cfRaw).filter(([k, v]) => k && v)
-            : [];
+        const cfEntries = cfRaw && typeof cfRaw === 'object' ? Object.entries(cfRaw).filter(([k, v]) => k && v) : [];
         for (const [k, v] of cfEntries) {
             const ek = k.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
             const vals = String(v).split(',').map(s => s.trim()).filter(Boolean);
-            if (vals.length === 0) continue;
-            const placeholders = vals.map(() => '?').join(', ');
-            whereParts.push(`JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${ek}"')) IN (${placeholders})`);
+            if (!vals.length) continue;
+            whereParts.push(`JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${ek}"')) IN (${vals.map(() => '?').join(', ')})`);
             vals.forEach(val => queryParams.push(val));
         }
-
         const whereSQL = whereParts.join(' AND ');
 
-        // Determine prog column: use first CF filter key if available (user filtered by it),
-        // otherwise fall back to common programme field names.
+        // Prog column: use first CF filter key, else scan common names
         const progCfKey = cfEntries.length > 0 ? cfEntries[0][0] : null;
         let selectExpr;
         if (progCfKey) {
@@ -1474,7 +1479,7 @@ router.post('/segregate', async (req, res, next) => {
             selectExpr = `id, COALESCE(programme, JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."Programme"')), JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."PROGRAMME"')), JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."programme"')), 'Unknown') AS prog`;
         }
 
-        // Fetch only (id, prog) — avoids loading full JSON blobs for 700k rows
+        // Fetch (id, prog) only — lightweight, no full JSON blob per row
         const rows = await prisma.$queryRawUnsafe(
             `SELECT ${selectExpr} FROM students WHERE ${whereSQL} ORDER BY id ASC`,
             ...queryParams
@@ -1485,62 +1490,131 @@ router.post('/segregate', async (req, res, next) => {
         for (const r of rows) {
             const prog = r.prog || 'Unknown';
             if (!byProgramme[prog]) byProgramme[prog] = [];
-            byProgramme[prog].push(r.id); // BigInt from MySQL
+            byProgramme[prog].push(r.id);
         }
-
-        // Legacy: filter by requested programmes if provided
         if (programmesFilter && Array.isArray(programmesFilter) && programmesFilter.length > 0) {
             for (const k of Object.keys(byProgramme)) {
                 if (!programmesFilter.includes(k)) delete byProgramme[k];
             }
         }
 
-        // Round-robin split per programme per assignee
-        const plan = [];
-        const ownershipUpdates = [];
+        // Round-robin split per programme per assignee, flatten to per-assignee ID lists
+        const perAssignee = {}; // assigneeId → {name, ids[]}
+        for (const a of assignees) perAssignee[a.id] = { name: a.fullName, ids: [] };
+
+        const planRows = []; // for dryRun preview
         for (const [prog, ids] of Object.entries(byProgramme)) {
             const chunks = Array.from({ length: assignees.length }, () => []);
             ids.forEach((id, i) => chunks[i % assignees.length].push(id));
             chunks.forEach((chunk, i) => {
-                if (chunk.length === 0) return;
+                if (!chunk.length) return;
                 const a = assignees[i];
-                plan.push({ assigneeId: a.id, assigneeName: a.fullName, programme: prog, count: chunk.length, studentIds: chunk.map(id => id.toString()) });
-                chunk.forEach(id => ownershipUpdates.push({ studentId: id, assigneeId: a.id, assigneeName: a.fullName }));
+                perAssignee[a.id].ids.push(...chunk);
+                planRows.push({ assigneeName: a.fullName, programme: prog, count: chunk.length });
             });
         }
 
         if (dryRun) {
-            return res.json({ success: true, data: { plan, totalStudents: rows.length } });
-        }
-
-        // Apply ownership: batch by assignee → one UPDATE per assignee per 500-row slice
-        const BATCH = 500;
-        for (let i = 0; i < ownershipUpdates.length; i += BATCH) {
-            const slice = ownershipUpdates.slice(i, i + BATCH);
-            const byAssignee = {};
-            for (const u of slice) {
-                const key = String(u.assigneeId);
-                if (!byAssignee[key]) byAssignee[key] = { assigneeId: u.assigneeId, assigneeName: u.assigneeName, ids: [] };
-                byAssignee[key].ids.push(u.studentId);
-            }
-            await Promise.all(Object.values(byAssignee).map(({ assigneeId, assigneeName, ids }) => {
-                const idPlaceholders = ids.map(() => '?').join(', ');
-                return prisma.$executeRawUnsafe(
-                    `UPDATE students SET custom_fields = JSON_SET(COALESCE(custom_fields, '{}'), '$._telecallerOwners', JSON_ARRAY(JSON_OBJECT('id', ?, 'name', ?))) WHERE id IN (${idPlaceholders})`,
-                    assigneeId, assigneeName, ...ids
-                );
+            // Return a compact per-member summary for the preview panel
+            const summary = assignees.map(a => ({
+                assigneeId: a.id,
+                assigneeName: a.fullName,
+                count: perAssignee[a.id].ids.length,
             }));
+            return res.json({ success: true, data: { summary, totalStudents: rows.length } });
         }
 
+        // Save plan to a temp JSON file so the download endpoint can serve it
+        const planId = randomUUID();
+        const planPayload = {
+            expires: Date.now() + 6 * 60 * 60 * 1000, // 6 hours
+            whereSQL, // stored for potential re-query on download
+            assignments: {}
+        };
+        for (const [aid, { name, ids }] of Object.entries(perAssignee)) {
+            planPayload.assignments[aid] = { name, ids: ids.map(id => id.toString()) };
+        }
+        fs.writeFileSync(path.join(SEG_PLANS_DIR, `${planId}.json`), JSON.stringify(planPayload));
+
+        // Return plan summary + download URLs (NO DB writes)
+        const members = assignees.map(a => ({
+            assigneeId: a.id,
+            assigneeName: a.fullName,
+            count: perAssignee[a.id].ids.length,
+            downloadUrl: `/api/students/segregate/csv/${planId}/${a.id}`,
+        }));
         res.json({
             success: true,
-            message: `Segregated ${rows.length} records among ${assignees.length} members`,
-            data: { plan, totalStudents: rows.length }
+            data: { planId, totalStudents: rows.length, members }
         });
-    } catch (error) {
-        next(error);
-    }
+    } catch (error) { next(error); }
 });
 
+// ── Stream CSV for a specific member from a saved plan ─────────────────────────
+// GET /api/students/segregate/csv/:planId/:assigneeId
+router.get('/segregate/csv/:planId/:assigneeId', async (req, res, next) => {
+    try {
+        const planFile = path.join(SEG_PLANS_DIR, `${req.params.planId}.json`);
+        if (!fs.existsSync(planFile)) {
+            return res.status(404).json({ success: false, message: 'Plan not found or has expired (plans last 6 hours).' });
+        }
+        const plan = JSON.parse(fs.readFileSync(planFile, 'utf8'));
+        if (plan.expires < Date.now()) {
+            fs.unlinkSync(planFile);
+            return res.status(410).json({ success: false, message: 'Plan expired. Please re-run segregation.' });
+        }
+        const assigneeData = plan.assignments[req.params.assigneeId];
+        if (!assigneeData) return res.status(404).json({ success: false, message: 'Assignee not found in plan.' });
+
+        const { name, ids } = assigneeData;
+        const safeName = name.replace(/[^a-z0-9]/gi, '_');
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}_segregated.csv"`);
+
+        // Stream records in batches of 2000 to keep memory low
+        const BATCH = 2000;
+        let headers = null;
+
+        for (let i = 0; i < ids.length; i += BATCH) {
+            const batchIds = ids.slice(i, i + BATCH).map(id => BigInt(id));
+            const records = await prisma.student.findMany({
+                where: { id: { in: batchIds } },
+                select: { id: true, customFields: true },
+                orderBy: { id: 'asc' },
+            });
+
+            // Determine headers from the first batch that has _columnOrder
+            if (!headers) {
+                for (const r of records) {
+                    const cf = r.customFields || {};
+                    if (Array.isArray(cf._columnOrder) && cf._columnOrder.length > 0) {
+                        headers = cf._columnOrder.filter(h => h && !cfIsInternal(h));
+                        break;
+                    }
+                }
+                if (!headers) {
+                    // Fallback: collect all non-internal keys from the batch
+                    const keySet = new Set();
+                    for (const r of records) {
+                        Object.keys(r.customFields || {}).forEach(k => { if (!cfIsInternal(k)) keySet.add(k); });
+                    }
+                    headers = [...keySet];
+                }
+                // Write CSV header row
+                res.write(headers.map(h => toCSVCell(h)).join(',') + '\r\n');
+            }
+
+            // Write data rows
+            for (const r of records) {
+                const cf = r.customFields || {};
+                const row = headers.map(h => toCSVCell(cf[h]));
+                res.write(row.join(',') + '\r\n');
+            }
+        }
+
+        res.end();
+    } catch (error) { next(error); }
+});
 
 export default router;

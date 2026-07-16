@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -245,9 +245,11 @@ export default function ImportPreviewPage() {
 
     // ── Segregation state ──────────────────────────────────────────────────
     const [showSegregateModal, setShowSegregateModal] = useState(false)
-    const [segregatePlan, setSegregatePlan]           = useState<any[] | null>(null)
-    const [segregateApplying, setSegregateApplying]   = useState(false)
+    const [segregatePreview, setSegregatePreview]     = useState<any[] | null>(null)
+    const [csvPlanResult, setCsvPlanResult]           = useState<{ planId: string; totalStudents: number; members: any[] } | null>(null)
     const [selectedAssignees, setSelectedAssignees]   = useState<number[]>([])
+    const [segregateLoading, setSegregateLoading]     = useState(false)
+    const [downloadingId, setDownloadingId]           = useState<number | null>(null)
 
     // Compatibility shim: single batch ID for IGNOU / old helpers
     const importBatchId = importBatchIds.size === 1 ? Array.from(importBatchIds)[0] : ''
@@ -466,66 +468,74 @@ export default function ImportPreviewPage() {
         u.role === 'ADMIN' || u.role === 'MANAGER' || (u.role === 'STAFF' && u.staffRole === 'TELECALLER')
     )
 
-    // ── Segregation mutation ────────────────────────────────────────────────
-    const segregateMutation = useMutation({
-        mutationFn: (payload: Parameters<typeof studentsAPI.segregate>[0]) => studentsAPI.segregate(payload),
-        onSuccess: (res: any) => {
-            const { plan, totalStudents } = res.data.data || {}
-            toast({ title: 'Segregation Complete!', description: `${totalStudents} records assigned to ${plan?.length ?? 0} groups.`, variant: 'success' })
-            setShowSegregateModal(false)
-            setSegregatePlan(null)
-            setSelectedAssignees([])
-            queryClient.invalidateQueries({ queryKey: ['import-preview'] })
-        },
-        onError: (err: any) => toast({ title: 'Segregation Failed', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' }),
-    })
-
-    const handleSegregatePreview = async () => {
-        if (selectedAssignees.length === 0) {
-            toast({ title: 'Select team members first', variant: 'destructive' }); return
-        }
-        // Pass ALL active column filters as customField so segregation respects the
-        // exact column keys from the imported Excel (e.g. "Programme", "Program Name", etc.)
+    // ── Segregation — Generate CSVs (NO DB writes) ─────────────────────────
+    const buildCfFilters = () => {
         const cfFilters: Record<string, string> = {}
         for (const [k, vals] of Object.entries(activeFilters)) {
             const filterCount = vals.size
             if (filterCount > 0) {
                 const totalDistinct = colTotalValuesRef.current[k]
-                if (totalDistinct !== undefined && filterCount >= totalDistinct) {
-                    // skip sending this filter if all options are selected
-                } else {
-                    cfFilters[k] = Array.from(vals).join(',')
-                }
+                if (totalDistinct !== undefined && filterCount >= totalDistinct) continue
+                cfFilters[k] = Array.from(vals).join(',')
             }
         }
-        const payload = {
-            assigneeIds: selectedAssignees,
-            importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
-            ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
-            dryRun: true,
-        }
-        const res = await studentsAPI.segregate(payload)
-        setSegregatePlan(res.data.data?.plan || [])
+        return cfFilters
     }
 
-    const handleSegregateApply = () => {
-        const cfFilters: Record<string, string> = {}
-        for (const [k, vals] of Object.entries(activeFilters)) {
-            const filterCount = vals.size
-            if (filterCount > 0) {
-                const totalDistinct = colTotalValuesRef.current[k]
-                if (totalDistinct !== undefined && filterCount >= totalDistinct) {
-                    // skip sending this filter if all options are selected
-                } else {
-                    cfFilters[k] = Array.from(vals).join(',')
-                }
-            }
-        }
-        segregateMutation.mutate({
-            assigneeIds: selectedAssignees,
-            importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
-            ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
-        })
+    const handleSegregatePreview = async () => {
+        if (selectedAssignees.length === 0) { toast({ title: 'Select team members first', variant: 'destructive' }); return }
+        const cfFilters = buildCfFilters()
+        try {
+            setSegregateLoading(true)
+            const res = await studentsAPI.segregate({
+                assigneeIds: selectedAssignees,
+                importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
+                ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
+                dryRun: true,
+            })
+            setSegregatePreview(res.data.data?.summary || [])
+        } catch (err: any) {
+            toast({ title: 'Preview Failed', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' })
+        } finally { setSegregateLoading(false) }
+    }
+
+    const handleGenerateCSVs = async () => {
+        if (selectedAssignees.length === 0) { toast({ title: 'Select team members first', variant: 'destructive' }); return }
+        const cfFilters = buildCfFilters()
+        try {
+            setSegregateLoading(true)
+            const res = await studentsAPI.segregate({
+                assigneeIds: selectedAssignees,
+                importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
+                ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
+            })
+            const d = res.data.data
+            setCsvPlanResult({ planId: d.planId, totalStudents: d.totalStudents, members: d.members })
+            toast({ title: 'CSVs Ready!', description: `${Number(d.totalStudents).toLocaleString()} records split across ${d.members.length} members.`, variant: 'success' })
+        } catch (err: any) {
+            toast({ title: 'Generation Failed', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' })
+        } finally { setSegregateLoading(false) }
+    }
+
+    const handleDownloadMemberCSV = async (member: { assigneeId: number; assigneeName: string; downloadUrl: string }) => {
+        try {
+            setDownloadingId(member.assigneeId)
+            const { default: apiInst } = await import('@/lib/api')
+            const res = await (apiInst as any).get(member.downloadUrl.replace('/api/', '/'), { responseType: 'blob' })
+            const blob = new Blob([res.data], { type: 'text/csv' })
+            const blobUrl = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = blobUrl
+            a.download = `${member.assigneeName.replace(/[^a-z0-9]/gi, '_')}_segregated.csv`
+            document.body.appendChild(a); a.click(); document.body.removeChild(a)
+            URL.revokeObjectURL(blobUrl)
+        } catch (err: any) {
+            toast({ title: 'Download Failed', description: err?.response?.data?.message || 'Could not download CSV.', variant: 'destructive' })
+        } finally { setDownloadingId(null) }
+    }
+
+    const resetSegregateModal = () => {
+        setShowSegregateModal(false); setSegregatePreview(null); setCsvPlanResult(null); setSelectedAssignees([])
     }
 
     // ── Export (CSV) ─────────────────────────────────────────────────────────
@@ -1498,21 +1508,20 @@ export default function ImportPreviewPage() {
                                 )}
                             </div>
 
-                            {segregatePlan && segregatePlan.length > 0 && (
+                            {/* Preview: per-member counts */}
+                            {segregatePreview && segregatePreview.length > 0 && (
                                 <div>
-                                    <p className="font-semibold text-sm mb-2 text-emerald-600 dark:text-emerald-400">Preview Plan</p>
+                                    <p className="font-semibold text-sm mb-2 text-emerald-600 dark:text-emerald-400">Preview — Records per member</p>
                                     <div className="rounded-lg border border-border overflow-hidden">
                                         <table className="w-full text-sm">
                                             <thead><tr className="bg-slate-50 dark:bg-white/5 text-left">
-                                                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground">Assignee</th>
-                                                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground">Programme</th>
+                                                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground">Member</th>
                                                 <th className="px-3 py-2 text-xs font-semibold text-muted-foreground text-right">Records</th>
                                             </tr></thead>
                                             <tbody>
-                                                {segregatePlan.map((row: any, i: number) => (
+                                                {segregatePreview.map((row: any, i: number) => (
                                                     <tr key={i} className="border-t border-border">
                                                         <td className="px-3 py-2 font-medium">{row.assigneeName}</td>
-                                                        <td className="px-3 py-2 text-muted-foreground">{row.programme}</td>
                                                         <td className="px-3 py-2 text-right font-semibold">{formatNumber(row.count)}</td>
                                                     </tr>
                                                 ))}
@@ -1521,20 +1530,52 @@ export default function ImportPreviewPage() {
                                     </div>
                                 </div>
                             )}
-                            {segregatePlan && segregatePlan.length === 0 && (
+                            {segregatePreview && segregatePreview.length === 0 && (
                                 <p className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-500/10 rounded-lg px-3 py-2">No records matched the current filter scope.</p>
+                            )}
+
+                            {/* CSV download links after generation */}
+                            {csvPlanResult && (
+                                <div>
+                                    <p className="font-semibold text-sm mb-1 text-emerald-600 dark:text-emerald-400">
+                                        CSVs ready — {Number(csvPlanResult.totalStudents).toLocaleString()} records split across {csvPlanResult.members.length} members
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mb-3">Plans expire after 6 hours. Download before closing.</p>
+                                    <div className="space-y-2">
+                                        {csvPlanResult.members.map((m: any) => (
+                                            <div key={m.assigneeId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
+                                                <div>
+                                                    <p className="text-sm font-medium">{m.assigneeName}</p>
+                                                    <p className="text-xs text-muted-foreground">{formatNumber(m.count)} records</p>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                                                    onClick={() => handleDownloadMemberCSV(m)}
+                                                    disabled={downloadingId === m.assigneeId}
+                                                >
+                                                    {downloadingId === m.assigneeId
+                                                        ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Downloading…</>
+                                                        : <><Download className="w-3.5 h-3.5" />{m.assigneeName.split(' ')[0]}.csv</>
+                                                    }
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
                         </div>
 
                         <div className="p-4 border-t border-border flex items-center justify-between gap-3">
-                            <Button variant="outline" onClick={() => setShowSegregateModal(false)}>Cancel</Button>
+                            <Button variant="outline" onClick={resetSegregateModal}>Close</Button>
                             <div className="flex items-center gap-2">
-                                <Button variant="outline" className="gap-2" onClick={handleSegregatePreview} disabled={selectedAssignees.length === 0}>
-                                    <RefreshCw className="w-4 h-4" />Preview
+                                <Button variant="outline" className="gap-2" onClick={handleSegregatePreview} disabled={selectedAssignees.length === 0 || segregateLoading}>
+                                    {segregateLoading && !csvPlanResult ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                    Preview
                                 </Button>
-                                <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleSegregateApply} disabled={selectedAssignees.length === 0 || segregateMutation.isPending}>
-                                    {segregateMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-                                    Apply Segregation
+                                <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleGenerateCSVs} disabled={selectedAssignees.length === 0 || segregateLoading}>
+                                    {segregateLoading && csvPlanResult === null && segregatePreview !== null ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                    Generate CSVs
                                 </Button>
                             </div>
 
