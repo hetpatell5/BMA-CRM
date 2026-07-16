@@ -470,7 +470,7 @@ function MemberCard({
 function AssetLightbox({ state, onClose }: { state: LightboxState | null; onClose: () => void }) {
     if (!state) return null
     return (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 sm:p-8" onClick={onClose}>
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/20 backdrop-blur-md p-4 sm:p-8" onClick={onClose}>
             <button type="button" onClick={onClose} className="absolute right-4 top-4 z-[91] rounded-full border border-white/15 bg-white/10 p-2 text-white hover:bg-white/15"><X className="h-5 w-5" /></button>
             <div className="relative flex max-h-[90vh] w-full max-w-[90vw] flex-col items-center justify-center gap-4" onClick={(event) => event.stopPropagation()}>
                 <img src={state.imageUrl} alt={state.title} className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl" />

@@ -782,7 +782,7 @@ export default function StudentDetailPage({ params }: { params: { id: string } }
 
             {/* Edit Price Modal */}
             {showEditPrice && (
-                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4" onClick={() => setShowEditPrice(false)}>
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4" onClick={() => setShowEditPrice(false)}>
                     <div className="glass rounded-2xl p-6 max-w-sm w-full border border-amber-500/20" onClick={e => e.stopPropagation()}>
                         <h3 className="text-lg font-semibold mb-4 text-emerald-500">Update Decided Price</h3>
                         <div className="space-y-4">

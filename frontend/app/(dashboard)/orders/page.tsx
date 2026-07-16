@@ -1840,7 +1840,7 @@ export default function StudentsPage() {
 
             {/* Assign Confirmation Modal */}
             {showAssignModal && assignmentDraft && (
-                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4" onClick={closeAssignModal}>
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4" onClick={closeAssignModal}>
                     <div className="glass rounded-2xl p-6 max-w-lg w-full border border-amber-500/20" onClick={e => e.stopPropagation()}>
                         <div className="flex items-start justify-between gap-4 mb-5">
                             <div>
@@ -1899,7 +1899,7 @@ export default function StudentsPage() {
             
             {/* Requirement Assignment Modal */}
             {showReqModal && reqModalStudent && (
-                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4" onClick={() => setShowReqModal(false)}>
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4" onClick={() => setShowReqModal(false)}>
                     <div className="glass rounded-2xl p-6 max-w-lg w-full border border-violet-500/20 space-y-5" onClick={e => e.stopPropagation()}>
                         <div className="flex items-start justify-between gap-4">
                             <div>
@@ -1986,7 +1986,7 @@ export default function StudentsPage() {
 
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in">
                     <div className="glass rounded-2xl p-6 max-w-md w-full mx-4 border border-red-500/20">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">

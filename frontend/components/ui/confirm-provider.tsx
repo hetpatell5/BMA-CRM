@@ -62,7 +62,7 @@ export const ConfirmProvider = ({ children }: { children: ReactNode }) => {
         <ConfirmContext.Provider value={{ confirm }}>
             {children}
             {isOpen && (
-                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-[100] animate-fade-in">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[100] animate-fade-in">
                     <div className={`glass rounded-2xl p-6 max-w-md w-full mx-4 border ${isDestructive ? 'border-red-500/20' : 'border-border'}`}>
                         <div className="flex items-center gap-3 mb-4">
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDestructive ? 'bg-red-500/20' : 'bg-primary/20'}`}>

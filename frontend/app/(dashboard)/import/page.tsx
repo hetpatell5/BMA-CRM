@@ -789,7 +789,7 @@ export default function ImportPage() {
 
             {/* ── Professional Upload Progress Modal (Zoho/Linear Style) ── */}
             {uploadingFile && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="w-[400px] rounded-xl border border-border bg-background shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 flex items-start gap-4">
                             <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
