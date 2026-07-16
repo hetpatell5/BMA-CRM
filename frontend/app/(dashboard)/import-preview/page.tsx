@@ -1108,7 +1108,7 @@ export default function ImportPreviewPage() {
                                                 {/* IGNOU Status cell */}
                                                 <td className={cn(
                                                     "p-2 border-border text-[13px] min-w-[130px] sticky right-[100px] z-10 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]",
-                                                    isSelected ? "bg-primary/5" : "bg-background group-hover/row:bg-slate-50/50 dark:bg-background dark:group-hover/row:bg-white/[0.02]"
+                                                    isSelected ? "bg-primary/5" : "bg-background group-hover/row:bg-slate-50 dark:bg-background dark:group-hover/row:bg-[#101625]"
                                                 )}>
                                                     {!ignouCheck ? (
                                                         <span className="text-[11px] text-muted-foreground">—</span>
@@ -1144,7 +1144,7 @@ export default function ImportPreviewPage() {
                                                 </td>
                                                 <td className={cn(
                                                     "p-2 border-border sticky right-0 z-20 w-[80px] min-w-[80px]",
-                                                    isSelected ? "bg-primary/5" : "bg-background group-hover/row:bg-slate-50/50 dark:bg-background dark:group-hover/row:bg-white/[0.02]"
+                                                    isSelected ? "bg-primary/5" : "bg-background group-hover/row:bg-slate-50 dark:bg-background dark:group-hover/row:bg-[#101625]"
                                                 )} onClick={e => e.stopPropagation()}>
                                                     <Button
                                                         variant="outline" size="sm"

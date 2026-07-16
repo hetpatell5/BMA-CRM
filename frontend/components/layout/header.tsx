@@ -77,7 +77,7 @@ export function Header() {
         : 'px-3 py-2.5 mb-1 rounded-xl bg-white/[0.06]'
 
     return (
-        <header className="h-16 bg-background/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-0 md:pr-6 sticky top-0 z-30">
+        <header className="h-16 bg-background/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-0 md:pr-6 sticky top-0 z-50">
             {/* Left side - Hamburger + Search */}
             <div className="flex items-center flex-1 transition-all duration-300 gap-4">
                 {/* Hamburger Menu */}
