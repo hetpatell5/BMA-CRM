@@ -1220,7 +1220,7 @@ export default function ImportPreviewPage() {
                 const [modalTab, setModalTab] = [ignouModalTab, setIgnouModalTab]
 
                 return (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { setIgnouModal(null); setIgnouModalTab('analysis') }}>
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => { setIgnouModal(null); setIgnouModalTab('analysis') }}>
                         <div className="absolute inset-0 bg-black/20 backdrop-blur-md" />
                         <div className="relative bg-background rounded-2xl border border-border shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
 
@@ -1469,7 +1469,7 @@ export default function ImportPreviewPage() {
 
             {/* ── Segregation Modal ─────────────────────────────────────── */}
             {showSegregateModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowSegregateModal(false)}>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowSegregateModal(false)}>
                     <div className="absolute inset-0 bg-black/20 backdrop-blur-md" />
                     <div className="relative bg-background rounded-2xl border border-border shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between p-5 border-b border-border">

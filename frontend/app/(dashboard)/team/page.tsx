@@ -615,7 +615,7 @@ export default function SettingsPage() {
 
             {/* ─── ADD MEMBER MODAL ─── */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4 !mt-0">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[100] p-4 !mt-0">
                     <div className="glass rounded-2xl p-6 max-w-md w-full border border-white/10 animate-fade-in">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-xl font-semibold flex items-center gap-2">
@@ -675,7 +675,7 @@ export default function SettingsPage() {
 
             {/* ─── EDIT MEMBER MODAL ─── */}
             {showEditModal && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4 !mt-0">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[100] p-4 !mt-0">
                     <div className="glass rounded-2xl p-6 max-w-md w-full border border-white/10 animate-fade-in">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-xl font-semibold flex items-center gap-2">
@@ -736,7 +736,7 @@ export default function SettingsPage() {
 
             {/* ─── DELETE CONFIRMATION MODAL ─── */}
             {showDeleteConfirm && deleteTarget && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in !mt-0">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in !mt-0">
                     <div className="glass rounded-2xl p-6 max-w-md w-full border border-red-500/20">
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
@@ -782,7 +782,7 @@ export default function SettingsPage() {
                 const requiresDegree = selectedRole.requiresDegree
 
                 return (
-                    <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in !mt-0">
+                    <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in !mt-0">
                         <div className="glass rounded-2xl p-6 max-w-sm w-full border border-white/10">
                             <div className="flex items-start justify-between mb-5">
                                 <div className="flex items-center gap-3">
@@ -847,7 +847,7 @@ export default function SettingsPage() {
 
             {/* ─── PAYMENT DETAILS MODAL ─── */}
             {showPaymentModal && paymentTarget && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in !mt-0">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in !mt-0">
                     <div className="glass rounded-2xl p-6 max-w-md w-full border border-white/10">
                         <div className="flex items-start justify-between mb-5">
                             <div className="flex items-center gap-3">
@@ -901,7 +901,7 @@ export default function SettingsPage() {
 
             {/* ─── VIEW MEMBER MODAL ─── */}
             {showViewModal && viewTarget && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4 !mt-0">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[100] p-4 !mt-0">
                     <div className="glass bg-background/95 dark:bg-transparent rounded-2xl p-6 max-w-2xl w-full border border-slate-200 dark:border-white/10 animate-fade-in max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-xl font-semibold flex items-center gap-2">
@@ -992,7 +992,7 @@ export default function SettingsPage() {
             )}
             {/* ─── CHANGE PASSWORD MODAL ─── */}
             {showPasswordModal && passwordTarget && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in !mt-0">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in !mt-0">
                     <div className="glass rounded-2xl p-6 max-w-sm w-full border border-amber-500/20">
                         <div className="flex items-start justify-between mb-5">
                             <div className="flex items-center gap-3">

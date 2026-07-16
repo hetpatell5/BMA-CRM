@@ -126,7 +126,7 @@ export default function ShiprocketModal({
 
     return (
         <div
-            className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4 !mt-0 animate-fade-in"
+            className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[100] p-4 !mt-0 animate-fade-in"
             onClick={onClose}
         >
             <div
