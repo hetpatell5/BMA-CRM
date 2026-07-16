@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -714,7 +714,7 @@ export default function ImportPreviewPage() {
                             size="sm"
                             variant="outline"
                             className="gap-2 border-violet-500/30 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10"
-                            onClick={() => { setShowSegregateModal(true); setSegregatePlan(null) }}
+                            onClick={() => { setSegregatePreview(null); setCsvPlanResult(null); setShowSegregateModal(true) }}
                         >
                             <Users className="w-4 h-4" />
                             <span className="hidden sm:inline">Segregate</span>
