@@ -1425,12 +1425,6 @@ router.post('/segregate', async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'assigneeIds array is required' });
         }
 
-        // Build where clause
-        const where = { source: 'excel_import' };
-        if (batchIdsRaw && Array.isArray(batchIdsRaw) && batchIdsRaw.length > 0) {
-            where.importBatchId = { in: batchIdsRaw.map(id => BigInt(id)) };
-        }
-
         // Validate assignees are real active users
         const assignees = await prisma.user.findMany({
             where: { id: { in: assigneeIds.map(Number) }, status: 'ACTIVE' },
@@ -1440,44 +1434,61 @@ router.post('/segregate', async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'No valid assignee IDs provided' });
         }
 
-        // Apply customField filters if provided
-        let matchingIds = null;
-        if (cfRaw && typeof cfRaw === 'object') {
-            const cfEntries = Object.entries(cfRaw).filter(([k, v]) => k && v);
-            if (cfEntries.length > 0) {
-                const cfWhereParts = cfEntries.map(([k, v]) => {
-                    const ek = k.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-                    const vals = String(v).split(',').map(s => s.trim()).filter(Boolean);
-                    return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${ek}"')) IN (${vals.map(() => '?').join(', ')})`;
-                });
-                const cfParams = cfEntries.flatMap(([, v]) => String(v).split(',').map(s => s.trim()).filter(Boolean));
-                const rows = await prisma.$queryRawUnsafe(
-                    `SELECT id FROM students WHERE ${cfWhereParts.join(' AND ')}`, ...cfParams
-                );
-                matchingIds = rows.map(r => BigInt(r.id));
-            }
-        }
-        if (matchingIds !== null) {
-            where.id = { in: matchingIds };
+        // ── Single raw SQL approach ────────────────────────────────────────────────
+        // The old approach (Prisma findMany with matchingIds BigInt IN-clause) crashes
+        // Prisma's napi binding when there are 100k+ matching records.
+        // Instead: build one raw SQL with all filters, fetching only (id, prog).
+        const whereParts = [`source = 'excel_import'`];
+        const queryParams = [];
+
+        // Batch filter
+        if (batchIdsRaw && Array.isArray(batchIdsRaw) && batchIdsRaw.length > 0) {
+            const placeholders = batchIdsRaw.map(() => '?').join(', ');
+            whereParts.push(`import_batch_id IN (${placeholders})`);
+            batchIdsRaw.forEach(id => queryParams.push(BigInt(id)));
         }
 
-        // Fetch all matching students
-        const students = await prisma.student.findMany({
-            where,
-            select: { id: true, programme: true, customFields: true },
-            orderBy: { id: 'asc' },
-        });
+        // customField filters
+        const cfEntries = cfRaw && typeof cfRaw === 'object'
+            ? Object.entries(cfRaw).filter(([k, v]) => k && v)
+            : [];
+        for (const [k, v] of cfEntries) {
+            const ek = k.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            const vals = String(v).split(',').map(s => s.trim()).filter(Boolean);
+            if (vals.length === 0) continue;
+            const placeholders = vals.map(() => '?').join(', ');
+            whereParts.push(`JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${ek}"')) IN (${placeholders})`);
+            vals.forEach(val => queryParams.push(val));
+        }
+
+        const whereSQL = whereParts.join(' AND ');
+
+        // Determine prog column: use first CF filter key if available (user filtered by it),
+        // otherwise fall back to common programme field names.
+        const progCfKey = cfEntries.length > 0 ? cfEntries[0][0] : null;
+        let selectExpr;
+        if (progCfKey) {
+            const ek = progCfKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            selectExpr = `id, COALESCE(JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${ek}"')), programme, 'Unknown') AS prog`;
+        } else {
+            selectExpr = `id, COALESCE(programme, JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."Programme"')), JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."PROGRAMME"')), JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."programme"')), 'Unknown') AS prog`;
+        }
+
+        // Fetch only (id, prog) — avoids loading full JSON blobs for 700k rows
+        const rows = await prisma.$queryRawUnsafe(
+            `SELECT ${selectExpr} FROM students WHERE ${whereSQL} ORDER BY id ASC`,
+            ...queryParams
+        );
 
         // Group by programme
         const byProgramme = {};
-        for (const s of students) {
-            const cf = s.customFields && typeof s.customFields === 'object' ? s.customFields : {};
-            const prog = s.programme || cf['Programme'] || cf['PROGRAMME'] || cf['programme'] || 'Unknown';
+        for (const r of rows) {
+            const prog = r.prog || 'Unknown';
             if (!byProgramme[prog]) byProgramme[prog] = [];
-            byProgramme[prog].push(s.id);
+            byProgramme[prog].push(r.id); // BigInt from MySQL
         }
 
-        // Filter to requested programmes if provided
+        // Legacy: filter by requested programmes if provided
         if (programmesFilter && Array.isArray(programmesFilter) && programmesFilter.length > 0) {
             for (const k of Object.keys(byProgramme)) {
                 if (!programmesFilter.includes(k)) delete byProgramme[k];
@@ -1499,29 +1510,37 @@ router.post('/segregate', async (req, res, next) => {
         }
 
         if (dryRun) {
-            return res.json({ success: true, data: { plan, totalStudents: students.length } });
+            return res.json({ success: true, data: { plan, totalStudents: rows.length } });
         }
 
-        // Apply ownership: set _telecallerOwners in customFields for each student
-        const BATCH = 200;
+        // Apply ownership: batch by assignee → one UPDATE per assignee per 500-row slice
+        const BATCH = 500;
         for (let i = 0; i < ownershipUpdates.length; i += BATCH) {
             const slice = ownershipUpdates.slice(i, i + BATCH);
-            await Promise.all(slice.map(({ studentId, assigneeId, assigneeName }) =>
-                prisma.$executeRaw`
-                    UPDATE students
-                    SET custom_fields = JSON_SET(COALESCE(custom_fields, '{}'), '$._telecallerOwners', JSON_ARRAY(JSON_OBJECT('id', ${assigneeId}, 'name', ${assigneeName})))
-                    WHERE id = ${studentId}`
-            ));
+            const byAssignee = {};
+            for (const u of slice) {
+                const key = String(u.assigneeId);
+                if (!byAssignee[key]) byAssignee[key] = { assigneeId: u.assigneeId, assigneeName: u.assigneeName, ids: [] };
+                byAssignee[key].ids.push(u.studentId);
+            }
+            await Promise.all(Object.values(byAssignee).map(({ assigneeId, assigneeName, ids }) => {
+                const idPlaceholders = ids.map(() => '?').join(', ');
+                return prisma.$executeRawUnsafe(
+                    `UPDATE students SET custom_fields = JSON_SET(COALESCE(custom_fields, '{}'), '$._telecallerOwners', JSON_ARRAY(JSON_OBJECT('id', ?, 'name', ?))) WHERE id IN (${idPlaceholders})`,
+                    assigneeId, assigneeName, ...ids
+                );
+            }));
         }
 
         res.json({
             success: true,
-            message: `Segregated ${students.length} records among ${assignees.length} members`,
-            data: { plan, totalStudents: students.length }
+            message: `Segregated ${rows.length} records among ${assignees.length} members`,
+            data: { plan, totalStudents: rows.length }
         });
     } catch (error) {
         next(error);
     }
 });
+
 
 export default router;
