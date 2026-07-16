@@ -55,16 +55,16 @@ interface FormTemplate {
 // Constants
 // ─────────────────────────────────────────────
 const FIELD_DEFS: { type: FieldType; label: string; icon: React.ElementType; color: string }[] = [
-    { type: 'short_text',      label: 'Short Answer',     icon: Type,           color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-    { type: 'long_text',       label: 'Paragraph',        icon: AlignLeft,      color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
-    { type: 'email',           label: 'Email',            icon: ExternalLink,   color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
-    { type: 'number',          label: 'Number',           icon: Hash,           color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-    { type: 'date',            label: 'Date',             icon: Calendar,       color: 'bg-rose-500/20 text-rose-400 border-rose-500/30' },
-    { type: 'dropdown',        label: 'Dropdown',         icon: List,           color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-    { type: 'multiple_choice', label: 'Multiple Choice',  icon: Radio,          color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-    { type: 'checkboxes',      label: 'Checkboxes',       icon: CheckSquare,    color: 'bg-teal-500/20 text-teal-400 border-teal-500/30' },
-    { type: 'file_upload',     label: 'File Upload',      icon: ImageIcon,      color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-    { type: 'section_header',  label: 'Section Header',   icon: ClipboardList,  color: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
+    { type: 'short_text',      label: 'Short Answer',     icon: Type,           color: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800' },
+    { type: 'long_text',       label: 'Paragraph',        icon: AlignLeft,      color: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-400 dark:border-indigo-800' },
+    { type: 'email',           label: 'Email',            icon: ExternalLink,   color: 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-400 dark:border-cyan-800' },
+    { type: 'number',          label: 'Number',           icon: Hash,           color: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/40 dark:text-purple-400 dark:border-purple-800' },
+    { type: 'date',            label: 'Date',             icon: Calendar,       color: 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/40 dark:text-rose-400 dark:border-rose-800' },
+    { type: 'dropdown',        label: 'Dropdown',         icon: List,           color: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800' },
+    { type: 'multiple_choice', label: 'Multiple Choice',  icon: Radio,          color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800' },
+    { type: 'checkboxes',      label: 'Checkboxes',       icon: CheckSquare,    color: 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/40 dark:text-teal-400 dark:border-teal-800' },
+    { type: 'file_upload',     label: 'File Upload',      icon: ImageIcon,      color: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-800' },
+    { type: 'section_header',  label: 'Section Header',   icon: ClipboardList,  color: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700' },
 ]
 
 const getFieldDef = (type: FieldType) => FIELD_DEFS.find(d => d.type === type)!
@@ -660,26 +660,6 @@ export default function FormTemplatesPage() {
                     <Plus className="w-4 h-4" />
                     New Template
                 </Button>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                    { label: 'Total', value: templates.length, icon: FileText, color: 'bg-violet-500/20 text-violet-400' },
-                    { label: 'Active', value: templates.filter(t => t.isActive).length, icon: ToggleLeft, color: 'bg-green-500/20 text-green-400' },
-                    { label: 'Total Fields', value: templates.reduce((acc, t) => acc + t.fields.length, 0), icon: Type, color: 'bg-blue-500/20 text-blue-400' },
-                    { label: 'Latest', value: templates.length > 0 ? '✓' : '—', icon: CheckSquare, color: 'bg-amber-500/20 text-amber-400' },
-                ].map(s => (
-                    <div key={s.label} className="glass rounded-xl p-4 flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${s.color}`}>
-                            <s.icon className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <p className="text-2xl font-bold">{s.value}</p>
-                            <p className="text-xs text-muted-foreground">{s.label}</p>
-                        </div>
-                    </div>
-                ))}
             </div>
 
             {/* Template Cards */}

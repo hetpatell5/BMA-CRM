@@ -724,7 +724,7 @@ export default function ImportPreviewPage() {
             </div>
 
             {/* ── IGNOU Assignment Status Checker Toolbar (Admin/Manager only) ── */}
-            {isAdminManager && (
+            {isAdminManager && selectedIds.length > 0 && (
             <div className="rounded-xl border border-border bg-gradient-to-r from-indigo-500/5 via-violet-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:via-violet-500/10 dark:to-purple-500/10 p-4 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
