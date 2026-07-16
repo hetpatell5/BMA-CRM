@@ -373,7 +373,7 @@ function FormBuilder({
         <div className="flex flex-col">
             {/* ── Back Confirm Modal ── */}
             {showBackConfirm && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="glass rounded-2xl p-6 max-w-sm w-full border border-white/10 space-y-4 animate-fade-in">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">

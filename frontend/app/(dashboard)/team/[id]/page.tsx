@@ -648,7 +648,7 @@ export default function MemberDashboard() {
             {/* Image Zoom Modal */}
             {zoomedImage && (
                 <div 
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-8 animate-in fade-in duration-200 !mt-0"
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 sm:p-8 animate-in fade-in duration-200 !mt-0"
                     onClick={() => setZoomedImage(null)}
                 >
                     <button 
