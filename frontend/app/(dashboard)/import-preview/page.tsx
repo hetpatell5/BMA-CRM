@@ -1055,10 +1055,7 @@ export default function ImportPreviewPage() {
                                         </th>
                                     ))}
                                     <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-[100px] z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
-                                        <span className="flex items-center gap-1.5">
-                                            <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
-                                            Data
-                                        </span>
+                                        Status
                                     </th>
                                     <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-0 z-30 w-[100px] min-w-[100px]">
                                         Action
@@ -1109,7 +1106,10 @@ export default function ImportPreviewPage() {
                                                     </td>
                                                 ))}
                                                 {/* IGNOU Status cell */}
-                                                <td className="p-2 border-border text-[13px] min-w-[130px] sticky right-[100px] z-10 bg-white dark:bg-[#0b1120] group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]">
+                                                <td className={cn(
+                                                    "p-2 border-border text-[13px] min-w-[130px] sticky right-[100px] z-10 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]",
+                                                    isSelected ? "bg-primary/5" : "bg-background group-hover/row:bg-slate-50/50 dark:bg-background dark:group-hover/row:bg-white/[0.02]"
+                                                )}>
                                                     {!ignouCheck ? (
                                                         <span className="text-[11px] text-muted-foreground">—</span>
                                                     ) : ignouCheck.checkStatus === 'RUNNING' || ignouCheck.checkStatus === 'PENDING' ? (
@@ -1142,15 +1142,18 @@ export default function ImportPreviewPage() {
                                                     )}
 
                                                 </td>
-                                                <td className="p-2 border-border sticky right-0 z-20 bg-white dark:bg-[#0b1120] group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-900 w-[100px] min-w-[100px]" onClick={e => e.stopPropagation()}>
+                                                <td className={cn(
+                                                    "p-2 border-border sticky right-0 z-20 w-[80px] min-w-[80px]",
+                                                    isSelected ? "bg-primary/5" : "bg-background group-hover/row:bg-slate-50/50 dark:bg-background dark:group-hover/row:bg-white/[0.02]"
+                                                )} onClick={e => e.stopPropagation()}>
                                                     <Button
                                                         variant="outline" size="sm"
-                                                        className="h-8 text-[11px] font-bold uppercase tracking-wider text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 whitespace-nowrap gap-1.5"
+                                                        className="h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 whitespace-nowrap gap-1"
                                                         onClick={() => { if (window.confirm('Mark this record as an Order?')) promoteRowMutation.mutate(student.id) }}
                                                         disabled={isPromoting || promoteSelectionMutation.isPending}
                                                     >
-                                                        {isPromoting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ArrowUpCircle className="w-3 h-3" />}
-                                                        Mark as Order
+                                                        {isPromoting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
+                                                        Order
                                                     </Button>
                                                 </td>
                                             </tr>
