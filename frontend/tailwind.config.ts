@@ -97,6 +97,11 @@ const config: Config = {
                     '0%, 100%': { transform: 'translate(0, 0)' },
                     '50%': { transform: 'translate(-5%, 5%)' },
                 },
+                'pan-bg': {
+                    '0%': { backgroundPosition: '0% 50%' },
+                    '50%': { backgroundPosition: '100% 50%' },
+                    '100%': { backgroundPosition: '0% 50%' },
+                },
             },
             animation: {
                 'accordion-down': 'accordion-down 0.2s ease-out',
@@ -107,6 +112,7 @@ const config: Config = {
                 pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'fade-in-up': 'fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards',
                 'slow-drift': 'slow-drift 20s ease-in-out infinite',
+                'pan-bg': 'pan-bg 15s ease infinite',
             },
         },
     },
