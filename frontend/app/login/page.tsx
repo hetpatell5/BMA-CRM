@@ -66,8 +66,7 @@ export default function LoginPage() {
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#fafafa] dark:bg-[#0a0a0c]">
             {/* Subtle Animated Background Sweep */}
             <div className="absolute inset-0 z-0 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-tr from-blue-100/80 via-[#fafafa] to-blue-50/50 dark:from-blue-900/30 dark:via-[#0a0a0c] dark:to-blue-950/20 bg-[length:200%_200%] animate-pan-bg" />
-                <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.04] dark:opacity-[0.06] mix-blend-overlay pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-200/50 via-slate-50 to-blue-200/50 dark:from-blue-900/40 dark:via-[#0a0a0c] dark:to-blue-900/40 bg-[length:200%_100%] animate-pan-bg" />
             </div>
 
             {/* Login Card */}
