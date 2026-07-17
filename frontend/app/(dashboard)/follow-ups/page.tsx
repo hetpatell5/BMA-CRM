@@ -12,6 +12,13 @@ import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/hooks/use-toast'
 import { format, isBefore, addDays, startOfDay } from 'date-fns'
 import { useConfirm } from '@/components/ui/confirm-provider'
+import RichTextEditor from '@/components/RichTextEditor'
+import DOMPurify from 'dompurify'
+
+const stripHtml = (html: string) => {
+    if (!html) return ''
+    return html.replace(/<[^>]*>?/gm, '')
+}
 
 export default function FollowUpsPage() {
     const { user } = useAuthStore()
@@ -31,7 +38,6 @@ export default function FollowUpsPage() {
     const [editDescription, setEditDescription] = useState('')
     const [editRequirement, setEditRequirement] = useState('')
     const [editFollowupDate, setEditFollowupDate] = useState('')
-    const [editColor, setEditColor] = useState('#000000')
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending')
     // Fetch follow-ups from backend on mount
@@ -60,7 +66,6 @@ export default function FollowUpsPage() {
         setEditDescription(selectedFollowUp.description)
         setEditRequirement(selectedFollowUp.requirement)
         setEditFollowupDate(selectedFollowUp.followupDate ? selectedFollowUp.followupDate.split('T')[0] : '')
-        setEditColor(selectedFollowUp.color || '#000000')
         setIsEditing(true)
     }
 
@@ -70,15 +75,13 @@ export default function FollowUpsPage() {
             await updateFollowUp(selectedFollowUp.id, {
                 description: editDescription,
                 requirement: editRequirement,
-                followupDate: editFollowupDate,
-                color: editColor
+                followupDate: editFollowupDate
             })
             setSelectedFollowUp({
                 ...selectedFollowUp,
                 description: editDescription,
                 requirement: editRequirement,
-                followupDate: editFollowupDate,
-                color: editColor
+                followupDate: editFollowupDate
             })
             setIsEditing(false)
             setDetailsOpen(false)
@@ -94,7 +97,6 @@ export default function FollowUpsPage() {
     const [description, setDescription] = useState('')
     const [followupDate, setFollowupDate] = useState('')
     const [requirement, setRequirement] = useState('')
-    const [color, setColor] = useState('#000000')
 
     // Removed local filter arrays since they are managed by the store
 
@@ -116,8 +118,7 @@ export default function FollowUpsPage() {
                 number,
                 description,
                 followupDate,
-                requirement,
-                color
+                requirement
             })
             toast({ title: 'Follow up added successfully' })
             setOpen(false)
@@ -126,7 +127,6 @@ export default function FollowUpsPage() {
             setDescription('')
             setFollowupDate('')
             setRequirement('')
-            setColor('#000000')
         } catch {
             toast({ title: 'Failed to add follow-up', variant: 'destructive' })
         }
@@ -197,14 +197,7 @@ export default function FollowUpsPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description</Label>
-                                <textarea id="description" placeholder="Brief description" value={description} onChange={e => setDescription(e.target.value)} required className="w-full rounded-xl min-h-[80px] p-3 text-sm border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="color" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Color</Label>
-                                <div className="flex items-center gap-2">
-                                    <input type="color" id="color" value={color} onChange={e => setColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0" />
-                                    <span className="text-xs text-muted-foreground">{color}</span>
-                                </div>
+                                <RichTextEditor value={description} onChange={setDescription} placeholder="Brief description" />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="followupDate" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-up Date</Label>
@@ -259,10 +252,10 @@ export default function FollowUpsPage() {
                                             <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <span className="font-bold truncate max-w-[200px] sm:max-w-[300px] text-[13px] block cursor-default" style={{ color: f.color || 'inherit' }}>{f.description}</span>
+                                                    <span className="truncate max-w-[200px] sm:max-w-[300px] text-[13px] block cursor-default">{stripHtml(f.description)}</span>
                                                 </TooltipTrigger>
                                                 <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
-                                                    <p>{f.description}</p>
+                                                    <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
                                                 </TooltipContent>
                                             </Tooltip>
                                         </div>
@@ -368,10 +361,10 @@ export default function FollowUpsPage() {
                                             <td className="px-5 py-4 text-[13px] max-w-[200px]">
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                        <div className="font-bold truncate cursor-default" style={{ color: f.color || 'inherit' }}>{f.description}</div>
+                                                        <div className="truncate cursor-default">{stripHtml(f.description)}</div>
                                                     </TooltipTrigger>
                                                     <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
-                                                        <p>{f.description}</p>
+                                                        <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </td>
@@ -438,10 +431,10 @@ export default function FollowUpsPage() {
                                             <td className="px-5 py-4 text-[13px] max-w-[200px]">
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                        <div className="font-bold truncate cursor-default" style={{ color: f.color || 'inherit' }}>{f.description}</div>
+                                                        <div className="truncate cursor-default">{stripHtml(f.description)}</div>
                                                     </TooltipTrigger>
                                                     <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
-                                                        <p>{f.description}</p>
+                                                        <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </td>
@@ -525,14 +518,10 @@ export default function FollowUpsPage() {
                                     </div>
                                     {isEditing ? (
                                         <div className="space-y-3">
-                                            <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} className="w-full min-h-[100px] p-3 text-sm rounded-xl border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 border focus:outline-none focus:ring-1 focus:ring-primary" />
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Color</span>
-                                                <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 p-0" />
-                                            </div>
+                                            <RichTextEditor value={editDescription} onChange={setEditDescription} />
                                         </div>
                                     ) : (
-                                        <p style={{ color: selectedFollowUp.color || 'inherit' }} className="text-[14px] font-bold leading-relaxed">{selectedFollowUp.description}</p>
+                                        <div className="text-[14px] leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedFollowUp.description) }} />
                                     )}
                                 </div>
 
@@ -589,7 +578,7 @@ export default function FollowUpsPage() {
                                                         {format(new Date(f.createdAt), 'MMM dd')}
                                                     </span>
                                                 </div>
-                                                <p className="text-[13px] font-bold pl-4 leading-relaxed" style={{ color: f.color || 'inherit' }}>{f.description}</p>
+                                                <div className="text-[13px] pl-4 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
                                                 <p className="text-[12px] text-slate-500 dark:text-slate-500 pl-4 mt-1">
                                                     <span className="font-bold text-[10px] text-slate-400 dark:text-slate-600 uppercase tracking-wider">Req:</span> {f.requirement}
                                                 </p>
