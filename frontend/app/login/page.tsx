@@ -65,8 +65,11 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#fafafa] dark:bg-[#0a0a0c]">
             {/* Subtle Animated Background Sweep */}
-            <div className="absolute inset-0 z-0 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-200/50 via-slate-50 to-blue-200/50 dark:from-blue-900/40 dark:via-[#0a0a0c] dark:to-blue-900/40 bg-[length:200%_100%] animate-pan-bg" />
+            <div className="absolute inset-0 z-0 overflow-hidden bg-[#fafafa] dark:bg-[#0a0a0c]">
+                {/* Top Left Drifting Glow */}
+                <div className="absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-300/30 via-transparent to-transparent dark:from-blue-800/15 blur-[100px] animate-[pulse_10s_ease-in-out_infinite]" />
+                {/* Bottom Right Drifting Glow */}
+                <div className="absolute top-[70%] left-[70%] w-[60vw] h-[60vw] rounded-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-200/40 via-transparent to-transparent dark:from-blue-900/20 blur-[100px] animate-[pulse_15s_ease-in-out_infinite]" />
             </div>
 
             {/* Login Card */}
@@ -85,11 +88,10 @@ export default function LoginPage() {
                                 }}
                             />
                         </div>
-                        <div className="flex items-center whitespace-nowrap mb-1.5">
+                        <div className="flex items-center whitespace-nowrap">
                             <span className={`text-[1.75rem] font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-none ${supportFont.className}`}>BMA</span>
                             <span className={`text-[1.75rem] font-medium text-slate-400 dark:text-slate-500 leading-none ml-1 ${supportFont.className}`}>CRM</span>
                         </div>
-                        <p className="text-slate-500 dark:text-slate-400 text-[13px] font-medium tracking-wide uppercase">Admin Portal</p>
                     </div>
 
                     {/* Form */}
@@ -113,14 +115,9 @@ export default function LoginPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="password" className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                                    Password
-                                </Label>
-                                <Link href="#" className="text-[13px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">
-                                    Forgot password?
-                                </Link>
-                            </div>
+                            <Label htmlFor="password" className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                                Password
+                            </Label>
                             <div className="relative group">
                                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                                 <Input
