@@ -177,27 +177,19 @@ export default function LoginPage() {
 
                 </div>
 
-                {/* Right Column: 3D Illustration & Presentation */}
-                <div className="hidden lg:flex w-full lg:w-1/2 flex-col relative items-center justify-center p-12 overflow-hidden bg-[#fafafa] border-l border-slate-100">
-                    
-                    {/* Abstract Geometric Background Elements to add depth */}
-                    <div className="absolute top-[15%] right-[20%] w-64 h-64 border-[3px] border-slate-200/60 rounded-full opacity-60 animate-[pulse_10s_ease-in-out_infinite]" />
-                    <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-100/50 via-transparent to-transparent blur-[80px]" />
-                    
-                    {/* Dot Grid Pattern (CSS Data URI) */}
-                    <div 
-                        className="absolute inset-0 opacity-[0.4]" 
-                        style={{ backgroundImage: 'radial-gradient(#cbd5e1 1.5px, transparent 1.5px)', backgroundSize: '32px 32px' }}
-                    />
-
-                    {/* 3D Illustration */}
-                    <div className="relative z-10 w-full max-w-[550px] animate-fade-in-up transition-transform duration-1000 hover:scale-[1.02]">
+                {/* Right Column: 3D Illustration */}
+                <div className="hidden lg:block w-full lg:w-1/2 relative overflow-hidden bg-white border-l border-slate-100">
+                    {/* 3D Illustration Filling the Container */}
+                    <div className="absolute inset-0 w-full h-full animate-fade-in transition-transform duration-[2000ms] hover:scale-105">
                         <img 
                             src="/illustration.png" 
                             alt="BMA CRM Student Management Illustration" 
-                            className="w-full h-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.06)]"
+                            className="w-full h-full object-cover object-center"
                         />
                     </div>
+                    
+                    {/* Subtle inner shadow overlay to blend edges */}
+                    <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.02)] pointer-events-none" />
                 </div>
                 
             </div>
