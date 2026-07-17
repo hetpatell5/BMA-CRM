@@ -81,7 +81,7 @@ export default function LoginPage() {
                             <img 
                                 src="/logo.png" 
                                 alt="BMA CRM Logo" 
-                                className="h-12 w-auto object-contain mr-3.5"
+                                className="h-[64px] w-auto object-contain mr-4"
                                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
                             <div className="flex items-center whitespace-nowrap mt-1">
@@ -92,6 +92,12 @@ export default function LoginPage() {
 
                         {/* Login Card */}
                         <div className="w-full bg-white border border-slate-200 p-8 md:p-10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-slate-300/50 before:pointer-events-none">
+                            
+                            {/* Sign In Header */}
+                            <div className="mb-8">
+                                <h1 className="text-[32px] font-semibold text-slate-900 tracking-tight mb-1.5 leading-none">Sign in</h1>
+                                <p className="text-[17px] text-slate-600">to access CRM</p>
+                            </div>
                             
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="relative group">
