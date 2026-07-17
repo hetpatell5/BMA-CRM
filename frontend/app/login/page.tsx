@@ -37,7 +37,7 @@ export default function LoginPage() {
 
         try {
             const user = {
-                id: '1',
+                id: 1,
                 email: 'admin@crm.com',
                 fullName: 'Admin User',
                 role: 'ADMIN',
