@@ -428,3 +428,46 @@ select:focus {
 .animate-spin-slow {
   animation: spinSlow 12s linear infinite;
 }
+
+/* ═══════════════════════════════════════════════════════
+   QUILL RICH TEXT EDITOR OVERRIDES
+   ═══════════════════════════════════════════════════════ */
+
+/* Fix color picker dropdowns appearing above Radix modals (z-index:50) */
+.ql-snow .ql-picker-options {
+  z-index: 9999 !important;
+}
+
+/* Prevent toolbar border duplication */
+.ql-toolbar.ql-snow {
+  border: none !important;
+  border-bottom: 1px solid rgba(148,163,184,0.3) !important;
+  border-radius: 12px 12px 0 0;
+}
+.ql-container.ql-snow {
+  border: none !important;
+  border-radius: 0 0 12px 12px;
+}
+
+/* Light mode toolbar icons */
+.ql-snow .ql-stroke { stroke: currentColor; }
+.ql-snow .ql-fill { fill: currentColor; }
+.ql-snow .ql-picker { color: inherit; }
+
+/* Dark mode adjustments */
+.dark .ql-toolbar.ql-snow {
+  border-bottom-color: rgba(255,255,255,0.08) !important;
+  background: rgba(0,0,0,0.15);
+}
+.dark .ql-snow .ql-picker-options {
+  background-color: #1a1f2e !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+.dark .ql-snow .ql-picker-label,
+.dark .ql-snow button .ql-stroke {
+  stroke: rgba(255,255,255,0.7);
+}
+.dark .ql-editor.ql-blank::before {
+  color: rgba(255,255,255,0.3) !important;
+}
+
