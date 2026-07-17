@@ -69,16 +69,33 @@ export default function LoginPage() {
     return (
         <div className={`min-h-screen flex flex-col p-4 relative overflow-hidden bg-[#fafafa] dark:bg-[#0d131a] ${supportFont.className}`}>
             
-            {/* Background Curvy Animations (Aurora/Mesh style) */}
+            {/* Background Animations */}
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                {/* Large spinning curvy elliptical blob */}
-                <div className="absolute top-[-10%] left-[-10%] w-[100vw] h-[40vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-300/50 via-slate-200/10 to-transparent dark:from-blue-600/30 dark:via-blue-800/10 dark:to-transparent blur-[60px] animate-[spin_12s_linear_infinite]" />
                 
-                {/* Secondary counter-spinning blob */}
-                <div className="absolute top-[40%] right-[-10%] w-[80vw] h-[50vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-400/40 via-slate-300/10 to-transparent dark:from-indigo-600/30 dark:via-indigo-800/10 dark:to-transparent blur-[80px] animate-[spin_16s_linear_infinite_reverse]" />
+                {/* ---------------- LIGHT THEME BACKGROUND (Soft Pastel Aurora) ---------------- */}
+                <div className="absolute inset-0 block dark:hidden transition-opacity duration-1000">
+                    {/* Slow drifting pastel blue blob */}
+                    <div className="absolute top-[-20%] left-[-20%] w-[120vw] h-[80vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-200/60 via-blue-100/20 to-transparent blur-[120px] animate-[spin_40s_linear_infinite]" />
+                    
+                    {/* Slow drifting lavender blob */}
+                    <div className="absolute top-[10%] right-[-20%] w-[140vw] h-[90vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-200/50 via-purple-100/10 to-transparent blur-[140px] animate-[spin_50s_linear_infinite_reverse]" />
+                    
+                    {/* Soft slate blob for depth */}
+                    <div className="absolute bottom-[-30%] left-[10%] w-[100vw] h-[70vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-300/50 via-slate-200/10 to-transparent blur-[100px] animate-[spin_45s_linear_infinite]" />
+                </div>
+
+                {/* ---------------- DARK THEME BACKGROUND (Original Curvy Mesh) ---------------- */}
+                <div className="absolute inset-0 hidden dark:block transition-opacity duration-1000">
+                    {/* Large spinning curvy elliptical blob */}
+                    <div className="absolute top-[-10%] left-[-10%] w-[100vw] h-[40vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-600/30 via-blue-800/10 to-transparent blur-[60px] animate-[spin_12s_linear_infinite]" />
+                    
+                    {/* Secondary counter-spinning blob */}
+                    <div className="absolute top-[40%] right-[-10%] w-[80vw] h-[50vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-600/30 via-indigo-800/10 to-transparent blur-[80px] animate-[spin_16s_linear_infinite_reverse]" />
+                    
+                    {/* Third pulsing curvy sweep */}
+                    <div className="absolute bottom-[-20%] left-[10%] w-[90vw] h-[35vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-500/30 via-sky-700/10 to-transparent blur-[70px] animate-[spin_20s_linear_infinite]" />
+                </div>
                 
-                {/* Third pulsing curvy sweep */}
-                <div className="absolute bottom-[-20%] left-[10%] w-[90vw] h-[35vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-200/50 via-blue-100/10 to-transparent dark:from-sky-500/30 dark:via-sky-700/10 dark:to-transparent blur-[70px] animate-[spin_20s_linear_infinite]" />
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center z-10 w-full max-w-[440px] mx-auto animate-fade-in-up">
