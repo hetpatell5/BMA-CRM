@@ -77,18 +77,16 @@ export default function LoginPage() {
                     <div className="w-full max-w-[440px] mx-auto animate-fade-in-up">
                         
                         {/* Header Logo */}
-                        <div className="flex items-center mb-10">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center mr-4">
-                                <img 
-                                    src="/logo.png" 
-                                    alt="BMA CRM Logo" 
-                                    className="w-full h-full object-contain"
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                />
-                            </div>
-                            <div className="flex items-center whitespace-nowrap">
-                                <span className="text-4xl font-bold text-slate-900 tracking-tight leading-none">BMA</span>
-                                <span className="text-4xl font-light text-slate-500 leading-none ml-1.5">CRM</span>
+                        <div className="flex items-center justify-center mb-10">
+                            <img 
+                                src="/logo.png" 
+                                alt="BMA CRM Logo" 
+                                className="h-12 w-auto object-contain mr-3.5"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                            <div className="flex items-center whitespace-nowrap mt-1">
+                                <span className="text-[34px] font-bold text-slate-900 tracking-tight leading-none">BMA</span>
+                                <span className="text-[34px] font-light text-slate-500 leading-none ml-1.5">CRM</span>
                             </div>
                         </div>
 
