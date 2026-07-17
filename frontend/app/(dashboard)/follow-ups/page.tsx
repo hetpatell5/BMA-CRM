@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useFollowUpStore, FollowUp } from '@/stores/followUpStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/hooks/use-toast'
@@ -166,6 +167,7 @@ export default function FollowUpsPage() {
     }
 
     return (
+        <TooltipProvider delayDuration={200}>
         <div className="space-y-4 md:space-y-6 animate-fade-in">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
@@ -255,13 +257,14 @@ export default function FollowUpsPage() {
                                             <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
                                             <span onClick={() => handleNumberClick(f)} className="font-semibold text-primary hover:text-primary/80 font-mono text-[13px] cursor-pointer underline decoration-primary/30 underline-offset-2 transition-colors">{f.number}</span>
                                             <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
-                                            <div className="relative group/tooltip">
-                                                <span className="font-bold truncate max-w-[200px] sm:max-w-[300px] text-[13px] block" style={{ color: f.color || 'inherit' }}>{f.description}</span>
-                                                <div className="absolute z-[100] invisible opacity-0 group-hover/tooltip:visible group-hover/tooltip:opacity-100 transition-all duration-200 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-normal p-3 rounded-lg shadow-xl w-72 whitespace-normal break-words left-1/2 -translate-x-1/2 bottom-full mb-2 pointer-events-none">
-                                                    {f.description}
-                                                    <div className="absolute w-2 h-2 bg-slate-900 dark:bg-white rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></div>
-                                                </div>
-                                            </div>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="font-bold truncate max-w-[200px] sm:max-w-[300px] text-[13px] block cursor-default" style={{ color: f.color || 'inherit' }}>{f.description}</span>
+                                                </TooltipTrigger>
+                                                <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
+                                                    <p>{f.description}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-1 rounded-lg border border-amber-500/20">
@@ -363,22 +366,24 @@ export default function FollowUpsPage() {
                                                 </div>
                                             </td>
                                             <td className="px-5 py-4 text-[13px] max-w-[200px]">
-                                                <div className="relative group/tooltip inline-block w-full">
-                                                    <div className="font-bold truncate" style={{ color: f.color || 'inherit' }}>{f.description}</div>
-                                                    <div className="absolute z-[100] invisible opacity-0 group-hover/tooltip:visible group-hover/tooltip:opacity-100 transition-all duration-200 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-normal p-3 rounded-lg shadow-xl w-72 whitespace-normal break-words left-1/2 -translate-x-1/2 bottom-full mb-2 pointer-events-none">
-                                                        {f.description}
-                                                        <div className="absolute w-2 h-2 bg-slate-900 dark:bg-white rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></div>
-                                                    </div>
-                                                </div>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="font-bold truncate cursor-default" style={{ color: f.color || 'inherit' }}>{f.description}</div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
+                                                        <p>{f.description}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
                                             </td>
                                             <td className="px-5 py-4 text-[13px] max-w-[200px]">
-                                                <div className="relative group/tooltip inline-block w-full">
-                                                    <div className="truncate text-slate-600 dark:text-slate-400">{f.requirement}</div>
-                                                    <div className="absolute z-[100] invisible opacity-0 group-hover/tooltip:visible group-hover/tooltip:opacity-100 transition-all duration-200 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-normal p-3 rounded-lg shadow-xl w-72 whitespace-normal break-words left-1/2 -translate-x-1/2 bottom-full mb-2 pointer-events-none">
-                                                        {f.requirement}
-                                                        <div className="absolute w-2 h-2 bg-slate-900 dark:bg-white rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></div>
-                                                    </div>
-                                                </div>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="truncate text-slate-600 dark:text-slate-400 cursor-default">{f.requirement}</div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
+                                                        <p>{f.requirement}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
                                             </td>
                                             <td className="px-5 py-4 text-[13px] font-medium text-slate-700 dark:text-slate-300">
                                                 {f.createdBy?.fullName || '-'}
@@ -431,22 +436,24 @@ export default function FollowUpsPage() {
                                             <td className="px-5 py-4 text-[13px] font-semibold text-slate-800 dark:text-slate-200">{f.name}</td>
                                             <td className="px-5 py-4 text-[13px] font-mono font-medium text-slate-600 dark:text-slate-400">{f.number}</td>
                                             <td className="px-5 py-4 text-[13px] max-w-[200px]">
-                                                <div className="relative group/tooltip inline-block w-full">
-                                                    <div className="font-bold truncate" style={{ color: f.color || 'inherit' }}>{f.description}</div>
-                                                    <div className="absolute z-[100] invisible opacity-0 group-hover/tooltip:visible group-hover/tooltip:opacity-100 transition-all duration-200 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-normal p-3 rounded-lg shadow-xl w-72 whitespace-normal break-words left-1/2 -translate-x-1/2 bottom-full mb-2 pointer-events-none">
-                                                        {f.description}
-                                                        <div className="absolute w-2 h-2 bg-slate-900 dark:bg-white rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></div>
-                                                    </div>
-                                                </div>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="font-bold truncate cursor-default" style={{ color: f.color || 'inherit' }}>{f.description}</div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
+                                                        <p>{f.description}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
                                             </td>
                                             <td className="px-5 py-4 text-[13px] max-w-[200px]">
-                                                <div className="relative group/tooltip inline-block w-full">
-                                                    <div className="truncate text-slate-600 dark:text-slate-400">{f.requirement}</div>
-                                                    <div className="absolute z-[100] invisible opacity-0 group-hover/tooltip:visible group-hover/tooltip:opacity-100 transition-all duration-200 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-normal p-3 rounded-lg shadow-xl w-72 whitespace-normal break-words left-1/2 -translate-x-1/2 bottom-full mb-2 pointer-events-none">
-                                                        {f.requirement}
-                                                        <div className="absolute w-2 h-2 bg-slate-900 dark:bg-white rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></div>
-                                                    </div>
-                                                </div>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="truncate text-slate-600 dark:text-slate-400 cursor-default">{f.requirement}</div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
+                                                        <p>{f.requirement}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
                                             </td>
                                             <td className="px-5 py-4">
                                                 <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all text-xs font-bold gap-1.5">
@@ -596,5 +603,6 @@ export default function FollowUpsPage() {
                 </DialogContent>
             </Dialog>
         </div>
+        </TooltipProvider>
     )
 }
