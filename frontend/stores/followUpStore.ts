@@ -9,6 +9,7 @@ export interface FollowUp {
     followupDate: string;
     requirement: string;
     status: string;
+    color?: string;
     createdAt: string;
     updatedAt: string;
     createdById: number;
@@ -31,8 +32,8 @@ interface FollowUpState {
     isLoadingCompleted: boolean;
     fetchPendingFollowUps: (page?: number, search?: string) => Promise<void>;
     fetchCompletedFollowUps: (page?: number, search?: string) => Promise<void>;
-    addFollowUp: (followUp: { name: string; number: string; description: string; followupDate: string; requirement: string }) => Promise<void>;
-    updateFollowUp: (id: string, data: Partial<Pick<FollowUp, 'description' | 'requirement' | 'followupDate' | 'status'>>) => Promise<void>;
+    addFollowUp: (data: Omit<FollowUp, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'status'> & { status?: string, color?: string }) => Promise<void>;
+    updateFollowUp: (id: string, data: Partial<FollowUp>) => Promise<void>;
     removeFollowUp: (id: string) => Promise<void>;
 }
 

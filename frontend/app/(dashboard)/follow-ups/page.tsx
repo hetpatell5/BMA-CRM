@@ -30,6 +30,7 @@ export default function FollowUpsPage() {
     const [editDescription, setEditDescription] = useState('')
     const [editRequirement, setEditRequirement] = useState('')
     const [editFollowupDate, setEditFollowupDate] = useState('')
+    const [editColor, setEditColor] = useState('#000000')
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending')
     // Fetch follow-ups from backend on mount
@@ -58,6 +59,7 @@ export default function FollowUpsPage() {
         setEditDescription(selectedFollowUp.description)
         setEditRequirement(selectedFollowUp.requirement)
         setEditFollowupDate(selectedFollowUp.followupDate ? selectedFollowUp.followupDate.split('T')[0] : '')
+        setEditColor(selectedFollowUp.color || '#000000')
         setIsEditing(true)
     }
 
@@ -68,12 +70,14 @@ export default function FollowUpsPage() {
                 description: editDescription,
                 requirement: editRequirement,
                 followupDate: editFollowupDate,
+                color: editColor
             })
             setSelectedFollowUp({
                 ...selectedFollowUp,
                 description: editDescription,
                 requirement: editRequirement,
                 followupDate: editFollowupDate,
+                color: editColor
             })
             setIsEditing(false)
             setDetailsOpen(false)
@@ -89,6 +93,7 @@ export default function FollowUpsPage() {
     const [description, setDescription] = useState('')
     const [followupDate, setFollowupDate] = useState('')
     const [requirement, setRequirement] = useState('')
+    const [color, setColor] = useState('#000000')
 
     // Removed local filter arrays since they are managed by the store
 
@@ -110,7 +115,8 @@ export default function FollowUpsPage() {
                 number,
                 description,
                 followupDate,
-                requirement
+                requirement,
+                color
             })
             toast({ title: 'Follow up added successfully' })
             setOpen(false)
@@ -119,6 +125,7 @@ export default function FollowUpsPage() {
             setDescription('')
             setFollowupDate('')
             setRequirement('')
+            setColor('#000000')
         } catch {
             toast({ title: 'Failed to add follow-up', variant: 'destructive' })
         }
@@ -188,7 +195,14 @@ export default function FollowUpsPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description</Label>
-                                <Input id="description" placeholder="Brief description" value={description} onChange={e => setDescription(e.target.value)} required className="rounded-xl h-10 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 focus:border-primary" />
+                                <textarea id="description" placeholder="Brief description" value={description} onChange={e => setDescription(e.target.value)} required className="w-full rounded-xl min-h-[80px] p-3 text-sm border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="color" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Color</Label>
+                                <div className="flex items-center gap-2">
+                                    <input type="color" id="color" value={color} onChange={e => setColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0" />
+                                    <span className="text-xs text-muted-foreground">{color}</span>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="followupDate" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-up Date</Label>
@@ -241,7 +255,7 @@ export default function FollowUpsPage() {
                                             <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
                                             <span onClick={() => handleNumberClick(f)} className="font-semibold text-primary hover:text-primary/80 font-mono text-[13px] cursor-pointer underline decoration-primary/30 underline-offset-2 transition-colors">{f.number}</span>
                                             <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
-                                            <span className="text-slate-600 dark:text-slate-400 truncate max-w-[200px] sm:max-w-[300px] text-[13px]">{f.description}</span>
+                                            <span title={f.description} className="font-bold truncate max-w-[200px] sm:max-w-[300px] text-[13px]" style={{ color: f.color || 'inherit' }}>{f.description}</span>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-1 rounded-lg border border-amber-500/20">
@@ -342,8 +356,10 @@ export default function FollowUpsPage() {
                                                     <span onClick={() => handleNumberClick(f)} className="font-mono cursor-pointer text-primary hover:text-primary/80 hover:underline underline-offset-2 transition-colors text-[13px] font-semibold">{f.number}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-5 py-4 text-[13px] max-w-[200px] truncate text-slate-600 dark:text-slate-400">{f.description}</td>
-                                            <td className="px-5 py-4 text-[13px] max-w-[200px] truncate text-slate-600 dark:text-slate-400">{f.requirement}</td>
+                                            <td className="px-5 py-4 text-[13px] max-w-[200px] truncate" title={f.description}>
+                                                <span className="font-bold" style={{ color: f.color || 'inherit' }}>{f.description}</span>
+                                            </td>
+                                            <td className="px-5 py-4 text-[13px] max-w-[200px] truncate text-slate-600 dark:text-slate-400" title={f.requirement}>{f.requirement}</td>
                                             <td className="px-5 py-4 text-[13px] font-medium text-slate-700 dark:text-slate-300">
                                                 {f.createdBy?.fullName || '-'}
                                             </td>
@@ -394,8 +410,10 @@ export default function FollowUpsPage() {
                                             <td className="px-5 py-4 text-[13px] font-medium text-slate-600 dark:text-slate-400">{format(new Date(f.followupDate), 'MMM dd, yyyy')}</td>
                                             <td className="px-5 py-4 text-[13px] font-semibold text-slate-800 dark:text-slate-200">{f.name}</td>
                                             <td className="px-5 py-4 text-[13px] font-mono font-medium text-slate-600 dark:text-slate-400">{f.number}</td>
-                                            <td className="px-5 py-4 text-[13px] text-slate-600 dark:text-slate-400 truncate max-w-[200px]">{f.description}</td>
-                                            <td className="px-5 py-4 text-[13px] text-slate-600 dark:text-slate-400 truncate max-w-[200px]">{f.requirement}</td>
+                                            <td className="px-5 py-4 text-[13px] max-w-[200px] truncate" title={f.description}>
+                                                <span className="font-bold" style={{ color: f.color || 'inherit' }}>{f.description}</span>
+                                            </td>
+                                            <td className="px-5 py-4 text-[13px] text-slate-600 dark:text-slate-400 truncate max-w-[200px]" title={f.requirement}>{f.requirement}</td>
                                             <td className="px-5 py-4">
                                                 <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all text-xs font-bold gap-1.5">
                                                     <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -465,9 +483,15 @@ export default function FollowUpsPage() {
                                         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Description</p>
                                     </div>
                                     {isEditing ? (
-                                        <Input value={editDescription} onChange={e => setEditDescription(e.target.value)} className="h-9 text-sm rounded-xl border-slate-200 dark:border-white/10 bg-white dark:bg-white/5" />
+                                        <div className="space-y-3">
+                                            <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} className="w-full min-h-[100px] p-3 text-sm rounded-xl border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 border focus:outline-none focus:ring-1 focus:ring-primary" />
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Color</span>
+                                                <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 p-0" />
+                                            </div>
+                                        </div>
                                     ) : (
-                                        <p className="text-[14px] text-slate-700 dark:text-slate-300 leading-relaxed">{selectedFollowUp.description}</p>
+                                        <p style={{ color: selectedFollowUp.color || 'inherit' }} className="text-[14px] font-bold leading-relaxed">{selectedFollowUp.description}</p>
                                     )}
                                 </div>
 
@@ -524,7 +548,7 @@ export default function FollowUpsPage() {
                                                         {format(new Date(f.createdAt), 'MMM dd')}
                                                     </span>
                                                 </div>
-                                                <p className="text-[13px] text-slate-600 dark:text-slate-400 pl-4 leading-relaxed">{f.description}</p>
+                                                <p className="text-[13px] font-bold pl-4 leading-relaxed" style={{ color: f.color || 'inherit' }}>{f.description}</p>
                                                 <p className="text-[12px] text-slate-500 dark:text-slate-500 pl-4 mt-1">
                                                     <span className="font-bold text-[10px] text-slate-400 dark:text-slate-600 uppercase tracking-wider">Req:</span> {f.requirement}
                                                 </p>

@@ -605,6 +605,7 @@ model DailyFollowUp {
   requirement  String   @db.Text
   followupDate DateTime @map("followup_date")
   status       String   @default("PENDING") // PENDING or COMPLETED
+  color        String?  // Optional text color for the description
 
   createdById  Int      @map("created_by")
   createdBy    User     @relation("CreatedFollowUps", fields: [createdById], references: [id])

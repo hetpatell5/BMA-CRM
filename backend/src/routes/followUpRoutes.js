@@ -65,7 +65,7 @@ router.get('/', async (req, res) => {
 // POST /api/follow-ups — Create a new follow-up
 router.post('/', async (req, res) => {
     try {
-        const { name, number, description, requirement, followupDate } = req.body;
+        const { name, number, description, requirement, followupDate, color } = req.body;
 
         if (!name || !number || !description || !requirement || !followupDate) {
             return res.status(400).json({ success: false, error: 'All fields are required' });
@@ -78,6 +78,7 @@ router.post('/', async (req, res) => {
                 description,
                 requirement,
                 followupDate: new Date(followupDate),
+                color,
                 createdById: req.user.id,
             },
             include: {
@@ -98,13 +99,14 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { description, requirement, followupDate, status } = req.body;
+        const { description, requirement, followupDate, status, color } = req.body;
 
         const updateData = {};
         if (description !== undefined) updateData.description = description;
         if (requirement !== undefined) updateData.requirement = requirement;
         if (followupDate !== undefined) updateData.followupDate = new Date(followupDate);
         if (status !== undefined) updateData.status = status;
+        if (color !== undefined) updateData.color = color;
 
         const followUp = await prisma.dailyFollowUp.update({
             where: { id: BigInt(id) },
