@@ -72,13 +72,13 @@ export default function LoginPage() {
             {/* Background Curvy Animations (Aurora/Mesh style) */}
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
                 {/* Large spinning curvy elliptical blob */}
-                <div className="absolute top-[-20%] left-[-10%] w-[120vw] h-[80vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-black/[0.03] via-transparent to-transparent dark:from-blue-400/10 blur-[100px] animate-[spin_40s_linear_infinite]" />
+                <div className="absolute top-[-10%] left-[-10%] w-[100vw] h-[40vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-300/50 via-slate-200/10 to-transparent dark:from-blue-600/30 dark:via-blue-800/10 dark:to-transparent blur-[60px] animate-[spin_12s_linear_infinite]" />
                 
                 {/* Secondary counter-spinning blob */}
-                <div className="absolute top-[30%] left-[20%] w-[140vw] h-[90vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-black/[0.02] via-black/[0.01] to-transparent dark:from-slate-400/5 dark:via-blue-600/10 blur-[120px] animate-[spin_50s_linear_infinite_reverse]" />
+                <div className="absolute top-[40%] right-[-10%] w-[80vw] h-[50vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-400/40 via-slate-300/10 to-transparent dark:from-indigo-600/30 dark:via-indigo-800/10 dark:to-transparent blur-[80px] animate-[spin_16s_linear_infinite_reverse]" />
                 
                 {/* Third pulsing curvy sweep */}
-                <div className="absolute bottom-[-20%] right-[-10%] w-[100vw] h-[70vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-black/[0.04] via-transparent to-transparent dark:from-blue-500/15 blur-[90px] animate-[pulse_15s_ease-in-out_infinite]" />
+                <div className="absolute bottom-[-20%] left-[10%] w-[90vw] h-[35vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-200/50 via-blue-100/10 to-transparent dark:from-sky-500/30 dark:via-sky-700/10 dark:to-transparent blur-[70px] animate-[spin_20s_linear_infinite]" />
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center z-10 w-full max-w-[440px] mx-auto animate-fade-in-up">
