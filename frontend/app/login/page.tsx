@@ -66,133 +66,137 @@ export default function LoginPage() {
     }
 
     return (
-        <div className={`min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-[#f8fafc] ${supportFont.className}`}>
+        <div className={`min-h-screen flex items-center justify-center bg-[#f1f5f9] p-4 sm:p-8 ${supportFont.className}`}>
             
-            {/* Left Column: Login Section */}
-            <div className="flex flex-col relative justify-center p-6 sm:p-12 md:p-16 lg:px-20 bg-[#fafafa]">
+            {/* The Main Container */}
+            <div className="w-full max-w-[1200px] min-h-[700px] bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden flex flex-col lg:flex-row relative">
                 
-                <div className="w-full max-w-[440px] mx-auto animate-fade-in-up">
+                {/* Left Column: Login Section */}
+                <div className="w-full lg:w-1/2 flex flex-col relative justify-center p-6 sm:p-12 md:p-16 lg:px-20 bg-white">
                     
-                    {/* Header Logo */}
-                    <div className="flex items-center mb-10">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center mr-4">
-                            <img 
-                                src="/logo.png" 
-                                alt="BMA CRM Logo" 
-                                className="w-full h-full object-contain"
-                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
-                        </div>
-                        <div className="flex items-center whitespace-nowrap">
-                            <span className="text-4xl font-bold text-slate-900 tracking-tight leading-none">BMA</span>
-                            <span className="text-4xl font-light text-slate-500 leading-none ml-1.5">CRM</span>
-                        </div>
-                    </div>
-
-                    {/* Login Card */}
-                    <div className="w-full bg-white border border-slate-200 p-8 md:p-10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-slate-300/50 before:pointer-events-none">
+                    <div className="w-full max-w-[440px] mx-auto animate-fade-in-up">
                         
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="relative group">
-                                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="Email Address"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="pl-10 h-12 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
-                                    disabled={isLoading}
+                        {/* Header Logo */}
+                        <div className="flex items-center mb-10">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center mr-4">
+                                <img 
+                                    src="/logo.png" 
+                                    alt="BMA CRM Logo" 
+                                    className="w-full h-full object-contain"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                 />
                             </div>
-
-                            <div className="relative group">
-                                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                                <Input
-                                    id="password"
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="pl-10 pr-10 h-12 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
-                                    disabled={isLoading}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
-                                >
-                                    {showPassword ? <Eye className="w-[18px] h-[18px]" /> : <EyeOff className="w-[18px] h-[18px]" />}
-                                </button>
+                            <div className="flex items-center whitespace-nowrap">
+                                <span className="text-4xl font-bold text-slate-900 tracking-tight leading-none">BMA</span>
+                                <span className="text-4xl font-light text-slate-500 leading-none ml-1.5">CRM</span>
                             </div>
+                        </div>
 
-                            <div className="flex items-center justify-end pt-1 pb-3">
-                                <div className="flex items-center space-x-2">
-                                    <div className="relative flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            id="rememberMe"
-                                            checked={rememberMe}
-                                            onChange={(e) => setRememberMe(e.target.checked)}
-                                            className="peer w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 bg-white transition-all cursor-pointer"
-                                            disabled={isLoading}
-                                        />
-                                    </div>
-                                    <Label htmlFor="rememberMe" className="text-[13px] text-slate-600 cursor-pointer select-none">
-                                        Remember Me
-                                    </Label>
+                        {/* Login Card */}
+                        <div className="w-full bg-white border border-slate-200 p-8 md:p-10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-slate-300/50 before:pointer-events-none">
+                            
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="relative group">
+                                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="Email Address"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="pl-10 h-12 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
+                                        disabled={isLoading}
+                                    />
                                 </div>
-                            </div>
 
-                            <Button
-                                type="submit"
-                                className="w-full h-11 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-[0_4px_14px_rgba(37,99,235,0.2)] transition-all border border-blue-600"
-                                disabled={isLoading}
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Logging in...
-                                    </>
-                                ) : (
-                                    'Login'
-                                )}
-                            </Button>
-                        </form>
+                                <div className="relative group">
+                                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="pl-10 pr-10 h-12 bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
+                                        disabled={isLoading}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                                    >
+                                        {showPassword ? <Eye className="w-[18px] h-[18px]" /> : <EyeOff className="w-[18px] h-[18px]" />}
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-end pt-1 pb-3">
+                                    <div className="flex items-center space-x-2">
+                                        <div className="relative flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                id="rememberMe"
+                                                checked={rememberMe}
+                                                onChange={(e) => setRememberMe(e.target.checked)}
+                                                className="peer w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 bg-white transition-all cursor-pointer"
+                                                disabled={isLoading}
+                                            />
+                                        </div>
+                                        <Label htmlFor="rememberMe" className="text-[13px] text-slate-600 cursor-pointer select-none">
+                                            Remember Me
+                                        </Label>
+                                    </div>
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    className="w-full h-11 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-[0_4px_14px_rgba(37,99,235,0.2)] transition-all border border-blue-600"
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Logging in...
+                                        </>
+                                    ) : (
+                                        'Login'
+                                    )}
+                                </Button>
+                            </form>
+                        </div>
+
+                    </div>
+
+                    {/* Footer */}
+                    <div className="absolute bottom-8 left-0 right-0 w-full text-center px-6">
+                        <p className="text-[13px] font-medium text-slate-400">© 2026 BMAP Eduservices pvt ltd. All rights reserved.</p>
                     </div>
 
                 </div>
 
-                {/* Footer */}
-                <div className="absolute bottom-6 left-0 right-0 w-full text-center px-6">
-                    <p className="text-[13px] font-medium text-slate-500">© 2026 BMAP Eduservices pvt ltd. All rights reserved.</p>
-                </div>
-
-            </div>
-
-            {/* Right Column: 3D Illustration & Presentation */}
-            <div className="hidden lg:flex flex-col relative items-center justify-center p-12 overflow-hidden bg-white border-l border-slate-200/50">
-                
-                {/* Abstract Geometric Background Elements to add depth */}
-                <div className="absolute top-[15%] right-[20%] w-64 h-64 border-[3px] border-slate-100 rounded-full opacity-60 animate-[pulse_10s_ease-in-out_infinite]" />
-                <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-100/50 via-transparent to-transparent blur-[80px]" />
-                
-                {/* Dot Grid Pattern (CSS Data URI) */}
-                <div 
-                    className="absolute inset-0 opacity-[0.3]" 
-                    style={{ backgroundImage: 'radial-gradient(#cbd5e1 1.5px, transparent 1.5px)', backgroundSize: '32px 32px' }}
-                />
-
-                {/* 3D Illustration */}
-                <div className="relative z-10 w-full max-w-[550px] animate-fade-in-up transition-transform duration-1000 hover:scale-[1.02]">
-                    <img 
-                        src="/illustration.png" 
-                        alt="BMA CRM Student Management Illustration" 
-                        className="w-full h-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.08)]"
+                {/* Right Column: 3D Illustration & Presentation */}
+                <div className="hidden lg:flex w-full lg:w-1/2 flex-col relative items-center justify-center p-12 overflow-hidden bg-[#fafafa] border-l border-slate-100">
+                    
+                    {/* Abstract Geometric Background Elements to add depth */}
+                    <div className="absolute top-[15%] right-[20%] w-64 h-64 border-[3px] border-slate-200/60 rounded-full opacity-60 animate-[pulse_10s_ease-in-out_infinite]" />
+                    <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-100/50 via-transparent to-transparent blur-[80px]" />
+                    
+                    {/* Dot Grid Pattern (CSS Data URI) */}
+                    <div 
+                        className="absolute inset-0 opacity-[0.4]" 
+                        style={{ backgroundImage: 'radial-gradient(#cbd5e1 1.5px, transparent 1.5px)', backgroundSize: '32px 32px' }}
                     />
+
+                    {/* 3D Illustration */}
+                    <div className="relative z-10 w-full max-w-[550px] animate-fade-in-up transition-transform duration-1000 hover:scale-[1.02]">
+                        <img 
+                            src="/illustration.png" 
+                            alt="BMA CRM Student Management Illustration" 
+                            className="w-full h-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.06)]"
+                        />
+                    </div>
                 </div>
+                
             </div>
-            
         </div>
     )
 }
