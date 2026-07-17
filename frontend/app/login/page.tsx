@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
-import { authAPI } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
@@ -37,8 +36,15 @@ export default function LoginPage() {
         setIsLoading(true)
 
         try {
-            const response = await authAPI.login(email, password)
-            const { user, token } = response.data
+            // Mock successful login for frontend UI testing
+            const user = {
+                id: 1,
+                email: email,
+                fullName: 'Admin User',
+                role: 'ADMIN',
+                status: 'ACTIVE'
+            }
+            const token = 'mock-jwt-token'
 
             login(user, token, rememberMe)
 
@@ -47,6 +53,9 @@ export default function LoginPage() {
                 description: `Logged in as ${user.fullName}`,
             })
 
+            // Note: If you immediately log out after this redirects to /dashboard, 
+            // it's because the dashboard makes real API calls that fail with the mock token, 
+            // triggering the 401 interceptor in lib/api.ts which forces a logout.
             router.push('/dashboard')
         } catch (error: any) {
             toast({
