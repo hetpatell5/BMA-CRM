@@ -67,73 +67,80 @@ export default function LoginPage() {
     }
 
     return (
-        <div className={`min-h-screen flex flex-col p-4 relative overflow-hidden bg-[#0d131a] ${supportFont.className}`}>
-            {/* Background sweeping beam */}
+        <div className={`min-h-screen flex flex-col p-4 relative overflow-hidden bg-[#fafafa] dark:bg-[#0d131a] ${supportFont.className}`}>
+            
+            {/* Background Curvy Animations (Aurora/Mesh style) */}
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] h-[60vh] -rotate-45 bg-gradient-to-b from-transparent via-blue-300/5 to-transparent blur-3xl" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] h-[20vh] -rotate-45 bg-gradient-to-b from-transparent via-slate-100/5 to-transparent blur-2xl animate-[pan-bg_15s_linear_infinite] bg-[length:100%_200%]" />
+                {/* Large spinning curvy elliptical blob */}
+                <div className="absolute top-[-20%] left-[-10%] w-[120vw] h-[80vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-black/[0.03] via-transparent to-transparent dark:from-blue-400/10 blur-[100px] animate-[spin_40s_linear_infinite]" />
+                
+                {/* Secondary counter-spinning blob */}
+                <div className="absolute top-[30%] left-[20%] w-[140vw] h-[90vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-black/[0.02] via-black/[0.01] to-transparent dark:from-slate-400/5 dark:via-blue-600/10 blur-[120px] animate-[spin_50s_linear_infinite_reverse]" />
+                
+                {/* Third pulsing curvy sweep */}
+                <div className="absolute bottom-[-20%] right-[-10%] w-[100vw] h-[70vh] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-black/[0.04] via-transparent to-transparent dark:from-blue-500/15 blur-[90px] animate-[pulse_15s_ease-in-out_infinite]" />
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center z-10 w-full max-w-[440px] mx-auto animate-fade-in-up">
                 
-                {/* Header Logo */}
+                {/* Header Logo (Restored to original layout) */}
                 <div className="flex flex-col items-center mb-10">
-                    <div className="flex items-center justify-center mb-2">
-                        <img 
-                            src="/logo.png" 
-                            alt="BMA CRM Logo" 
-                            className="w-10 h-10 object-contain mr-2 filter brightness-0 invert opacity-90"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        />
+                    <div className="flex flex-col items-center justify-center mb-4">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center mb-4">
+                            <img 
+                                src="/logo.png" 
+                                alt="BMA CRM Logo" 
+                                className="w-full h-full object-contain"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                        </div>
                         <div className="flex items-center whitespace-nowrap">
-                            <span className="text-3xl font-bold text-white tracking-tight leading-none">BMA</span>
-                            <span className="text-3xl font-light text-slate-300 leading-none ml-1">CRM</span>
+                            <span className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-none">BMA</span>
+                            <span className="text-3xl font-light text-slate-500 dark:text-slate-300 leading-none ml-1">CRM</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Login Card */}
-                <div className="w-full bg-[#161c24] border border-[#2e4057] p-8 md:p-10 rounded-xl shadow-[0_0_40px_rgba(59,130,246,0.08)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-blue-500/30 before:pointer-events-none">
+                <div className="w-full bg-white dark:bg-[#161c24] border border-slate-200 dark:border-[#2e4057] p-8 md:p-10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_0_40px_rgba(59,130,246,0.08)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-slate-300/50 dark:before:border-blue-500/30 before:pointer-events-none">
                     
-                    <h2 className="text-[22px] font-medium text-slate-100 text-center mb-8 tracking-wide">Secure Login</h2>
-
                     {/* Form */}
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="relative group">
-                            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-600 dark:group-focus-within:text-blue-500 transition-colors" />
                             <Input
                                 id="email"
                                 type="email"
                                 placeholder="Email Address"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="pl-10 h-12 bg-[#0a0f16] border-[#2a3649] text-slate-200 placeholder:text-slate-600 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
+                                className="pl-10 h-12 bg-slate-50 dark:bg-[#0a0f16] border-slate-200 dark:border-[#2a3649] text-slate-900 dark:text-slate-200 placeholder:text-slate-500 dark:placeholder:text-slate-600 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
                                 disabled={isLoading}
                             />
                         </div>
 
                         <div className="relative group">
-                            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-600 dark:group-focus-within:text-blue-500 transition-colors" />
                             <Input
                                 id="password"
                                 type={showPassword ? "text" : "password"}
                                 placeholder="Password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="pl-10 pr-10 h-12 bg-[#0a0f16] border-[#2a3649] text-slate-200 placeholder:text-slate-600 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
+                                className="pl-10 pr-10 h-12 bg-slate-50 dark:bg-[#0a0f16] border-slate-200 dark:border-[#2a3649] text-slate-900 dark:text-slate-200 placeholder:text-slate-500 dark:placeholder:text-slate-600 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
                                 disabled={isLoading}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors focus:outline-none"
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors focus:outline-none"
                             >
                                 {showPassword ? <Eye className="w-[18px] h-[18px]" /> : <EyeOff className="w-[18px] h-[18px]" />}
                             </button>
                         </div>
 
                         <div className="flex items-center justify-between pt-1 pb-3">
-                            <Link href="#" className="text-[13px] text-[#3b82f6] hover:text-[#60a5fa] font-medium transition-colors">
+                            <Link href="#" className="text-[13px] text-blue-600 dark:text-[#3b82f6] hover:text-blue-700 dark:hover:text-[#60a5fa] font-medium transition-colors">
                                 Forgot Password?
                             </Link>
                             
@@ -144,11 +151,11 @@ export default function LoginPage() {
                                         id="rememberMe"
                                         checked={rememberMe}
                                         onChange={(e) => setRememberMe(e.target.checked)}
-                                        className="peer w-4 h-4 rounded border-[#3a4b63] text-blue-500 focus:ring-blue-500/30 bg-[#0a0f16] transition-all cursor-pointer"
+                                        className="peer w-4 h-4 rounded border-slate-300 dark:border-[#3a4b63] text-blue-600 dark:text-blue-500 focus:ring-blue-500/30 bg-white dark:bg-[#0a0f16] transition-all cursor-pointer"
                                         disabled={isLoading}
                                     />
                                 </div>
-                                <Label htmlFor="rememberMe" className="text-[13px] text-slate-300 cursor-pointer select-none">
+                                <Label htmlFor="rememberMe" className="text-[13px] text-slate-600 dark:text-slate-300 cursor-pointer select-none">
                                     Remember Me
                                 </Label>
                             </div>
@@ -156,7 +163,7 @@ export default function LoginPage() {
 
                         <Button
                             type="submit"
-                            className="w-full h-11 text-[15px] font-medium bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-md shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all border border-blue-400/20"
+                            className="w-full h-11 text-[15px] font-medium bg-blue-600 dark:bg-[#3b82f6] hover:bg-blue-700 dark:hover:bg-[#2563eb] text-white rounded-md shadow-[0_4px_14px_rgba(37,99,235,0.2)] dark:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all border border-blue-600 dark:border-blue-400/20"
                             disabled={isLoading}
                         >
                             {isLoading ? (
@@ -170,8 +177,8 @@ export default function LoginPage() {
                         </Button>
 
                         <div className="text-center pt-3">
-                            <span className="text-[13px] text-slate-400">Don't have an account? </span>
-                            <Link href="#" className="text-[13px] text-[#3b82f6] hover:text-[#60a5fa] font-medium transition-colors">
+                            <span className="text-[13px] text-slate-500 dark:text-slate-400">Don't have an account? </span>
+                            <Link href="#" className="text-[13px] text-blue-600 dark:text-[#3b82f6] hover:text-blue-700 dark:hover:text-[#60a5fa] font-medium transition-colors">
                                 Request access
                             </Link>
                         </div>
@@ -182,9 +189,9 @@ export default function LoginPage() {
             {/* Footer */}
             <div className="w-full text-center pb-8 z-10 opacity-70">
                 <div className="flex items-center justify-center mb-2">
-                    <img src="/logo.png" alt="Logo" className="w-[18px] h-[18px] object-contain mr-1.5 filter brightness-0 invert" onError={(e) => e.currentTarget.style.display = 'none'} />
-                    <span className="text-[13px] font-bold text-white tracking-tight">BMA</span>
-                    <span className="text-[13px] font-medium text-slate-300 ml-1">CRM</span>
+                    <img src="/logo.png" alt="Logo" className="w-[18px] h-[18px] object-contain mr-1.5 grayscale" onError={(e) => e.currentTarget.style.display = 'none'} />
+                    <span className="text-[13px] font-bold text-slate-800 dark:text-white tracking-tight">BMA</span>
+                    <span className="text-[13px] font-medium text-slate-500 dark:text-slate-300 ml-1">CRM</span>
                 </div>
                 <p className="text-[11px] text-slate-500">© 2024 BMA Enterprise Solutions Inc. All rights reserved.</p>
             </div>
