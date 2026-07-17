@@ -252,7 +252,7 @@ export default function FollowUpsPage() {
                                             <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <span className="truncate max-w-[200px] sm:max-w-[300px] text-[13px] block cursor-default">{stripHtml(f.description)}</span>
+                                                    <div className="line-clamp-1 max-w-[200px] sm:max-w-[300px] text-[13px] cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
                                                 </TooltipTrigger>
                                                 <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
                                                     <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
@@ -361,7 +361,7 @@ export default function FollowUpsPage() {
                                             <td className="px-5 py-4 text-[13px] max-w-[200px]">
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                        <div className="truncate cursor-default">{stripHtml(f.description)}</div>
+                                                        <div className="line-clamp-1 cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
                                                     </TooltipTrigger>
                                                     <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
                                                         <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
@@ -431,7 +431,7 @@ export default function FollowUpsPage() {
                                             <td className="px-5 py-4 text-[13px] max-w-[200px]">
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                        <div className="truncate cursor-default">{stripHtml(f.description)}</div>
+                                                        <div className="line-clamp-1 cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
                                                     </TooltipTrigger>
                                                     <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
                                                         <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
