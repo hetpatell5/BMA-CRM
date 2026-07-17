@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/lib/store/authStore'
+import { useAuthStore } from '@/stores/authStore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/components/ui/use-toast'
+import { useToast } from '@/hooks/use-toast'
 import { Lock, Loader2, User, EyeOff, Eye } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
