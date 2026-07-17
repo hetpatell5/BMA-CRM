@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
+import { authAPI } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
@@ -36,28 +37,21 @@ export default function LoginPage() {
         setIsLoading(true)
 
         try {
-            const user = {
-                id: 1,
-                email: 'admin@crm.com',
-                fullName: 'Admin User',
-                role: 'ADMIN',
-                status: 'ACTIVE'
-            }
-            const token = 'mock-jwt-token'
+            const response = await authAPI.login(email, password)
+            const { user, token } = response.data
 
             login(user, token, rememberMe)
 
             toast({
                 title: 'Welcome back!',
                 description: `Logged in as ${user.fullName}`,
-                variant: 'success',
             })
 
             router.push('/dashboard')
         } catch (error: any) {
             toast({
                 title: 'Login failed',
-                description: error.response?.data?.message || 'Invalid credentials',
+                description: error.response?.data?.error || error.response?.data?.message || 'Invalid credentials',
                 variant: 'destructive',
             })
         } finally {
