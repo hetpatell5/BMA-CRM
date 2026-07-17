@@ -38,7 +38,7 @@ export default function LoginPage() {
 
         try {
             const response = await authAPI.login(email, password)
-            const { user, token } = response.data
+            const { user, token } = response.data.data
 
             login(user, token, rememberMe)
 
