@@ -83,21 +83,19 @@ export default function LoginPage() {
 
             <div className="flex-1 flex flex-col items-center justify-center z-10 w-full max-w-[440px] mx-auto animate-fade-in-up">
                 
-                {/* Header Logo (Restored to original layout) */}
-                <div className="flex flex-col items-center mb-10">
-                    <div className="flex flex-col items-center justify-center mb-4">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center mb-4">
-                            <img 
-                                src="/logo.png" 
-                                alt="BMA CRM Logo" 
-                                className="w-full h-full object-contain"
-                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
-                        </div>
-                        <div className="flex items-center whitespace-nowrap">
-                            <span className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-none">BMA</span>
-                            <span className="text-3xl font-light text-slate-500 dark:text-slate-300 leading-none ml-1">CRM</span>
-                        </div>
+                {/* Header Logo */}
+                <div className="flex items-center justify-center mb-10">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center mr-4">
+                        <img 
+                            src="/logo.png" 
+                            alt="BMA CRM Logo" 
+                            className="w-full h-full object-contain"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                    </div>
+                    <div className="flex items-center whitespace-nowrap">
+                        <span className="text-4xl font-bold text-slate-900 dark:text-white tracking-tight leading-none">BMA</span>
+                        <span className="text-4xl font-light text-slate-500 dark:text-slate-300 leading-none ml-1.5">CRM</span>
                     </div>
                 </div>
 
@@ -139,11 +137,7 @@ export default function LoginPage() {
                             </button>
                         </div>
 
-                        <div className="flex items-center justify-between pt-1 pb-3">
-                            <Link href="#" className="text-[13px] text-blue-600 dark:text-[#3b82f6] hover:text-blue-700 dark:hover:text-[#60a5fa] font-medium transition-colors">
-                                Forgot Password?
-                            </Link>
-                            
+                        <div className="flex items-center justify-end pt-1 pb-3">
                             <div className="flex items-center space-x-2">
                                 <div className="relative flex items-center">
                                     <input
@@ -176,24 +170,13 @@ export default function LoginPage() {
                             )}
                         </Button>
 
-                        <div className="text-center pt-3">
-                            <span className="text-[13px] text-slate-500 dark:text-slate-400">Don't have an account? </span>
-                            <Link href="#" className="text-[13px] text-blue-600 dark:text-[#3b82f6] hover:text-blue-700 dark:hover:text-[#60a5fa] font-medium transition-colors">
-                                Request access
-                            </Link>
-                        </div>
                     </form>
                 </div>
             </div>
 
             {/* Footer */}
-            <div className="w-full text-center pb-8 z-10 opacity-70">
-                <div className="flex items-center justify-center mb-2">
-                    <img src="/logo.png" alt="Logo" className="w-[18px] h-[18px] object-contain mr-1.5 grayscale" onError={(e) => e.currentTarget.style.display = 'none'} />
-                    <span className="text-[13px] font-bold text-slate-800 dark:text-white tracking-tight">BMA</span>
-                    <span className="text-[13px] font-medium text-slate-500 dark:text-slate-300 ml-1">CRM</span>
-                </div>
-                <p className="text-[11px] text-slate-500">© 2024 BMA Enterprise Solutions Inc. All rights reserved.</p>
+            <div className="w-full text-center pb-8 z-10">
+                <p className="text-[13px] font-medium text-slate-600 dark:text-slate-400">© 2026 BMAP Eduservices pvt ltd. All rights reserved.</p>
             </div>
         </div>
     )
