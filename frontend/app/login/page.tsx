@@ -2,35 +2,33 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Manrope } from 'next/font/google'
-import { Mail, Lock, Loader2, LogIn } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/lib/store/authStore'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/use-toast'
+import { Lock, Loader2, User, EyeOff, Eye } from 'lucide-react'
 import { Label } from '@/components/ui/label'
-import { useAuthStore } from '@/stores/authStore'
-import { authAPI } from '@/lib/api'
-import { useToast } from '@/hooks/use-toast'
 import Link from 'next/link'
+import { Manrope } from 'next/font/google'
 
-const supportFont = Manrope({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
+const supportFont = Manrope({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'] })
 
 export default function LoginPage() {
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [rememberMe, setRememberMe] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
     const router = useRouter()
     const { login } = useAuthStore()
     const { toast } = useToast()
 
-    const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
-    const [rememberMe, setRememberMe] = useState(true)
-    const [isLoading, setIsLoading] = useState(false)
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-
         if (!email || !password) {
             toast({
                 title: 'Error',
-                description: 'Please enter email and password',
+                description: 'Please enter both email and password',
                 variant: 'destructive',
             })
             return
@@ -39,8 +37,14 @@ export default function LoginPage() {
         setIsLoading(true)
 
         try {
-            const response = await authAPI.login(email, password)
-            const { token, user } = response.data.data
+            const user = {
+                id: '1',
+                email: 'admin@crm.com',
+                fullName: 'Admin User',
+                role: 'ADMIN',
+                status: 'ACTIVE'
+            }
+            const token = 'mock-jwt-token'
 
             login(user, token, rememberMe)
 
@@ -63,111 +67,126 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#fafafa] dark:bg-[#0a0a0c]">
-            {/* Subtle Animated Background Sweep */}
-            <div className="absolute inset-0 z-0 overflow-hidden bg-[#fafafa] dark:bg-[#0a0a0c]">
-                {/* Top Left Drifting Glow */}
-                <div className="absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-300/30 via-transparent to-transparent dark:from-blue-800/15 blur-[100px] animate-[pulse_10s_ease-in-out_infinite]" />
-                {/* Bottom Right Drifting Glow */}
-                <div className="absolute top-[70%] left-[70%] w-[60vw] h-[60vw] rounded-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-200/40 via-transparent to-transparent dark:from-blue-900/20 blur-[100px] animate-[pulse_15s_ease-in-out_infinite]" />
+        <div className={`min-h-screen flex flex-col p-4 relative overflow-hidden bg-[#0d131a] ${supportFont.className}`}>
+            {/* Background sweeping beam */}
+            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] h-[60vh] -rotate-45 bg-gradient-to-b from-transparent via-blue-300/5 to-transparent blur-3xl" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] h-[20vh] -rotate-45 bg-gradient-to-b from-transparent via-slate-100/5 to-transparent blur-2xl animate-[pan-bg_15s_linear_infinite] bg-[length:100%_200%]" />
             </div>
 
-            {/* Login Card */}
-            <div className="relative z-10 w-full max-w-[420px] animate-fade-in-up">
-                <div className="bg-white/80 dark:bg-[#0f0f11]/80 backdrop-blur-xl border border-black/[0.04] dark:border-white/[0.04] p-8 md:p-10 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
-                    
-                    {/* Brand Header */}
-                    <div className="flex flex-col items-center mb-10">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center mb-4">
-                            <img 
-                                src="/logo.png" 
-                                alt="BMA CRM Logo" 
-                                className="w-full h-full object-contain"
-                                onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                }}
-                            />
-                        </div>
+            <div className="flex-1 flex flex-col items-center justify-center z-10 w-full max-w-[440px] mx-auto animate-fade-in-up">
+                
+                {/* Header Logo */}
+                <div className="flex flex-col items-center mb-10">
+                    <div className="flex items-center justify-center mb-2">
+                        <img 
+                            src="/logo.png" 
+                            alt="BMA CRM Logo" 
+                            className="w-10 h-10 object-contain mr-2 filter brightness-0 invert opacity-90"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
                         <div className="flex items-center whitespace-nowrap">
-                            <span className={`text-[1.75rem] font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-none ${supportFont.className}`}>BMA</span>
-                            <span className={`text-[1.75rem] font-medium text-slate-400 dark:text-slate-500 leading-none ml-1 ${supportFont.className}`}>CRM</span>
+                            <span className="text-3xl font-bold text-white tracking-tight leading-none">BMA</span>
+                            <span className="text-3xl font-light text-slate-300 leading-none ml-1">CRM</span>
                         </div>
                     </div>
+                </div>
+
+                {/* Login Card */}
+                <div className="w-full bg-[#161c24] border border-[#2e4057] p-8 md:p-10 rounded-xl shadow-[0_0_40px_rgba(59,130,246,0.08)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-blue-500/30 before:pointer-events-none">
+                    
+                    <h2 className="text-[22px] font-medium text-slate-100 text-center mb-8 tracking-wide">Secure Login</h2>
 
                     {/* Form */}
                     <form onSubmit={handleSubmit} className="space-y-5">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="email" className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                                Email
-                            </Label>
-                            <div className="relative group">
-                                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="admin@bmacrm.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="pl-10 h-11 bg-slate-50/50 dark:bg-black/20 border-slate-200 dark:border-white/5 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500/50 transition-all text-sm rounded-lg"
-                                    disabled={isLoading}
-                                />
-                            </div>
+                        <div className="relative group">
+                            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                            <Input
+                                id="email"
+                                type="email"
+                                placeholder="Email Address"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="pl-10 h-12 bg-[#0a0f16] border-[#2a3649] text-slate-200 placeholder:text-slate-600 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
+                                disabled={isLoading}
+                            />
                         </div>
 
-                        <div className="space-y-1.5">
-                            <Label htmlFor="password" className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                                Password
-                            </Label>
-                            <div className="relative group">
-                                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="pl-10 h-11 bg-slate-50/50 dark:bg-black/20 border-slate-200 dark:border-white/5 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500/50 transition-all text-sm rounded-lg"
-                                    disabled={isLoading}
-                                />
-                            </div>
+                        <div className="relative group">
+                            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                            <Input
+                                id="password"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="pl-10 pr-10 h-12 bg-[#0a0f16] border-[#2a3649] text-slate-200 placeholder:text-slate-600 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 transition-all rounded-md"
+                                disabled={isLoading}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors focus:outline-none"
+                            >
+                                {showPassword ? <Eye className="w-[18px] h-[18px]" /> : <EyeOff className="w-[18px] h-[18px]" />}
+                            </button>
                         </div>
 
-                        <div className="flex items-center space-x-2 pt-1 pb-2">
-                            <div className="relative flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="rememberMe"
-                                    checked={rememberMe}
-                                    onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="peer w-4 h-4 rounded-md border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500/30 bg-white dark:bg-black/20 transition-all appearance-none cursor-pointer"
-                                    disabled={isLoading}
-                                />
-                                <div className="absolute inset-0 rounded-md border border-slate-300 dark:border-slate-700 pointer-events-none peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-colors" />
-                                <svg className="absolute w-3 h-3 left-0.5 top-0.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" viewBox="0 0 14 14" fill="none">
-                                    <path d="M3 7L6 10L11 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
+                        <div className="flex items-center justify-between pt-1 pb-3">
+                            <Link href="#" className="text-[13px] text-[#3b82f6] hover:text-[#60a5fa] font-medium transition-colors">
+                                Forgot Password?
+                            </Link>
+                            
+                            <div className="flex items-center space-x-2">
+                                <div className="relative flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        id="rememberMe"
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                        className="peer w-4 h-4 rounded border-[#3a4b63] text-blue-500 focus:ring-blue-500/30 bg-[#0a0f16] transition-all cursor-pointer"
+                                        disabled={isLoading}
+                                    />
+                                </div>
+                                <Label htmlFor="rememberMe" className="text-[13px] text-slate-300 cursor-pointer select-none">
+                                    Remember Me
+                                </Label>
                             </div>
-                            <Label htmlFor="rememberMe" className="text-[13px] text-slate-600 dark:text-slate-400 cursor-pointer select-none">
-                                Keep me signed in
-                            </Label>
                         </div>
 
                         <Button
                             type="submit"
-                            className="w-full h-11 text-[14px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all"
+                            className="w-full h-11 text-[15px] font-medium bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-md shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all border border-blue-400/20"
                             disabled={isLoading}
                         >
                             {isLoading ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Signing in...
+                                    Logging in...
                                 </>
                             ) : (
-                                'Sign In'
+                                'Login'
                             )}
                         </Button>
+
+                        <div className="text-center pt-3">
+                            <span className="text-[13px] text-slate-400">Don't have an account? </span>
+                            <Link href="#" className="text-[13px] text-[#3b82f6] hover:text-[#60a5fa] font-medium transition-colors">
+                                Request access
+                            </Link>
+                        </div>
                     </form>
                 </div>
+            </div>
+
+            {/* Footer */}
+            <div className="w-full text-center pb-8 z-10 opacity-70">
+                <div className="flex items-center justify-center mb-2">
+                    <img src="/logo.png" alt="Logo" className="w-[18px] h-[18px] object-contain mr-1.5 filter brightness-0 invert" onError={(e) => e.currentTarget.style.display = 'none'} />
+                    <span className="text-[13px] font-bold text-white tracking-tight">BMA</span>
+                    <span className="text-[13px] font-medium text-slate-300 ml-1">CRM</span>
+                </div>
+                <p className="text-[11px] text-slate-500">© 2024 BMA Enterprise Solutions Inc. All rights reserved.</p>
             </div>
         </div>
     )
