@@ -69,24 +69,24 @@ export default function LoginPage() {
         <div className={`min-h-screen flex items-center justify-center bg-[#f1f5f9] p-4 sm:p-8 ${supportFont.className}`}>
             
             {/* The Main Container */}
-            <div className="w-full max-w-[1200px] min-h-[700px] bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] flex flex-col lg:flex-row relative">
+            <div className="w-full max-w-[1200px] min-h-[600px] bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] flex flex-col lg:flex-row relative">
                 
                 {/* Left Column: Login Section */}
-                <div className="w-full lg:w-1/2 flex flex-col relative justify-center p-6 sm:p-12 md:p-16 lg:px-20 bg-white rounded-l-3xl z-10">
+                <div className="w-full lg:w-1/2 flex flex-col relative justify-center p-6 sm:p-10 md:p-12 lg:px-16 bg-white rounded-l-3xl z-10">
                     
                     <div className="w-full max-w-[440px] mx-auto animate-fade-in-up">
                         
                         {/* Header Logo */}
-                        <div className="flex items-center justify-center mb-10">
+                        <div className="flex flex-col items-center justify-center mb-8">
                             <img 
                                 src="/logo.png" 
                                 alt="BMA CRM Logo" 
-                                className="h-[64px] w-auto object-contain mr-4"
+                                className="h-[84px] w-auto object-contain mb-3"
                                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
-                            <div className="flex items-center whitespace-nowrap mt-1">
-                                <span className="text-[34px] font-bold text-slate-900 tracking-tight leading-none">BMA</span>
-                                <span className="text-[34px] font-light text-slate-500 leading-none ml-1.5">CRM</span>
+                            <div className="flex items-center whitespace-nowrap tracking-[0.15em]">
+                                <span className="text-2xl font-bold text-slate-900 leading-none">BMA</span>
+                                <span className="text-2xl font-light text-slate-500 leading-none ml-2">CRM</span>
                             </div>
                         </div>
 
@@ -171,14 +171,14 @@ export default function LoginPage() {
                     </div>
 
                     {/* Footer */}
-                    <div className="absolute bottom-8 left-0 right-0 w-full text-center px-6">
+                    <div className="absolute bottom-6 left-0 right-0 w-full text-center px-6">
                         <p className="text-[13px] font-medium text-slate-400">© 2026 BMAP Eduservices pvt ltd. All rights reserved.</p>
                     </div>
 
                 </div>
 
-                {/* Right Column: 3D Illustration & Presentation */}
-                <div className="hidden lg:flex w-full lg:w-1/2 flex-col relative items-center justify-center bg-[#f8fafc] border-l border-slate-100 rounded-r-3xl overflow-hidden">
+                {/* Right Column: 3D Illustration */}
+                <div className="hidden lg:flex w-full lg:w-1/2 relative flex-col items-center justify-center overflow-hidden bg-[#f8fafc] border-l border-slate-100 rounded-r-3xl">
                     
                     {/* Dot Grid Pattern */}
                     <div 
@@ -186,12 +186,12 @@ export default function LoginPage() {
                         style={{ backgroundImage: 'radial-gradient(#cbd5e1 1.5px, transparent 1.5px)', backgroundSize: '32px 32px' }}
                     />
 
-                    {/* 3D Illustration (Contained & Blended) */}
-                    <div className="relative z-10 w-[120%] max-w-[800px] mt-[10%] animate-fade-in pointer-events-none transition-transform duration-[2000ms] hover:scale-[1.02]">
+                    {/* 3D Illustration (Shifted to crop top and right space) */}
+                    <div className="relative z-10 w-[120%] flex items-center justify-center pointer-events-none -mt-[5%] ml-[2%]">
                         <img 
                             src="/illustration.png" 
                             alt="BMA CRM Student Management Illustration" 
-                            className="w-full h-auto mix-blend-darken contrast-[1.05]"
+                            className="w-full h-auto mix-blend-darken contrast-[1.02] transform transition-transform duration-[2000ms] hover:scale-[1.02]"
                         />
                     </div>
                 </div>
