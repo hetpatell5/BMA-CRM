@@ -178,20 +178,20 @@ export default function LoginPage() {
                 </div>
 
                 {/* Right Column: 3D Illustration & Presentation */}
-                <div className="hidden lg:flex w-full lg:w-1/2 flex-col relative items-center justify-center bg-[#f8fafc] border-l border-slate-100 rounded-r-3xl">
+                <div className="hidden lg:flex w-full lg:w-1/2 flex-col relative items-center justify-center bg-[#f8fafc] border-l border-slate-100 rounded-r-3xl overflow-hidden">
                     
-                    {/* Dot Grid Pattern (CSS Data URI) */}
+                    {/* Dot Grid Pattern */}
                     <div 
-                        className="absolute inset-0 opacity-[0.35] rounded-r-3xl pointer-events-none" 
+                        className="absolute inset-0 opacity-[0.4] pointer-events-none" 
                         style={{ backgroundImage: 'radial-gradient(#cbd5e1 1.5px, transparent 1.5px)', backgroundSize: '32px 32px' }}
                     />
 
-                    {/* 3D Illustration (Zoomed & Overlapping) */}
-                    <div className="relative z-10 w-[145%] max-w-[900px] -ml-[25%] mt-[15%] animate-fade-in pointer-events-none transition-transform duration-[2000ms] hover:scale-[1.02]">
+                    {/* 3D Illustration (Contained & Blended) */}
+                    <div className="relative z-10 w-[120%] max-w-[800px] mt-[10%] animate-fade-in pointer-events-none transition-transform duration-[2000ms] hover:scale-[1.02]">
                         <img 
                             src="/illustration.png" 
                             alt="BMA CRM Student Management Illustration" 
-                            className="w-full h-auto mix-blend-multiply contrast-[1.02] brightness-[1.02]"
+                            className="w-full h-auto mix-blend-darken contrast-[1.05]"
                         />
                     </div>
                 </div>
