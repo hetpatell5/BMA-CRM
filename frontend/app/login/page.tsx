@@ -69,10 +69,10 @@ export default function LoginPage() {
         <div className={`min-h-screen flex items-center justify-center bg-[#f1f5f9] p-4 sm:p-8 ${supportFont.className}`}>
             
             {/* The Main Container */}
-            <div className="w-full max-w-[1200px] min-h-[700px] bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden flex flex-col lg:flex-row relative">
+            <div className="w-full max-w-[1200px] min-h-[700px] bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] flex flex-col lg:flex-row relative">
                 
                 {/* Left Column: Login Section */}
-                <div className="w-full lg:w-1/2 flex flex-col relative justify-center p-6 sm:p-12 md:p-16 lg:px-20 bg-white">
+                <div className="w-full lg:w-1/2 flex flex-col relative justify-center p-6 sm:p-12 md:p-16 lg:px-20 bg-white rounded-l-3xl z-10">
                     
                     <div className="w-full max-w-[440px] mx-auto animate-fade-in-up">
                         
@@ -177,19 +177,23 @@ export default function LoginPage() {
 
                 </div>
 
-                {/* Right Column: 3D Illustration */}
-                <div className="hidden lg:block w-full lg:w-1/2 relative overflow-hidden bg-white border-l border-slate-100">
-                    {/* 3D Illustration Filling the Container */}
-                    <div className="absolute inset-0 w-full h-full animate-fade-in transition-transform duration-[2000ms] hover:scale-105">
+                {/* Right Column: 3D Illustration & Presentation */}
+                <div className="hidden lg:flex w-full lg:w-1/2 flex-col relative items-center justify-center bg-[#f8fafc] border-l border-slate-100 rounded-r-3xl">
+                    
+                    {/* Dot Grid Pattern (CSS Data URI) */}
+                    <div 
+                        className="absolute inset-0 opacity-[0.35] rounded-r-3xl pointer-events-none" 
+                        style={{ backgroundImage: 'radial-gradient(#cbd5e1 1.5px, transparent 1.5px)', backgroundSize: '32px 32px' }}
+                    />
+
+                    {/* 3D Illustration (Zoomed & Overlapping) */}
+                    <div className="relative z-10 w-[145%] max-w-[900px] -ml-[25%] mt-[15%] animate-fade-in pointer-events-none transition-transform duration-[2000ms] hover:scale-[1.02]">
                         <img 
                             src="/illustration.png" 
                             alt="BMA CRM Student Management Illustration" 
-                            className="w-full h-full object-cover object-center"
+                            className="w-full h-auto mix-blend-multiply contrast-[1.02] brightness-[1.02]"
                         />
                     </div>
-                    
-                    {/* Subtle inner shadow overlay to blend edges */}
-                    <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.02)] pointer-events-none" />
                 </div>
                 
             </div>
