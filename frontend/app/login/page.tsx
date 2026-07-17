@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/authStore'
 import { authAPI } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
+import Link from 'next/link'
 
 const supportFont = Manrope({ subsets: ['latin'], weight: ['500', '600', '700', '800'] })
 
@@ -62,104 +63,111 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-            {/* Animated background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-100 via-purple-100/40 to-slate-100 dark:from-slate-900 dark:via-purple-900/20 dark:to-slate-900 transition-colors duration-500" />
-            <div className="absolute inset-0">
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/30 dark:bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/30 dark:bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#fafafa] dark:bg-[#0a0a0c]">
+            {/* Subtle Animated Background Sweep */}
+            <div className="absolute inset-0 z-0">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-100/40 via-[#fafafa] to-[#fafafa] dark:from-blue-900/10 dark:via-[#0a0a0c] dark:to-[#0a0a0c] animate-slow-drift" />
+                <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] dark:opacity-[0.05] mix-blend-overlay pointer-events-none" />
             </div>
 
-            {/* Login card */}
-            <div className="relative w-full max-w-md">
-                <div className="glass rounded-2xl p-8 shadow-2xl animate-fade-in relative z-10">
-                    {/* Logo */}
-                    <div className="flex flex-col items-center mb-8">
-                        <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center mb-2">
+            {/* Login Card */}
+            <div className="relative z-10 w-full max-w-[420px] animate-fade-in-up">
+                <div className="bg-white/80 dark:bg-[#0f0f11]/80 backdrop-blur-xl border border-black/[0.04] dark:border-white/[0.04] p-8 md:p-10 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
+                    
+                    {/* Brand Header */}
+                    <div className="flex flex-col items-center mb-10">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center mb-4">
                             <img 
                                 src="/logo.png" 
                                 alt="BMA CRM Logo" 
-                                className="w-full h-full object-contain drop-shadow-sm"
+                                className="w-full h-full object-contain"
                                 onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                 }}
                             />
                         </div>
-                        <div className="flex items-center whitespace-nowrap mb-1">
-                            <span className={`text-[2rem] font-bold text-slate-800 dark:text-[#b8bfc6] leading-none ${supportFont.className}`}>BMA</span>
-                            <span className={`text-[2rem] font-bold text-slate-500 dark:text-[#b8bfc6] leading-none ml-1.5 ${supportFont.className}`}>CRM</span>
+                        <div className="flex items-center whitespace-nowrap mb-1.5">
+                            <span className={`text-[1.75rem] font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-none ${supportFont.className}`}>BMA</span>
+                            <span className={`text-[1.75rem] font-medium text-slate-400 dark:text-slate-500 leading-none ml-1 ${supportFont.className}`}>CRM</span>
                         </div>
-                        <p className="text-muted-foreground mt-1 text-sm font-medium">Student Management System</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-[13px] font-medium tracking-wide uppercase">Admin Portal</p>
                     </div>
 
                     {/* Form */}
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="email" className="text-sm text-muted-foreground">
-                                Email Address
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="email" className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                                Email
                             </Label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                            <div className="relative group">
+                                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                                 <Input
                                     id="email"
                                     type="email"
-                                    placeholder="admin@crm.com"
+                                    placeholder="admin@bmacrm.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="pl-10 h-12 bg-white/5 border-white/10 focus:border-primary"
+                                    className="pl-10 h-11 bg-slate-50/50 dark:bg-black/20 border-slate-200 dark:border-white/5 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500/50 transition-all text-sm rounded-lg"
                                     disabled={isLoading}
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="password" className="text-sm text-muted-foreground">
-                                Password
-                            </Label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="password" className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                                    Password
+                                </Label>
+                                <Link href="#" className="text-[13px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">
+                                    Forgot password?
+                                </Link>
+                            </div>
+                            <div className="relative group">
+                                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                                 <Input
                                     id="password"
                                     type="password"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="pl-10 h-12 bg-white/5 border-white/10 focus:border-primary"
+                                    className="pl-10 h-11 bg-slate-50/50 dark:bg-black/20 border-slate-200 dark:border-white/5 focus-visible:ring-1 focus-visible:ring-blue-500/50 focus-visible:border-blue-500/50 transition-all text-sm rounded-lg"
                                     disabled={isLoading}
                                 />
                             </div>
                         </div>
 
-                        <div className="flex items-center space-x-2">
-                            <input
-                                type="checkbox"
-                                id="rememberMe"
-                                checked={rememberMe}
-                                onChange={(e) => setRememberMe(e.target.checked)}
-                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary bg-white/5"
-                                disabled={isLoading}
-                            />
-                            <Label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer font-normal">
-                                Remember me
+                        <div className="flex items-center space-x-2 pt-1 pb-2">
+                            <div className="relative flex items-center">
+                                <input
+                                    type="checkbox"
+                                    id="rememberMe"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
+                                    className="peer w-4 h-4 rounded-md border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500/30 bg-white dark:bg-black/20 transition-all appearance-none cursor-pointer"
+                                    disabled={isLoading}
+                                />
+                                <div className="absolute inset-0 rounded-md border border-slate-300 dark:border-slate-700 pointer-events-none peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-colors" />
+                                <svg className="absolute w-3 h-3 left-0.5 top-0.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" viewBox="0 0 14 14" fill="none">
+                                    <path d="M3 7L6 10L11 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </div>
+                            <Label htmlFor="rememberMe" className="text-[13px] text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+                                Keep me signed in
                             </Label>
                         </div>
 
                         <Button
                             type="submit"
-                            className="w-full h-12 text-base"
-                            variant="gradient"
+                            className="w-full h-11 text-[14px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all"
                             disabled={isLoading}
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                     Signing in...
                                 </>
                             ) : (
-                                <>
-                                    <LogIn className="w-5 h-5 mr-2" />
-                                    Sign In
-                                </>
+                                'Sign In'
                             )}
                         </Button>
                     </form>
