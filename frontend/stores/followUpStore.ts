@@ -32,7 +32,7 @@ interface FollowUpState {
     isLoadingCompleted: boolean;
     fetchPendingFollowUps: (page?: number, search?: string) => Promise<void>;
     fetchCompletedFollowUps: (page?: number, search?: string) => Promise<void>;
-    addFollowUp: (data: Omit<FollowUp, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'status'> & { status?: string, color?: string }) => Promise<void>;
+    addFollowUp: (data: Omit<FollowUp, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'createdById' | 'status'> & { status?: string, color?: string }) => Promise<void>;
     updateFollowUp: (id: string, data: Partial<FollowUp>) => Promise<void>;
     removeFollowUp: (id: string) => Promise<void>;
 }
