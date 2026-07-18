@@ -166,7 +166,7 @@ export default function LoginPage() {
 
                     {/* Footer */}
                     <div className="absolute bottom-6 left-0 right-0 w-full text-center px-6">
-                        <p className="text-[13px] font-medium text-slate-400">© 2026 BMAP Eduservices pvt ltd. All rights reserved.</p>
+                        {/* <p className="text-[13px] font-medium text-slate-400">© 2026 BMAP Eduservices pvt ltd. All rights reserved.</p> */}
                     </div>
 
                 </div>
