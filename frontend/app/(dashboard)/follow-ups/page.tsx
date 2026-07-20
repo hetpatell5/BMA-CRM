@@ -429,10 +429,15 @@ export default function FollowUpsPage() {
                         </div>
                     ) : (
                         (activeTab === 'attention' ? upcomingFollowUps : pendingFollowUps).map((f) => {
+                            const urgency = getUrgency(f.followupDate)
                             return (
-                                <div key={f.id} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 card-surface hover:shadow-md transition-all group overflow-hidden">
-                                    {/* Urgency indicator strip */}
-                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${getUrgency(f.followupDate) === 'overdue' ? 'bg-red-500' : getUrgency(f.followupDate) === 'today' ? 'bg-amber-500' : 'bg-transparent group-hover:bg-primary/20'} transition-colors`} />
+                                <div key={f.id} className={`relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 rounded-2xl border backdrop-blur-md hover:shadow-md transition-all group overflow-hidden ${
+                                    urgency === 'overdue' 
+                                        ? 'bg-red-500/5 dark:bg-red-500/10 border-red-500/20 dark:border-red-500/30' 
+                                        : urgency === 'today'
+                                            ? 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/20 dark:border-amber-500/30'
+                                            : 'bg-white/40 dark:bg-white/5 border-border/50 dark:border-white/10'
+                                }`}>
                                     
                                     <div className="flex items-start gap-4 flex-1 min-w-0 pl-1">
                                         <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${isValidName(f.name) ? 'bg-primary/10 border-primary/20 text-primary border' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 border'}`}>
@@ -509,8 +514,7 @@ export default function FollowUpsPage() {
                         <span>Completed Date & Actions</span>
                     </div>
                     {completedFollowUps.map((f) => (
-                        <div key={f.id} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 card-surface hover:shadow-md transition-all group overflow-hidden">
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/30" />
+                        <div key={f.id} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 rounded-2xl border backdrop-blur-md hover:shadow-md transition-all group overflow-hidden bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20 dark:border-emerald-500/30">
                             
                             <div className="flex items-start gap-4 flex-1 min-w-0 pl-1">
                                 <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 border border-border flex items-center justify-center text-sm font-bold text-muted-foreground shrink-0 opacity-70">
