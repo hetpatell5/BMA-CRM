@@ -269,19 +269,7 @@ export default function FollowUpsPage() {
             </div>
 
 
-            {/* Search Bar */}
-            <div className="relative max-w-full">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 dark:text-slate-500" />
-                <Input
-                    placeholder="Search by name, number, description or requirement..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="pl-11 h-11 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 focus:border-primary text-[14px] placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-sm"
-                />
-                {(isLoadingPending || isLoadingCompleted) && (
-                    <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
-                )}
-            </div>
+
 
             {/* Admin: Team Performance Panel */}
             {isAdmin && statsData && statsData.length > 0 && (
@@ -380,27 +368,44 @@ export default function FollowUpsPage() {
             )}
 
 
-            {/* Tabs */}
-            <div className="flex bg-muted/50 p-1 rounded-xl w-fit border border-border/50 mb-1">
-                <button 
-                    onClick={() => setActiveTab('attention')}
-                    className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'attention' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
-                >
-                    <AlertTriangle className={`w-4 h-4 ${activeTab === 'attention' ? 'text-amber-500' : 'text-amber-500/60'}`} />
-                    Attention ({upcomingFollowUps.length})
-                </button>
-                <button 
-                    onClick={() => setActiveTab('pending')}
-                    className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'pending' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
-                >
-                    Pending ({pendingFollowUps.length})
-                </button>
-                <button 
-                    onClick={() => setActiveTab('completed')}
-                    className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'completed' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
-                >
-                    Completed ({completedFollowUps.length})
-                </button>
+            {/* Controls Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+                {/* Tabs */}
+                <div className="flex bg-muted/50 p-1 rounded-xl w-fit border border-border/50">
+                    <button 
+                        onClick={() => setActiveTab('attention')}
+                        className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'attention' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+                    >
+                        <AlertTriangle className={`w-4 h-4 ${activeTab === 'attention' ? 'text-amber-500' : 'text-amber-500/60'}`} />
+                        Attention ({upcomingFollowUps.length})
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('pending')}
+                        className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'pending' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+                    >
+                        Pending ({pendingFollowUps.length})
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('completed')}
+                        className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'completed' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+                    >
+                        Completed ({completedFollowUps.length})
+                    </button>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative w-full sm:w-[320px] shrink-0">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 dark:text-slate-500" />
+                    <Input
+                        placeholder="Search follow-ups..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="pl-11 h-11 rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/5 backdrop-blur-xl focus:border-primary text-[14px] placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-sm w-full"
+                    />
+                    {(isLoadingPending || isLoadingCompleted) && (
+                        <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
+                    )}
+                </div>
             </div>
 
             {/* Attention or Pending List */}
@@ -431,12 +436,12 @@ export default function FollowUpsPage() {
                         (activeTab === 'attention' ? upcomingFollowUps : pendingFollowUps).map((f) => {
                             const urgency = getUrgency(f.followupDate)
                             return (
-                                <div key={f.id} className={`relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 rounded-2xl border backdrop-blur-md hover:shadow-md transition-all group overflow-hidden ${
+                                <div key={f.id} className={`relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 rounded-2xl border backdrop-blur-xl hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 group overflow-hidden shadow-[inset_0_1px_1px_rgba(255,255,255,0.5),0_4px_15px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_15px_rgba(0,0,0,0.2)] ${
                                     urgency === 'overdue' 
-                                        ? 'bg-red-500/5 dark:bg-red-500/10 border-red-500/20 dark:border-red-500/30' 
+                                        ? 'bg-red-500/10 dark:bg-red-500/10 border-red-500/30 dark:border-red-500/30' 
                                         : urgency === 'today'
-                                            ? 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/20 dark:border-amber-500/30'
-                                            : 'bg-white/40 dark:bg-white/5 border-border/50 dark:border-white/10'
+                                            ? 'bg-amber-500/10 dark:bg-amber-500/10 border-amber-500/30 dark:border-amber-500/30'
+                                            : 'bg-white/60 dark:bg-white/5 border-slate-200/60 dark:border-white/10'
                                 }`}>
                                     
                                     <div className="flex items-start gap-4 flex-1 min-w-0 pl-1">
@@ -514,7 +519,7 @@ export default function FollowUpsPage() {
                         <span>Completed Date & Actions</span>
                     </div>
                     {completedFollowUps.map((f) => (
-                        <div key={f.id} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 rounded-2xl border backdrop-blur-md hover:shadow-md transition-all group overflow-hidden bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20 dark:border-emerald-500/30">
+                        <div key={f.id} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 rounded-2xl border backdrop-blur-xl hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 group overflow-hidden shadow-[inset_0_1px_1px_rgba(255,255,255,0.5),0_4px_15px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_15px_rgba(0,0,0,0.2)] bg-emerald-500/10 dark:bg-emerald-500/10 border-emerald-500/30 dark:border-emerald-500/30">
                             
                             <div className="flex items-start gap-4 flex-1 min-w-0 pl-1">
                                 <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 border border-border flex items-center justify-center text-sm font-bold text-muted-foreground shrink-0 opacity-70">
