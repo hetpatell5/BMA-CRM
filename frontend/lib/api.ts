@@ -307,10 +307,13 @@ export const appSettingsAPI = {
 
 // Follow-ups API
 export const followUpsAPI = {
-    getAll: (params?: { search?: string, status?: string, page?: number, limit?: number }) => api.get('/follow-ups', { params }),
+    getAll: (params?: { search?: string, status?: string, page?: number, limit?: number, userId?: number }) => api.get('/follow-ups', { params }),
     create: (data: any) => api.post('/follow-ups', data),
     update: (id: string, data: any) => api.put(`/follow-ups/${id}`, data),
     remove: (id: string) => api.delete(`/follow-ups/${id}`),
+    // Admin-only
+    getStats: () => api.get('/follow-ups/stats'),
+    getTeamToday: () => api.get('/follow-ups/team-today'),
 }
 
 // IGNOU Assignment Status Checker API

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2, Trash2, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2, Trash2, CheckCircle2, ChevronLeft, ChevronRight, Users, BarChart2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,6 +14,8 @@ import { format, isBefore, addDays, startOfDay } from 'date-fns'
 import { useConfirm } from '@/components/ui/confirm-provider'
 import RichTextEditor from '@/components/RichTextEditor'
 import DOMPurify from 'dompurify'
+import { useQuery } from '@tanstack/react-query'
+import { followUpsAPI } from '@/lib/api'
 
 const stripHtml = (html: string) => {
     if (!html) return ''
@@ -40,20 +42,40 @@ export default function FollowUpsPage() {
     const [editFollowupDate, setEditFollowupDate] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending')
-    // Fetch follow-ups from backend on mount
+    const isAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER'
+
+    // Admin: selected user filter (null = all users)
+    const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
+
+    // Fetch follow-ups from backend on mount (and re-fetch when userId filter changes)
     useEffect(() => {
-        fetchPendingFollowUps(1)
-        fetchCompletedFollowUps(1)
-    }, [fetchPendingFollowUps, fetchCompletedFollowUps])
+        fetchPendingFollowUps(1, '', selectedUserId ?? undefined)
+        fetchCompletedFollowUps(1, '', selectedUserId ?? undefined)
+    }, [fetchPendingFollowUps, fetchCompletedFollowUps, selectedUserId])
 
     // Debounced search
     useEffect(() => {
         const timer = setTimeout(() => {
-            fetchPendingFollowUps(1, searchQuery || undefined)
-            fetchCompletedFollowUps(1, searchQuery || undefined)
+            fetchPendingFollowUps(1, searchQuery || undefined, selectedUserId ?? undefined)
+            fetchCompletedFollowUps(1, searchQuery || undefined, selectedUserId ?? undefined)
         }, 400)
         return () => clearTimeout(timer)
-    }, [searchQuery, fetchPendingFollowUps, fetchCompletedFollowUps])
+    }, [searchQuery, fetchPendingFollowUps, fetchCompletedFollowUps, selectedUserId])
+
+    // Admin: fetch per-user stats for performance panel
+    const { data: statsData } = useQuery({
+        queryKey: ['follow-ups-stats'],
+        queryFn: async () => {
+            const res = await followUpsAPI.getStats()
+            return res.data.data as Array<{
+                user: { id: number; fullName: string }
+                pending: number
+                completed: number
+            }>
+        },
+        enabled: isAdmin,
+        staleTime: 60_000,
+    })
 
     const handleNumberClick = (f: FollowUp) => {
         setSelectedFollowUp(f)
@@ -227,6 +249,48 @@ export default function FollowUpsPage() {
                     <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
                 )}
             </div>
+
+            {/* Admin: Team Member Filter Pills */}
+            {isAdmin && statsData && statsData.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mr-1">
+                        <Users className="w-3.5 h-3.5" />
+                        Filter by:
+                    </div>
+                    <button
+                        onClick={() => setSelectedUserId(null)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                            selectedUserId === null
+                                ? 'bg-primary text-white border-primary shadow-sm shadow-primary/25'
+                                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-primary/40'
+                        }`}
+                    >
+                        All Members
+                        <span className="ml-1.5 text-[10px] opacity-70">
+                            ({statsData.reduce((s, u) => s + u.pending, 0)} pending)
+                        </span>
+                    </button>
+                    {statsData.map(s => (
+                        <button
+                            key={s.user.id}
+                            onClick={() => setSelectedUserId(selectedUserId === s.user.id ? null : s.user.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                selectedUserId === s.user.id
+                                    ? 'bg-primary text-white border-primary shadow-sm shadow-primary/25'
+                                    : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-primary/40'
+                            }`}
+                        >
+                            {s.user.fullName.split(' ')[0]}
+                            {s.pending > 0 && (
+                                <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded-md ${selectedUserId === s.user.id ? 'bg-white/20' : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'}`}>
+                                    {s.pending}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            )}
+
 
             {/* Alert for upcoming follow-ups */}
             {upcomingFollowUps.length > 0 && (
@@ -413,12 +477,13 @@ export default function FollowUpsPage() {
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[860px] border-collapse">
                                 <thead>
-                                    <tr className="text-left text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
+                                     <tr className="text-left text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
                                         <th className="px-5 py-4">Date</th>
                                         <th className="px-5 py-4">Name</th>
                                         <th className="px-5 py-4">Number</th>
                                         <th className="px-5 py-4">Description</th>
                                         <th className="px-5 py-4">Requirement</th>
+                                        {isAdmin && <th className="px-5 py-4">Team Member</th>}
                                         <th className="px-5 py-4">Actions</th>
                                     </tr>
                                 </thead>
@@ -448,6 +513,13 @@ export default function FollowUpsPage() {
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </td>
+                                            {isAdmin && (
+                                                <td className="px-5 py-4">
+                                                    <span className="text-[12px] font-semibold text-slate-600 dark:text-slate-300">
+                                                        {f.createdBy?.fullName || '—'}
+                                                    </span>
+                                                </td>
+                                            )}
                                             <td className="px-5 py-4">
                                                 <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all text-xs font-bold gap-1.5">
                                                     <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -591,6 +663,61 @@ export default function FollowUpsPage() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* Admin: Team Performance Panel */}
+            {isAdmin && statsData && statsData.length > 0 && (
+                <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-5 shadow-lg dark:shadow-none">
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                            <BarChart2 className="w-5 h-5 text-purple-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-base font-bold text-foreground">Team Performance</h2>
+                            <p className="text-xs text-muted-foreground mt-0.5">Follow-up completion rate per team member</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {statsData.map(s => {
+                            const total = s.pending + s.completed
+                            const pct = total > 0 ? Math.round((s.completed / total) * 100) : 0
+                            return (
+                                <button
+                                    key={s.user.id}
+                                    onClick={() => setSelectedUserId(selectedUserId === s.user.id ? null : s.user.id)}
+                                    className={`relative text-left rounded-xl border p-4 transition-all ${
+                                        selectedUserId === s.user.id
+                                            ? 'border-primary/40 bg-primary/5 dark:bg-primary/10 shadow-sm'
+                                            : 'border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] hover:border-slate-300 dark:hover:border-white/10'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2.5 mb-3">
+                                        <div className="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[11px] font-bold text-purple-600 dark:text-purple-400 shrink-0">
+                                            {s.user.fullName.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[13px] font-bold text-slate-800 dark:text-slate-200 truncate">{s.user.fullName}</p>
+                                            <p className="text-[10px] text-muted-foreground">{total} total follow-ups</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between text-[11px] font-semibold mb-2">
+                                        <span className="text-amber-600 dark:text-amber-400">{s.pending} pending</span>
+                                        <span className="text-emerald-600 dark:text-emerald-400">{s.completed} done</span>
+                                    </div>
+                                    <div className="h-2 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-700"
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
+                                    <div className="text-right mt-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                        {pct}% completion
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
         </TooltipProvider>
     )

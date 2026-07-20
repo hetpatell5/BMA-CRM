@@ -36,6 +36,7 @@ import Link from 'next/link'
 import { StaffDashboard } from '@/components/dashboard/staff-dashboard'
 import { TelecallerDashboard } from '@/components/dashboard/telecaller-dashboard'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ComposedChart, Bar, Line } from 'recharts'
+import { TeamFollowUpsWidget } from '@/components/dashboard/team-followups-widget'
 
 // Stat Card Component
 function StatCard({
@@ -328,7 +329,11 @@ export default function DashboardPage() {
                 </div>
             )}
 
-            {/* Main Content Grid */}
+            {/* Team Follow-ups Widget — Admin/Manager only */}
+            {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER') && (
+                <TeamFollowUpsWidget />
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                 {/* Follow-ups Today */}
                 <div className="glass rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 md:p-6 pb-2 shadow-lg dark:shadow-none">

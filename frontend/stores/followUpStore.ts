@@ -30,8 +30,8 @@ interface FollowUpState {
     completedMeta: FollowUpMeta;
     isLoadingPending: boolean;
     isLoadingCompleted: boolean;
-    fetchPendingFollowUps: (page?: number, search?: string) => Promise<void>;
-    fetchCompletedFollowUps: (page?: number, search?: string) => Promise<void>;
+    fetchPendingFollowUps: (page?: number, search?: string, userId?: number) => Promise<void>;
+    fetchCompletedFollowUps: (page?: number, search?: string, userId?: number) => Promise<void>;
     addFollowUp: (data: Omit<FollowUp, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'createdById' | 'status'> & { status?: string, color?: string }) => Promise<void>;
     updateFollowUp: (id: string, data: Partial<FollowUp>) => Promise<void>;
     removeFollowUp: (id: string) => Promise<void>;
@@ -47,10 +47,10 @@ export const useFollowUpStore = create<FollowUpState>()((set, get) => ({
     isLoadingPending: false,
     isLoadingCompleted: false,
 
-    fetchPendingFollowUps: async (page = 1, search = '') => {
+    fetchPendingFollowUps: async (page = 1, search = '', userId?: number) => {
         set({ isLoadingPending: true });
         try {
-            const response = await followUpsAPI.getAll({ page, limit: 1000, search, status: 'PENDING' });
+            const response = await followUpsAPI.getAll({ page, limit: 1000, search, status: 'PENDING', ...(userId ? { userId } : {}) });
             const data = response.data.data || [];
             const meta = response.data.meta || defaultMeta;
             
@@ -68,10 +68,10 @@ export const useFollowUpStore = create<FollowUpState>()((set, get) => ({
         }
     },
 
-    fetchCompletedFollowUps: async (page = 1, search = '') => {
+    fetchCompletedFollowUps: async (page = 1, search = '', userId?: number) => {
         set({ isLoadingCompleted: true });
         try {
-            const response = await followUpsAPI.getAll({ page, limit: 1000, search, status: 'COMPLETED' });
+            const response = await followUpsAPI.getAll({ page, limit: 1000, search, status: 'COMPLETED', ...(userId ? { userId } : {}) });
             const data = response.data.data || [];
             const meta = response.data.meta || defaultMeta;
 
