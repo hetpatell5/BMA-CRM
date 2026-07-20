@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
         const pageSize = parseInt(limit, 10);
         const skip = (pageNumber - 1) * pageSize;
 
-        const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
+        const isAdmin = req.user.role === 'ADMIN';
 
         // Admin sees all; optionally filter by a specific userId
         // Non-admin always scoped to their own records
@@ -73,7 +73,7 @@ router.get('/', async (req, res) => {
 // GET /api/follow-ups/stats — Per-user follow-up summary (Admin/Manager only)
 router.get('/stats', async (req, res) => {
     try {
-        const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
+        const isAdmin = req.user.role === 'ADMIN';
         if (!isAdmin) {
             return res.status(403).json({ success: false, error: 'Access denied' });
         }
@@ -122,7 +122,7 @@ router.get('/stats', async (req, res) => {
 // GET /api/follow-ups/team-today — Today's pending follow-ups per user (Admin/Manager only)
 router.get('/team-today', async (req, res) => {
     try {
-        const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
+        const isAdmin = req.user.role === 'ADMIN';
         if (!isAdmin) {
             return res.status(403).json({ success: false, error: 'Access denied' });
         }
