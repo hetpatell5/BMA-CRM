@@ -194,8 +194,8 @@ export default function FollowUpsPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold">Daily Follow Ups</h1>
-                    <p className="text-sm text-muted-foreground">Manage and track your follow-up tasks.</p>
+                    <h1 className="page-title">Daily Follow Ups</h1>
+                    <p className="page-subtitle">Manage and track your follow-up tasks.</p>
                 </div>
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>

@@ -203,6 +203,7 @@ export default function SettingsPage() {
         }
     }
 
+
     if (!isAdmin) {
         return (
             <div className="p-6 text-center text-muted-foreground">
@@ -221,15 +222,16 @@ export default function SettingsPage() {
                 <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Settings</h1>
-                            <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">Configure integrations and application defaults</p>
+                            <h1 className="page-title">Settings</h1>
+                            <p className="page-subtitle">Configure integrations and application defaults</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
                         <Button
                             onClick={() => saveMutation.mutate()}
                             disabled={saveMutation.isPending}
-                            className="h-[42px] rounded-[10px] bg-blue-600 px-6 text-[14px] font-semibold text-white shadow-md hover:bg-blue-700 transition-all dark:bg-blue-600 dark:hover:bg-blue-700"
+                            variant="gradient"
+                            className="h-[42px] px-6 text-[14px] font-semibold"
                         >
                             {saveMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Changes</>}
                         </Button>
@@ -238,7 +240,7 @@ export default function SettingsPage() {
             </div>
 
             {isLoading || isOrderIdRulesLoading ? (
-                <div className="flex items-center justify-center py-20 gap-3 text-slate-500 dark:text-muted-foreground">
+                <div className="flex items-center justify-center py-20 gap-3 text-muted-foreground">
                     <Loader2 className="w-5 h-5 animate-spin" /> Loading settings...
                 </div>
             ) : (

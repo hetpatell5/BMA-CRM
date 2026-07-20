@@ -38,16 +38,36 @@
 
     --radius:             0.5rem;
 
+    /* Semantic surface shadows (dark) */
+    --shadow-card:        0 1px 3px rgba(0,0,0,0.40), 0 4px 16px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.04);
+    --shadow-card-hover:  0 2px 8px rgba(0,0,0,0.50), 0 8px 32px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06);
+    --shadow-popover:     0 4px 24px rgba(0,0,0,0.55), 0 1px 4px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06);
+    --shadow-button:      0 1px 2px rgba(0,0,0,0.30);
+
     /* Dark-specific glass vars */
     --glass-bg:           rgba(255,255,255,0.05);
-    --glass-border:       rgba(255,255,255,0.10);
-    --glass-hover:        rgba(255,255,255,0.10);
-    --glass-dropdown-bg:  linear-gradient(145deg, rgba(22,27,46,0.90) 0%, rgba(15,20,38,0.84) 100%);
+    --glass-border:       rgba(255,255,255,0.08);
+    --glass-hover:        rgba(255,255,255,0.09);
+    --glass-dropdown-bg:  linear-gradient(145deg, rgba(22,27,46,0.92) 0%, rgba(15,20,38,0.88) 100%);
     --glass-dropdown-border: rgba(255,255,255,0.12);
     --glass-dropdown-shadow: 0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.20);
     --glass-shimmer-via:  rgba(255,255,255,0.10);
     --select-option-bg:   #1a1a2e;
     --select-option-color:#ffffff;
+
+    /* Icon badge tonal backgrounds (dark) */
+    --icon-primary-bg:    rgba(59,130,246,0.12);
+    --icon-primary-fg:    hsl(var(--primary));
+    --icon-success-bg:    rgba(16,185,129,0.12);
+    --icon-success-fg:    #34d399;
+    --icon-warning-bg:    rgba(245,158,11,0.12);
+    --icon-warning-fg:    #fbbf24;
+    --icon-danger-bg:     rgba(239,68,68,0.12);
+    --icon-danger-fg:     #f87171;
+    --icon-purple-bg:     rgba(139,92,246,0.12);
+    --icon-purple-fg:     #a78bfa;
+    --icon-cyan-bg:       rgba(6,182,212,0.12);
+    --icon-cyan-fg:       #22d3ee;
   }
 }
 
@@ -86,16 +106,36 @@
 
     --radius:             0.5rem;
 
+    /* Semantic surface shadows (light) */
+    --shadow-card:        0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9);
+    --shadow-card-hover:  0 2px 8px rgba(0,0,0,0.10), 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,1);
+    --shadow-popover:     0 4px 24px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
+    --shadow-button:      0 1px 2px rgba(0,0,0,0.08);
+
     /* Light-specific glass vars */
-    --glass-bg:           rgba(255,255,255,0.72);
-    --glass-border:       rgba(0,0,0,0.08);
-    --glass-hover:        rgba(0,0,0,0.05);
+    --glass-bg:           rgba(255,255,255,0.80);
+    --glass-border:       rgba(0,0,0,0.07);
+    --glass-hover:        rgba(0,0,0,0.04);
     --glass-dropdown-bg:  linear-gradient(145deg, rgba(255,255,255,0.97) 0%, rgba(245,248,255,0.95) 100%);
     --glass-dropdown-border: rgba(0,0,0,0.10);
     --glass-dropdown-shadow: 0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
     --glass-shimmer-via:  rgba(0,0,0,0.05);
     --select-option-bg:   #f5f8ff;
     --select-option-color:#1e293b;
+
+    /* Icon badge tonal backgrounds (light) */
+    --icon-primary-bg:    rgba(59,130,246,0.10);
+    --icon-primary-fg:    hsl(var(--primary));
+    --icon-success-bg:    rgba(16,185,129,0.10);
+    --icon-success-fg:    #059669;
+    --icon-warning-bg:    rgba(245,158,11,0.10);
+    --icon-warning-fg:    #d97706;
+    --icon-danger-bg:     rgba(239,68,68,0.10);
+    --icon-danger-fg:     #dc2626;
+    --icon-purple-bg:     rgba(139,92,246,0.10);
+    --icon-purple-fg:     #7c3aed;
+    --icon-cyan-bg:       rgba(6,182,212,0.10);
+    --icon-cyan-fg:       #0891b2;
   }
 }
 
@@ -111,7 +151,7 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     transition: background-color 0.25s ease, color 0.25s ease;
   }
-  
+
   /* Prevent Radix UI scroll-lock from pushing the page down */
   html[data-scroll-locked],
   body[data-scroll-locked] {
@@ -128,10 +168,15 @@
   /* Glass card — adapts to theme via CSS vars */
   .glass {
     background: var(--glass-bg);
-    backdrop-filter: blur(20px) saturate(150%);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
     border: 1px solid var(--glass-border);
-    transition: background 0.25s ease, border-color 0.25s ease;
+    box-shadow: var(--shadow-card);
+    transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  .glass:hover {
+    box-shadow: var(--shadow-card-hover);
   }
 
   .glass-hover {
@@ -141,24 +186,91 @@
     background: var(--glass-hover);
   }
 
+  /* ─── Primary gradient — CTA buttons only ─── */
   .gradient-primary {
-    @apply bg-primary;
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(225 85% 62%) 100%);
+    box-shadow: 0 2px 12px hsl(var(--primary) / 0.30), var(--shadow-button);
   }
 
+  /* ─── Tonal status utilities (flat, not gradient) ─── */
+  .status-success {
+    @apply bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20;
+  }
+  .status-warning {
+    @apply bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20;
+  }
+  .status-danger {
+    @apply bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20;
+  }
+  .status-info {
+    @apply bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20;
+  }
+  .status-muted {
+    @apply bg-slate-100 dark:bg-white/5 text-muted-foreground border border-slate-200 dark:border-white/10;
+  }
+
+  /* ─── Icon badge tonal containers ─── */
+  .icon-badge-primary  { background: var(--icon-primary-bg);  color: var(--icon-primary-fg);  }
+  .icon-badge-success  { background: var(--icon-success-bg);  color: var(--icon-success-fg);  }
+  .icon-badge-warning  { background: var(--icon-warning-bg);  color: var(--icon-warning-fg);  }
+  .icon-badge-danger   { background: var(--icon-danger-bg);   color: var(--icon-danger-fg);   }
+  .icon-badge-purple   { background: var(--icon-purple-bg);   color: var(--icon-purple-fg);   }
+  .icon-badge-cyan     { background: var(--icon-cyan-bg);     color: var(--icon-cyan-fg);     }
+
+  /* ─── Kept for backward compatibility — prefer status-* above ─── */
   .gradient-success {
-    @apply bg-gradient-to-r from-emerald-500 to-teal-500;
+    @apply bg-emerald-500/10 text-emerald-600 dark:text-emerald-400;
   }
-
   .gradient-warning {
-    @apply bg-gradient-to-r from-amber-500 to-orange-500;
+    @apply bg-amber-500/10 text-amber-600 dark:text-amber-400;
   }
-
   .gradient-danger {
-    @apply bg-gradient-to-r from-rose-500 to-red-500;
+    @apply bg-red-500/10 text-red-600 dark:text-red-400;
   }
 
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500;
+  }
+
+  /* ─── Typography scale ─── */
+  .page-header {
+    @apply flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4;
+  }
+  .page-title {
+    @apply text-xl md:text-2xl font-semibold tracking-tight text-foreground;
+  }
+  .page-subtitle {
+    @apply text-sm text-muted-foreground mt-0.5;
+  }
+  .section-label {
+    @apply text-[11px] font-bold uppercase tracking-widest text-muted-foreground;
+  }
+  .metric-number {
+    @apply text-3xl font-bold tracking-tight tabular-nums text-foreground leading-none;
+  }
+  .metric-label {
+    @apply text-sm font-semibold text-muted-foreground;
+  }
+  .table-cell {
+    @apply text-[13px] text-foreground;
+  }
+  .table-cell-muted {
+    @apply text-[13px] text-muted-foreground;
+  }
+
+  /* ─── Card surface — standardised ─── */
+  .card-surface {
+    @apply rounded-[var(--radius)] bg-card border border-border;
+    box-shadow: var(--shadow-card);
+  }
+  .card-surface:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* ─── Page section wrapper ─── */
+  .page-section {
+    @apply rounded-[calc(var(--radius)+4px)] bg-card border border-border overflow-hidden;
+    box-shadow: var(--shadow-card);
   }
 
   .scrollbar-thin {
@@ -184,6 +296,44 @@
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--primary) / 0.4);
+  }
+
+  /* ─── Stat card at-rest visual interest ─── */
+  .stat-card-tile {
+    position: relative;
+    overflow: hidden;
+    @apply rounded-[calc(var(--radius)+4px)] bg-card border border-border transition-all duration-300;
+    box-shadow: var(--shadow-card);
+  }
+  .stat-card-tile::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.50) 50%, transparent 100%);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .stat-card-tile:hover {
+    box-shadow: var(--shadow-card-hover);
+    border-color: hsl(var(--primary) / 0.20);
+  }
+  .stat-card-tile:hover::before {
+    opacity: 1;
+  }
+
+  /* ─── Empty state pattern ─── */
+  .empty-state {
+    @apply text-center flex flex-col items-center justify-center;
+  }
+  .empty-state-icon {
+    @apply w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3;
+  }
+  .empty-state-title {
+    @apply text-sm font-semibold text-foreground mb-1;
+  }
+  .empty-state-body {
+    @apply text-xs text-muted-foreground;
   }
 }
 
@@ -269,7 +419,23 @@
   width: 100%;
 }
 
-/* Stat card glow effect */
+/* Sidebar active nav item: left accent bar */
+.nav-item-active {
+  position: relative;
+  @apply bg-primary/10 text-primary;
+}
+.nav-item-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: hsl(var(--primary));
+}
+
+/* Stat card glow effect (legacy — still valid) */
 .stat-card {
   position: relative;
   overflow: hidden;
@@ -323,6 +489,29 @@
 }
 
 /* ═══════════════════════════════════════════════════════
+   EMPTY STATE — shared pattern
+   ═══════════════════════════════════════════════════════ */
+.empty-state {
+  @apply flex flex-col items-center justify-center text-center py-16 px-6;
+}
+.empty-state-icon {
+  @apply w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center mx-auto mb-5;
+}
+.empty-state-title {
+  @apply text-base font-semibold text-foreground mb-1.5;
+}
+.empty-state-body {
+  @apply text-sm text-muted-foreground max-w-xs;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PAGE HEADER — shared pattern
+   ═══════════════════════════════════════════════════════ */
+.page-header {
+  @apply flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4;
+}
+
+/* ═══════════════════════════════════════════════════════
    SELECT / NATIVE DROPDOWN
    ═══════════════════════════════════════════════════════ */
 select {
@@ -365,6 +554,7 @@ select:focus {
 /* bg-white/5 → real white in light */
 .light .bg-white\/5  { background: rgba(255,255,255,0.70) !important; }
 .light .bg-white\/\[0\.03\] { background: rgba(255,255,255,0.65) !important; }
+.light .bg-white\/\[0\.02\] { background: rgba(255,255,255,0.75) !important; }
 .light .bg-white\/10 { background: rgba(0,0,0,0.04) !important; }
 .light .hover\:bg-white\/10:hover { background: rgba(0,0,0,0.05) !important; }
 .light .hover\:bg-white\/5:hover  { background: rgba(0,0,0,0.03) !important; }
@@ -372,6 +562,7 @@ select:focus {
 /* Border overrides */
 .light .border-white\/10 { border-color: rgba(0,0,0,0.09) !important; }
 .light .border-white\/\[0\.08\] { border-color: rgba(0,0,0,0.07) !important; }
+.light .border-white\/5 { border-color: rgba(0,0,0,0.07) !important; }
 
 /* Text – white becomes dark */
 .light .text-white\/70 { color: hsl(var(--muted-foreground)) !important; }
@@ -383,7 +574,6 @@ select:focus {
   background: hsl(210 40% 97%) !important;
 }
 
-/* Animate theme transition */
 /* Animate theme transition */
 .light,
 .dark {
@@ -470,4 +660,3 @@ select:focus {
 .dark .ql-editor.ql-blank::before {
   color: rgba(255,255,255,0.3) !important;
 }
-

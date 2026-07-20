@@ -77,7 +77,7 @@ export function Header() {
         : 'px-3 py-2.5 mb-1 rounded-xl bg-white/[0.06]'
 
     return (
-        <header className="h-16 bg-background/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-0 md:pr-6 sticky top-0 z-50">
+        <header className="h-16 bg-background/90 backdrop-blur-xl border-b border-border flex items-center justify-between pl-3 pr-4 md:pr-6 sticky top-0 z-50" style={{ boxShadow: '0 1px 0 hsl(var(--border)), 0 2px 8px rgba(0,0,0,0.06)' }}>
             {/* Left side - Hamburger + Search */}
             <div className="flex items-center flex-1 transition-all duration-300 gap-4">
                 {/* Hamburger Menu */}
@@ -85,24 +85,21 @@ export function Header() {
                     variant="ghost"
                     size="icon"
                     onClick={toggleSidebar}
-                    className={cn(
-                        "hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0 transition-all duration-300",
-                        isOpen ? "-ml-4" : "-ml-1"
-                    )}
+                    className="hover:bg-accent flex-shrink-0 text-muted-foreground hover:text-foreground rounded-lg"
                 >
                     <Menu className="w-5 h-5" />
                 </Button>
 
                 {/* Search – Desktop */}
-                <form onSubmit={handleSearch} className="hidden md:block flex-1 max-w-md">
+                <form onSubmit={handleSearch} className="hidden md:block flex-1 max-w-sm">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/70" />
                         <Input
                             type="text"
                             placeholder="Search orders, leads..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 w-full"
+                            className="pl-10 w-full h-9 bg-muted/60 dark:bg-white/[0.06] border-border focus:ring-2 focus:ring-ring/40 focus:border-ring text-[13px] rounded-lg"
                         />
                     </div>
                 </form>
@@ -153,7 +150,7 @@ export function Header() {
                 <div className="relative">
                     <button
                         onClick={() => setShowUserMenu(!showUserMenu)}
-                        className={`flex items-center gap-2 md:gap-3 px-2 md:px-3 py-2 rounded-xl transition-colors ${isLight ? 'hover:bg-black/5' : 'hover:bg-white/5'
+                        className={`flex items-center gap-2 md:gap-2.5 px-2 md:px-2.5 py-1.5 rounded-xl transition-all duration-200 border border-transparent hover:border-border ${isLight ? 'hover:bg-black/5' : 'hover:bg-white/[0.07]'
                             }`}
                     >
                         <div className="w-9 h-9 rounded-full overflow-hidden gradient-primary flex items-center justify-center text-sm font-bold text-white border border-black/5 dark:border-white/5 shrink-0">

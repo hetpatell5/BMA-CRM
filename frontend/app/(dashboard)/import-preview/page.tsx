@@ -671,7 +671,7 @@ export default function ImportPreviewPage() {
             {/* ── Page Header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold">Data</h1>
+                    <h1 className="page-title">Data</h1>
                     <p className="text-muted-foreground text-sm mt-0.5">
                         {isAdminManager
                             ? 'Review imported records. Mark individual rows or batches as Orders.'

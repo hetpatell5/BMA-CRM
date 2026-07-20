@@ -157,7 +157,7 @@ export default function LeadsPage() {
             {/* ── Page Header ───────────────────────────────────── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold">Leads</h1>
+                    <h1 className="page-title">Leads</h1>
                     <p className="text-muted-foreground text-sm">
                         {isStaff
                             ? `Your assigned leads • ${formatNumber(pagination.total)} total`
@@ -214,7 +214,7 @@ export default function LeadsPage() {
                     </div>
                     <div className="glass rounded-xl p-4">
                         <p className="text-sm text-muted-foreground mb-1">Won</p>
-                        <p className="text-2xl font-bold text-emerald-400">{formatNumber(stats?.wonLeads || 0)}</p>
+                        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatNumber(stats?.wonLeads || 0)}</p>
                     </div>
                     <div className="glass rounded-xl p-4">
                         <p className="text-sm text-muted-foreground mb-1">Conversion Rate</p>

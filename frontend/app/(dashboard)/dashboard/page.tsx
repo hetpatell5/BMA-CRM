@@ -62,52 +62,54 @@ function StatCard({
 }) {
     const Card = href ? Link : 'div'
     
-    // Extract the duration if change exists and has a space
     const changeParts = change ? change.split(' ') : []
     const changeVal = changeParts.length > 0 ? changeParts[0] : ''
-    const changeDesc = changeParts.length > 1 ? changeParts.slice(1).join(' ') : ''
 
     return (
         <Card
             href={href || '#'}
             className={cn(
-                "group relative overflow-hidden rounded-[20px] bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 p-5 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-white/[0.05] hover:border-slate-300 dark:hover:border-white/10 shadow-lg dark:shadow-2xl",
+                "stat-card-tile group p-5 transition-all duration-300 hover:-translate-y-0.5",
                 className
             )}
         >
-            <div className="flex items-start justify-between mb-10">
-                <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl border transition-all duration-300", iconContainerClassName || "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white")}>
-                    <Icon className="h-6 w-6" />
+            <div className="flex items-start justify-between mb-8">
+                <div className={cn(
+                    "flex h-11 w-11 items-center justify-center rounded-xl border transition-all duration-300",
+                    iconContainerClassName || "icon-badge-primary border-primary/20"
+                )}>
+                    <Icon className="h-5 w-5" />
                 </div>
                 {change && (
                     <span
                         className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold tracking-tight",
+                            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-tight",
                             changeType === 'up'
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10'
-                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/10'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/15'
+                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/15'
                         )}
                     >
-                        {changeType === 'up' ? '+' : '-'}{changeVal}
+                        {changeType === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                        {changeVal}
                     </span>
                 )}
             </div>
             
             <div className="space-y-1">
-                <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">{value}</div>
-                <p className="text-base font-semibold text-slate-500 dark:text-slate-400 tracking-tight">{title}</p>
+                <div className="metric-number">{value}</div>
+                <p className="metric-label">{title}</p>
             </div>
 
-            {/* Subtle glow effect on hover */}
-            <div className={cn("absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-2xl transition-all duration-500", glowClassName || "bg-white/5 group-hover:bg-white/10")} />
+            {/* Corner glow */}
+            <div className={cn("absolute -right-4 -bottom-4 w-20 h-20 rounded-full blur-2xl transition-all duration-500 opacity-30 group-hover:opacity-60", glowClassName || "bg-primary/20")} />
         </Card>
     )
 }
 
 function OrderBreakdownCard({ stats, total }: { stats: any, total: number }) {
     const categories = [
-        { label: 'Project (Synopsis)', key: 'synopsis', color: 'bg-blue-500' },
-        { label: 'Project (Report)', key: 'report', color: 'bg-blue-400' },
+        { label: 'Project (Synopsis)', key: 'synopsis', color: 'bg-primary/70' },
+        { label: 'Project (Report)', key: 'report', color: 'bg-primary' },
         { label: 'Handwritten Assignment', key: 'assignment', color: 'bg-indigo-500' },
         { label: 'Handwritten Practical', key: 'practical', color: 'bg-violet-500' },
         { label: 'Guess Paper', key: 'guessPaper', color: 'bg-purple-500' },
@@ -116,30 +118,30 @@ function OrderBreakdownCard({ stats, total }: { stats: any, total: number }) {
     ];
 
     return (
-        <div className="group relative overflow-hidden rounded-[20px] bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 p-6 transition-all duration-300 shadow-lg dark:shadow-2xl h-full flex flex-col">
+        <div className="stat-card-tile group p-6 transition-all duration-300 hover:-translate-y-0.5 h-full flex flex-col">
             <div className="flex items-start justify-between mb-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-all duration-300">
-                    <ClipboardList className="h-6 w-6" />
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl icon-badge-primary border border-primary/20 group-hover:scale-110 transition-transform duration-300">
+                    <ClipboardList className="h-5 w-5" />
                 </div>
                 <div className="text-right">
-                    <div className="text-3xl font-bold text-slate-900 dark:text-white leading-none">{total}</div>
-                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">Total Orders</p>
+                    <div className="metric-number">{total}</div>
+                    <p className="metric-label mt-0.5">Total Orders</p>
                 </div>
             </div>
 
-            <div className="space-y-4 flex-1 overflow-y-auto pr-2 scrollbar-none">
+            <div className="space-y-3.5 flex-1 overflow-y-auto pr-1 scrollbar-thin">
                 {categories.map((cat) => {
                     const count = stats?.[cat.key] || 0;
                     const pct = total > 0 ? (count / total) * 100 : 0;
                     return (
                         <div key={cat.key} className="space-y-1.5">
-                            <div className="flex justify-between text-xs font-semibold tracking-tight">
-                                <span className="text-slate-600 dark:text-slate-300">{cat.label}</span>
-                                <span className="text-slate-900 dark:text-white font-bold tracking-tight">{count} <span className="text-[10px] font-medium opacity-60">orders</span></span>
+                            <div className="flex justify-between text-xs font-medium">
+                                <span className="text-muted-foreground">{cat.label}</span>
+                                <span className="text-foreground font-semibold tabular-nums">{count}</span>
                             </div>
-                            <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden border border-slate-200/50 dark:border-white/5">
+                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                                 <div 
-                                    className={cn("h-full rounded-full transition-all duration-1000 ease-out", cat.color)} 
+                                    className={`h-full rounded-full transition-all duration-1000 ease-out ${cat.color}`} 
                                     style={{ width: `${Math.max(pct, count > 0 ? 5 : 0)}%` }} 
                                 />
                             </div>
@@ -218,15 +220,15 @@ export default function DashboardPage() {
     return (
         <div className="space-y-4 md:space-y-6 animate-fade-in">
             {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
+            <div className="page-header">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold">Dashboard</h1>
-                    <p className="text-sm text-muted-foreground">Welcome back! Here's your overview.</p>
+                    <h1 className="page-title">Dashboard</h1>
+                    <p className="page-subtitle">Welcome back! Here's your overview.</p>
                 </div>
                 {canImport && (
                     <Link
                         href="/import"
-                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-blue-500/25 hover:opacity-90 transition-opacity text-sm"
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg gradient-primary text-white font-semibold shadow-lg shadow-primary/25 hover:opacity-90 transition-opacity text-sm"
                     >
                         <Upload className="w-4 h-4" />
                         <span className="hidden sm:inline">Import Data</span>
@@ -272,48 +274,48 @@ export default function DashboardPage() {
                                 title="Active Orders"
                                 value={formatNumber(stats?.students?.active || 0)}
                                 icon={Activity}
-                                iconContainerClassName="bg-blue-500/10 border-blue-500/20 text-blue-500 dark:text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-300"
-                                glowClassName="bg-blue-500/5 group-hover:bg-blue-500/10"
+                                iconContainerClassName="icon-badge-primary border-primary/20"
+                                glowClassName="bg-primary/20"
                                 href="/orders?status=REPORT_IN_PROGRESS"
                             />
                             <StatCard
                                 title="Completed Orders"
                                 value={formatNumber(stats?.students?.alumni || 0)}
                                 icon={CheckCircle}
-                                iconContainerClassName="bg-emerald-500/10 border-emerald-500/20 text-emerald-500 dark:text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300"
-                                glowClassName="bg-emerald-500/5 group-hover:bg-emerald-500/10"
+                                iconContainerClassName="icon-badge-success border-emerald-500/20"
+                                glowClassName="bg-emerald-500/20"
                                 href="/orders?status=ALL_DONE"
                             />
                             <StatCard
                                 title="Soft Copy Revenue"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.softCopyTotal)}
                                 icon={IndianRupee}
-                                iconContainerClassName="bg-cyan-500/10 border-cyan-500/20 text-cyan-500 dark:text-cyan-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-300"
-                                glowClassName="bg-cyan-500/5 group-hover:bg-cyan-500/10"
+                                iconContainerClassName="icon-badge-cyan border-cyan-500/20"
+                                glowClassName="bg-cyan-500/20"
                                 href="/orders"
                             />
                             <StatCard
                                 title="Hard Copy Revenue"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.hardCopyTotal)}
                                 icon={Wallet}
-                                iconContainerClassName="bg-amber-500/10 border-amber-500/20 text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300"
-                                glowClassName="bg-amber-500/5 group-hover:bg-amber-500/10"
+                                iconContainerClassName="icon-badge-warning border-amber-500/20"
+                                glowClassName="bg-amber-500/20"
                                 href="/orders"
                             />
                             <StatCard
                                 title="Total Collected"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.totalCollected)}
                                 icon={CreditCard}
-                                iconContainerClassName="bg-purple-500/10 border-purple-500/20 text-purple-500 dark:text-purple-400 group-hover:text-purple-600 dark:group-hover:text-purple-300"
-                                glowClassName="bg-purple-500/5 group-hover:bg-purple-500/10"
+                                iconContainerClassName="icon-badge-purple border-purple-500/20"
+                                glowClassName="bg-purple-500/20"
                                 href="/orders"
                             />
                             <StatCard
                                 title="Payment Pending"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.totalPending)}
                                 icon={Hourglass}
-                                iconContainerClassName="bg-rose-500/10 border-rose-500/20 text-rose-500 dark:text-rose-400 group-hover:text-rose-600 dark:group-hover:text-rose-300"
-                                glowClassName="bg-rose-500/5 group-hover:bg-rose-500/10"
+                                iconContainerClassName="icon-badge-danger border-red-500/20"
+                                glowClassName="bg-red-500/20"
                                 href="/orders"
                             />
                         </>
@@ -336,14 +338,14 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                 {/* Follow-ups Today */}
-                <div className="glass rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 md:p-6 pb-2 shadow-lg dark:shadow-none">
-                    <div className="flex items-center justify-between mb-6">
+                <div className="card-surface p-4 md:p-6 pb-2 transition-all duration-300 hover:-translate-y-0.5">
+                    <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                                <Clock className="w-5 h-5 text-amber-400" />
+                            <div className="w-10 h-10 rounded-xl icon-badge-warning border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                <Clock className="w-5 h-5" />
                             </div>
                             <div>
-                                <h2 className="text-base font-bold text-foreground">Follow-ups Today</h2>
+                                <h2 className="text-[15px] font-semibold text-foreground">Follow-ups Today</h2>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                     {followUps?.length || 0} tasks pending
                                 </p>
@@ -351,32 +353,33 @@ export default function DashboardPage() {
                         </div>
                         <Link
                             href="/leads?followUp=today"
-                            className="px-3 py-1 bg-white/5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-white/10 transition-all border border-white/5"
+                            className="px-3 py-1 rounded-md text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/15 transition-all border border-primary/20"
                         >
                             View All
                         </Link>
                     </div>
 
-                    <div className="space-y-1 max-h-[340px] overflow-y-auto scrollbar-none">
+                    <div className="space-y-1 max-h-[340px] overflow-y-auto scrollbar-thin">
                         {followUps?.length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground">
-                                <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <Clock className="w-6 h-6 opacity-30" />
+                            <div className="empty-state py-10">
+                                <div className="empty-state-icon">
+                                    <Clock className="w-6 h-6 text-muted-foreground" />
                                 </div>
-                                <p className="text-sm">No follow-ups for today</p>
+                                <p className="empty-state-title">All caught up!</p>
+                                <p className="empty-state-body">No follow-ups scheduled for today.</p>
                             </div>
                         ) : (
                             followUps?.slice(0, 5).map((lead: any) => (
                                 <Link
                                     key={lead.id}
                                     href={`/leads/${lead.id}`}
-                                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-all group border border-transparent hover:border-slate-200 dark:hover:border-white/5"
+                                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-all group border border-transparent hover:border-border"
                                 >
-                                    <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-foreground/70">
+                                    <div className="w-8 h-8 rounded-full icon-badge-primary border border-primary/20 flex items-center justify-center text-xs font-bold flex-shrink-0">
                                         {lead.fullName?.charAt(0)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[14px] font-semibold truncate group-hover:text-blue-400 transition-colors">
+                                        <p className="text-[13px] font-semibold truncate group-hover:text-primary transition-colors">
                                             {lead.fullName}
                                         </p>
                                         <p className="text-xs text-muted-foreground truncate">
@@ -393,40 +396,41 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Recent Activities */}
-                <div className="glass rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 md:p-6 pb-2 shadow-lg dark:shadow-none">
-                    <div className="flex items-center justify-between mb-6">
+                <div className="card-surface p-4 md:p-6 pb-2 transition-all duration-300 hover:-translate-y-0.5">
+                    <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                                <TrendingUp className="w-5 h-5 text-blue-400" />
+                            <div className="w-10 h-10 rounded-xl icon-badge-primary border border-primary/20 flex items-center justify-center flex-shrink-0">
+                                <TrendingUp className="w-5 h-5" />
                             </div>
                             <div>
-                                <h2 className="text-base font-bold text-foreground">Recent Activities</h2>
+                                <h2 className="text-[15px] font-semibold text-foreground">Recent Activities</h2>
                                 <p className="text-xs text-muted-foreground mt-0.5">Latest account updates</p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-1 max-h-[340px] overflow-y-auto scrollbar-none">
+                    <div className="space-y-1 max-h-[340px] overflow-y-auto scrollbar-thin">
                         {activities?.length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground">
-                                <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <TrendingUp className="w-6 h-6 opacity-30" />
+                            <div className="empty-state py-10">
+                                <div className="empty-state-icon">
+                                    <TrendingUp className="w-6 h-6 text-muted-foreground" />
                                 </div>
-                                <p className="text-sm">No activity logs found</p>
+                                <p className="empty-state-title">No activities yet</p>
+                                <p className="empty-state-body">Activity logs will appear here as your team works.</p>
                             </div>
                         ) : (
                             activities?.slice(0, 8).map((activity: any) => (
                                 <div
                                     key={activity.id}
-                                    className="flex items-start gap-4 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-all group border border-transparent hover:border-slate-200 dark:hover:border-white/5"
+                                    className="flex items-start gap-3 p-3 rounded-lg hover:bg-accent transition-all group border border-transparent hover:border-border"
                                 >
-                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 border border-white/5 ${activity.activityType === 'STAGE_CHANGE'
-                                        ? 'bg-purple-500/10 text-purple-400'
+                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 border ${activity.activityType === 'STAGE_CHANGE'
+                                        ? 'icon-badge-purple border-purple-500/20'
                                         : activity.activityType === 'CALL'
-                                            ? 'bg-emerald-500/10 text-emerald-400'
+                                            ? 'icon-badge-success border-emerald-500/20'
                                             : activity.activityType === 'EMAIL'
-                                                ? 'bg-blue-500/10 text-blue-400'
-                                                : 'bg-white/5 text-gray-400'
+                                                ? 'icon-badge-primary border-primary/20'
+                                                : 'icon-badge-primary border-primary/20'
                                         }`}>
                                         {activity.activityType === 'CALL' ? (
                                             <Phone className="w-4 h-4" />
@@ -438,7 +442,7 @@ export default function DashboardPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-2">
-                                            <p className="text-[14px] font-semibold text-foreground/90 truncate">
+                                            <p className="text-[13px] font-semibold text-foreground truncate">
                                                 {activity.lead?.fullName}
                                             </p>
                                             <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">

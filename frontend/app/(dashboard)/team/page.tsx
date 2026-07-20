@@ -374,13 +374,14 @@ export default function SettingsPage() {
     return (
         <div className="space-y-6" onClick={() => showAssignMenu !== null && setShowAssignMenu(null)}>
             {/* Header */}
-            <div className="flex items-center justify-between bg-white/[0.02] border border-white/5 rounded-2xl p-4 sm:p-5">
-                <div className="px-2">
-                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Team Management</h1>
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Team Management</h1>
+                    <p className="page-subtitle">Manage roles, assignments, and staff performance</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {canCreateMembers && (
-                        <Button onClick={() => { resetForm(); setShowAddModal(true) }} className="gap-2">
+                        <Button variant="gradient" onClick={() => { resetForm(); setShowAddModal(true) }} className="gap-2">
                             <Plus className="w-4 h-4" /> Add Member
                         </Button>
                     )}
@@ -390,16 +391,16 @@ export default function SettingsPage() {
             {/* Quick Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Guides',          count: team.filter((m: any) => m.staffRole === 'GUIDE').length,            tag: 'Guides' },
-                    { label: 'Total Experts',         count: team.filter((m: any) => m.staffRole === 'EXPERT').length,           tag: 'Experts' },
-                    { label: 'Total Telecallers',     count: team.filter((m: any) => m.staffRole === 'TELECALLER').length,       tag: 'Telecallers' },
-                    { label: 'Total Writters',        count: team.filter((m: any) => m.staffRole === 'WRITTER' || m.staffRole === 'WRITER').length, tag: 'Writters' },
-                ].map(({ label, count, tag }) => (
-                    <div key={label} className="bg-transparent border border-white/10 rounded-xl p-5 hover:bg-white/[0.02] transition-colors">
-                        <p className="text-sm text-muted-foreground mb-4">{label}</p>
-                        <div className="flex items-center gap-3">
-                            <h3 className="text-3xl font-bold text-foreground">{count}</h3>
-                            <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-white/5 text-muted-foreground">{tag}</span>
+                    { label: 'Total Guides',      count: team.filter((m: any) => m.staffRole === 'GUIDE').length,            tag: 'Guides',      badgeClass: 'icon-badge-primary' },
+                    { label: 'Total Experts',     count: team.filter((m: any) => m.staffRole === 'EXPERT').length,           tag: 'Experts',     badgeClass: 'icon-badge-success' },
+                    { label: 'Total Telecallers', count: team.filter((m: any) => m.staffRole === 'TELECALLER').length,       tag: 'Telecallers', badgeClass: 'icon-badge-warning' },
+                    { label: 'Total Writters',    count: team.filter((m: any) => m.staffRole === 'WRITTER' || m.staffRole === 'WRITER').length, tag: 'Writters', badgeClass: 'icon-badge-purple' },
+                ].map(({ label, count, tag, badgeClass }) => (
+                    <div key={label} className="stat-card-tile p-5 transition-all duration-300 hover:-translate-y-0.5">
+                        <p className="section-label mb-3">{label}</p>
+                        <div className="flex items-end gap-3">
+                            <h3 className="metric-number">{count}</h3>
+                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md mb-0.5 ${badgeClass}`}>{tag}</span>
                         </div>
                     </div>
                 ))}
@@ -420,8 +421,8 @@ export default function SettingsPage() {
                         onClick={() => setRoleFilter(value)}
                         className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 border ${
                             roleFilter === value
-                                ? 'bg-white/10 border-transparent text-foreground shadow-sm'
-                                : 'bg-transparent border-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                                ? 'bg-primary/10 border-primary/20 text-primary shadow-sm'
+                                : 'bg-transparent border-border text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                     >
                         {label}

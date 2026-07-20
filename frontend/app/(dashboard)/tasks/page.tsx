@@ -247,8 +247,8 @@ export default function TasksPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Task Board</h1>
-                    <p className="text-muted-foreground">Manage and track team projects</p>
+                    <h1 className="page-title">Task Board</h1>
+                    <p className="page-subtitle">Manage and track team projects</p>
                 </div>
 
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto">

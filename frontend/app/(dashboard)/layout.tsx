@@ -57,7 +57,7 @@ export default function DashboardLayout({
                     )}
                 >
                     <Header />
-                    <main className="flex-1 min-w-0 md:px-0 md:py-4 md:mr-4 overflow-y-auto overflow-x-hidden transition-all duration-300">
+                    <main className="flex-1 min-w-0 px-4 md:px-6 py-4 md:mr-4 overflow-y-auto overflow-x-hidden transition-all duration-300">
                         {children}
                     </main>
                 </div>

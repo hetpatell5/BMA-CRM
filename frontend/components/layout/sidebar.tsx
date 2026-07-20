@@ -67,7 +67,7 @@ export function Sidebar() {
         <>
             {isOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+                    className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm"
                     onClick={close}
                 />
             )}
@@ -75,37 +75,38 @@ export function Sidebar() {
             <aside
                 className={cn(
                     "fixed left-0 top-0 h-full bg-background border-r border-border flex flex-col z-40 transition-all duration-300 ease-in-out",
-                    "max-lg:translate-x-[-100%]",
+                    "w-72 max-lg:translate-x-[-100%]",
                     isOpen && "max-lg:translate-x-0",
                     "lg:translate-x-0",
-                    isOpen ? "lg:w-[240px]" : "lg:w-[68px]",
-                    "w-72 lg:w-auto"
+                    isOpen ? "lg:w-[240px]" : "lg:w-[68px]"
                 )}
             >
+                {/* Brand header */}
                 <div className={cn(
                     "h-16 flex items-center border-b border-border transition-all duration-300",
-                    isOpen ? "gap-3 px-6 justify-between" : "lg:justify-center lg:px-0 px-6 gap-0"
+                    isOpen ? "gap-3 px-5 justify-between" : "lg:justify-center lg:px-0 px-5 gap-0"
                 )}>
                     <div className={cn("flex items-center min-w-0", isOpen ? "gap-2" : "lg:justify-center w-full")}>
                         <BrandMark />
                         <div className={cn("overflow-hidden min-w-0 transition-opacity duration-300", !isOpen && "lg:opacity-0 lg:w-0 lg:hidden")}>
                             <div className="flex items-center whitespace-nowrap">
-                                <span className={cn("text-[1.35rem] font-bold text-slate-800 dark:text-[#b8bfc6] leading-none", supportFont.className)}>BMA</span>
-                                <span className={cn("text-[1.35rem] font-bold text-slate-500 dark:text-[#b8bfc6] leading-none ml-1.5", supportFont.className)}>CRM</span>
+                                <span className={cn("text-[1.3rem] font-bold tracking-tight text-foreground leading-none", supportFont.className)}>BMA</span>
+                                <span className={cn("text-[1.3rem] font-bold tracking-tight text-muted-foreground leading-none ml-1.5", supportFont.className)}>CRM</span>
                             </div>
                         </div>
                     </div>
                     <button
                         onClick={close}
-                        className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+                        className="lg:hidden p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
+                {/* Navigation */}
                 <nav className={cn(
-                    "flex-1 space-y-1 overflow-y-auto scrollbar-thin transition-all duration-300",
-                    isOpen ? "p-4" : "lg:p-2 p-4"
+                    "flex-1 space-y-0.5 overflow-y-auto scrollbar-thin transition-all duration-300",
+                    isOpen ? "p-3" : "lg:p-2 p-3"
                 )}>
                     {filteredNav.map((item) => {
                         const isActive = item.exact
@@ -122,19 +123,24 @@ export function Sidebar() {
                                 }}
                                 title={!isOpen ? item.name : undefined}
                                 className={cn(
-                                    'flex items-center rounded-xl text-sm font-medium transition-all duration-200',
-                                    isOpen ? 'gap-3 px-4 py-3' : 'lg:justify-center lg:p-3 gap-3 px-4 py-3',
+                                    'relative flex items-center rounded-lg text-sm font-medium transition-all duration-200 group',
+                                    isOpen ? 'gap-3 px-3 py-2.5' : 'lg:justify-center lg:p-3 gap-3 px-3 py-2.5',
                                     isActive
-                                        ? 'bg-primary/10 text-primary shadow-lg shadow-primary/10'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                                 )}
                             >
+                                {/* Left accent bar for active state */}
+                                {isActive && (
+                                    <span className="absolute left-0 top-[20%] bottom-[20%] w-[3px] rounded-r-full bg-primary" />
+                                )}
+
                                 <item.icon className={cn(
-                                    'w-5 h-5 transition-colors flex-shrink-0',
-                                    isActive ? 'text-primary' : 'text-muted-foreground'
+                                    'w-[18px] h-[18px] transition-colors flex-shrink-0',
+                                    isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
                                 )} />
                                 <span className={cn(
-                                    "flex-1 truncate text-left",
+                                    "flex-1 truncate text-left font-medium",
                                     !isOpen && "lg:hidden"
                                 )}>
                                     {item.name}
@@ -144,18 +150,24 @@ export function Sidebar() {
                     })}
                 </nav>
 
+                {/* Quick Import card */}
                 {(userRole === 'ADMIN' || userRole === 'MANAGER') && (
                     <div className={cn(
                         "border-t border-border transition-all duration-300",
-                        isOpen ? "p-4" : "lg:p-2 p-4"
+                        isOpen ? "p-3" : "lg:p-2 p-3"
                     )}>
-                        <div className={cn("glass rounded-xl p-4", !isOpen && "lg:hidden")}>
+                        <div className={cn(
+                            "rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-primary/20",
+                            !isOpen && "lg:hidden"
+                        )}
+                            style={{ boxShadow: 'var(--shadow-card)' }}
+                        >
                             <div className="flex items-center gap-3 mb-3">
-                                <div className="w-10 h-10 rounded-lg gradient-success flex items-center justify-center flex-shrink-0">
-                                    <UserPlus className="w-5 h-5 text-white" />
+                                <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 icon-badge-success border border-emerald-500/20">
+                                    <UserPlus className="w-4.5 h-4.5" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium">Quick Import</p>
+                                    <p className="text-sm font-semibold text-foreground">Quick Import</p>
                                     <p className="text-xs text-muted-foreground">Upload Excel file</p>
                                 </div>
                             </div>
@@ -164,16 +176,16 @@ export function Sidebar() {
                                 onClick={() => {
                                     if (window.innerWidth < 1024) close()
                                 }}
-                                className="block w-full py-2 text-center text-sm font-medium rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                                className="block w-full py-2 text-center text-xs font-semibold rounded-md bg-primary/10 text-primary hover:bg-primary/15 transition-colors border border-primary/20"
                             >
-                                Import Now
+                                Import Now →
                             </Link>
                         </div>
                         {!isOpen && (
                             <Link
                                 href="/import"
                                 title="Quick Import"
-                                className="hidden lg:flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-200"
+                                className="hidden lg:flex items-center justify-center p-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-200"
                             >
                                 <UserPlus className="w-5 h-5" />
                             </Link>
@@ -184,4 +196,3 @@ export function Sidebar() {
         </>
     )
 }
-

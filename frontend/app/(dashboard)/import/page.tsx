@@ -396,8 +396,8 @@ export default function ImportPage() {
         <>
         <div className="space-y-6 animate-fade-in">
             <div>
-                <h1 className="text-xl md:text-2xl font-bold">Import Data</h1>
-                <p className="text-sm text-muted-foreground">Upload Excel files to import order or lead data</p>
+                <h1 className="page-title">Import Data</h1>
+                <p className="page-subtitle">Upload Excel files to import order or lead data</p>
             </div>
 
             <div className="glass rounded-xl p-3 md:p-4">
