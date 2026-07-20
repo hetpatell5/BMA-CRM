@@ -52,7 +52,7 @@ export default function FollowUpsPage() {
     const [editFollowupDate, setEditFollowupDate] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending')
-    const isAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER'
+    const isAdmin = user?.role === 'ADMIN'
 
     // Admin: selected user filter (null = all users)
     const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
@@ -204,7 +204,7 @@ export default function FollowUpsPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">Daily Follow Ups</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Daily Follow Ups</h1>
                     <p className="text-sm text-muted-foreground mt-1.5 font-medium">Manage and track your follow-up tasks.</p>
                 </div>
                 <Dialog open={open} onOpenChange={setOpen}>
@@ -260,6 +260,61 @@ export default function FollowUpsPage() {
                 )}
             </div>
 
+            {/* Admin: Team Performance Panel */}
+            {isAdmin && statsData && statsData.length > 0 && (
+                <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-5 shadow-sm">
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                            <BarChart2 className="w-5 h-5 text-purple-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-base font-bold text-foreground">Team Performance</h2>
+                            <p className="text-xs text-muted-foreground mt-0.5">Follow-up completion rate per team member</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {statsData.map(s => {
+                            const total = s.pending + s.completed
+                            const pct = total > 0 ? Math.round((s.completed / total) * 100) : 0
+                            return (
+                                <button
+                                    key={s.user.id}
+                                    onClick={() => setSelectedUserId(selectedUserId === s.user.id ? null : s.user.id)}
+                                    className={`relative text-left rounded-xl border p-4 transition-all ${
+                                        selectedUserId === s.user.id
+                                            ? 'border-primary/40 bg-primary/5 dark:bg-primary/10 shadow-sm'
+                                            : 'border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] hover:border-slate-300 dark:hover:border-white/10'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2.5 mb-3">
+                                        <div className="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[11px] font-bold text-purple-600 dark:text-purple-400 shrink-0">
+                                            {s.user.fullName.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[13px] font-bold text-slate-800 dark:text-slate-200 truncate">{s.user.fullName}</p>
+                                            <p className="text-[10px] text-muted-foreground">{total} total follow-ups</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between text-[11px] font-semibold mb-2">
+                                        <span className="text-amber-600 dark:text-amber-400">{s.pending} pending</span>
+                                        <span className="text-emerald-600 dark:text-emerald-400">{s.completed} done</span>
+                                    </div>
+                                    <div className="h-2 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-700"
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
+                                    <div className="text-right mt-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                        {pct}% completion
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Admin: Team Member Filter Pills */}
             {isAdmin && statsData && statsData.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
@@ -310,7 +365,7 @@ export default function FollowUpsPage() {
                             <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-500" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h3 className="font-extrabold text-amber-800 dark:text-amber-400 text-lg md:text-xl mb-1 mt-0.5 tracking-tight">
+                            <h3 className="font-bold text-amber-800 dark:text-amber-400 text-lg md:text-xl mb-1 mt-0.5 tracking-tight">
                                 Attention Needed
                             </h3>
                             <p className="text-amber-700/80 dark:text-amber-500/80 font-medium text-sm mb-4">
@@ -677,61 +732,6 @@ export default function FollowUpsPage() {
                     )}
                 </DialogContent>
             </Dialog>
-
-            {/* Admin: Team Performance Panel */}
-            {isAdmin && statsData && statsData.length > 0 && (
-                <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-5 shadow-lg dark:shadow-none">
-                    <div className="flex items-center gap-3 mb-5">
-                        <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                            <BarChart2 className="w-5 h-5 text-purple-500" />
-                        </div>
-                        <div>
-                            <h2 className="text-base font-bold text-foreground">Team Performance</h2>
-                            <p className="text-xs text-muted-foreground mt-0.5">Follow-up completion rate per team member</p>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {statsData.map(s => {
-                            const total = s.pending + s.completed
-                            const pct = total > 0 ? Math.round((s.completed / total) * 100) : 0
-                            return (
-                                <button
-                                    key={s.user.id}
-                                    onClick={() => setSelectedUserId(selectedUserId === s.user.id ? null : s.user.id)}
-                                    className={`relative text-left rounded-xl border p-4 transition-all ${
-                                        selectedUserId === s.user.id
-                                            ? 'border-primary/40 bg-primary/5 dark:bg-primary/10 shadow-sm'
-                                            : 'border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] hover:border-slate-300 dark:hover:border-white/10'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-2.5 mb-3">
-                                        <div className="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[11px] font-bold text-purple-600 dark:text-purple-400 shrink-0">
-                                            {s.user.fullName.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-[13px] font-bold text-slate-800 dark:text-slate-200 truncate">{s.user.fullName}</p>
-                                            <p className="text-[10px] text-muted-foreground">{total} total follow-ups</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between text-[11px] font-semibold mb-2">
-                                        <span className="text-amber-600 dark:text-amber-400">{s.pending} pending</span>
-                                        <span className="text-emerald-600 dark:text-emerald-400">{s.completed} done</span>
-                                    </div>
-                                    <div className="h-2 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-700"
-                                            style={{ width: `${pct}%` }}
-                                        />
-                                    </div>
-                                    <div className="text-right mt-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                                        {pct}% completion
-                                    </div>
-                                </button>
-                            )
-                        })}
-                    </div>
-                </div>
-            )}
         </div>
         </TooltipProvider>
     )
