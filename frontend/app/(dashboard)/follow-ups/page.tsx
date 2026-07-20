@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2, Trash2, CheckCircle2, ChevronLeft, ChevronRight, Users, BarChart2 } from 'lucide-react'
+import { Plus, BellRing, Phone, Calendar, ClipboardList, Pencil, Check, AlertTriangle, FileText, Target, Search, Loader2, Trash2, CheckCircle2, ChevronLeft, ChevronRight, Users, BarChart2, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,6 +16,16 @@ import RichTextEditor from '@/components/RichTextEditor'
 import DOMPurify from 'dompurify'
 import { useQuery } from '@tanstack/react-query'
 import { followUpsAPI } from '@/lib/api'
+
+const getInitials = (name: string) => {
+    if (!name || name.trim().length === 0) return '?'
+    const words = name.trim().split(/\s+/)
+    if (words.length > 1) {
+        return (words[0][0] + words[words.length - 1][0]).toUpperCase()
+    }
+    const single = words[0].replace(/[^a-zA-Z]/g, '')
+    return single.length > 0 ? single.slice(0, 2).toUpperCase() : '?'
+}
 
 const stripHtml = (html: string) => {
     if (!html) return ''
@@ -194,8 +204,8 @@ export default function FollowUpsPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
                 <div>
-                    <h1 className="page-title">Daily Follow Ups</h1>
-                    <p className="page-subtitle">Manage and track your follow-up tasks.</p>
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">Daily Follow Ups</h1>
+                    <p className="text-sm text-muted-foreground mt-1.5 font-medium">Manage and track your follow-up tasks.</p>
                 </div>
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
@@ -261,13 +271,13 @@ export default function FollowUpsPage() {
                         onClick={() => setSelectedUserId(null)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                             selectedUserId === null
-                                ? 'bg-primary text-white border-primary shadow-sm shadow-primary/25'
-                                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-primary/40'
+                                ? 'bg-gradient-to-b from-primary to-primary/90 text-white border-primary/50 shadow-md shadow-primary/20'
+                                : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground'
                         }`}
                     >
                         All Members
-                        <span className="ml-1.5 text-[10px] opacity-70">
-                            ({statsData.reduce((s, u) => s + u.pending, 0)} pending)
+                        <span className={`ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] ${selectedUserId === null ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400'}`}>
+                            {statsData.reduce((s, u) => s + u.pending, 0)}
                         </span>
                     </button>
                     {statsData.map(s => (
@@ -276,13 +286,13 @@ export default function FollowUpsPage() {
                             onClick={() => setSelectedUserId(selectedUserId === s.user.id ? null : s.user.id)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                                 selectedUserId === s.user.id
-                                    ? 'bg-primary text-white border-primary shadow-sm shadow-primary/25'
-                                    : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-primary/40'
+                                    ? 'bg-gradient-to-b from-primary to-primary/90 text-white border-primary/50 shadow-md shadow-primary/20'
+                                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground'
                             }`}
                         >
                             {s.user.fullName.split(' ')[0]}
                             {s.pending > 0 && (
-                                <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded-md ${selectedUserId === s.user.id ? 'bg-white/20' : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'}`}>
+                                <span className={`ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] ${selectedUserId === s.user.id ? 'bg-white/20 text-white' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}`}>
                                     {s.pending}
                                 </span>
                             )}
@@ -294,45 +304,55 @@ export default function FollowUpsPage() {
 
             {/* Alert for upcoming follow-ups */}
             {upcomingFollowUps.length > 0 && (
-                <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-amber-300/50 dark:border-amber-500/20 p-4 md:p-5 shadow-sm transition-colors">
-                    <div className="flex items-start gap-3 md:gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                            <BellRing className="w-5 h-5 text-amber-500 dark:text-amber-400 animate-pulse" />
+                <div className="rounded-[20px] bg-amber-500/10 border border-amber-500/20 p-4 md:p-6 shadow-sm">
+                    <div className="flex items-start gap-4 md:gap-5">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-inner">
+                            <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-500" />
                         </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-amber-700 dark:text-amber-400 text-base mb-2 mt-1">
-                                Attention Needed — {upcomingFollowUps.length} follow-up{upcomingFollowUps.length > 1 ? 's' : ''} due
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-extrabold text-amber-800 dark:text-amber-400 text-lg md:text-xl mb-1 mt-0.5 tracking-tight">
+                                Attention Needed
                             </h3>
-                            <div className="flex flex-col gap-1.5 mt-3">
+                            <p className="text-amber-700/80 dark:text-amber-500/80 font-medium text-sm mb-4">
+                                You have {upcomingFollowUps.length} follow-up{upcomingFollowUps.length > 1 ? 's' : ''} due soon.
+                            </p>
+                            <div className="flex flex-col gap-2.5">
                                 {upcomingFollowUps.map(f => (
-                                    <div key={f.id} className="flex items-center justify-between bg-slate-50 dark:bg-white/[0.03] hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-200 px-3.5 py-2.5 rounded-xl text-sm border border-slate-200/60 dark:border-white/5">
-                                        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
-                                            <div className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-[11px] font-bold text-amber-600 dark:text-amber-400 shrink-0">
-                                                {f.name.charAt(0).toUpperCase()}
+                                    <div key={f.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-card hover:bg-accent transition-all duration-200 px-4 py-3 rounded-xl border border-border shadow-sm">
+                                        <div className="flex items-center gap-3.5 mb-3 sm:mb-0 min-w-0">
+                                            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-700 dark:text-amber-400 shrink-0">
+                                                {f.name.trim().length <= 2 ? <User className="w-4 h-4" /> : getInitials(f.name)}
                                             </div>
-                                            <span className="font-semibold text-slate-800 dark:text-amber-400 text-[13px]">{f.name}</span>
-                                            <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
-                                            <span onClick={() => handleNumberClick(f)} className="font-semibold text-primary hover:text-primary/80 font-mono text-[13px] cursor-pointer underline decoration-primary/30 underline-offset-2 transition-colors">{f.number}</span>
-                                            <span className="hidden sm:inline text-slate-300 dark:text-white/10">|</span>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <div className="line-clamp-1 max-w-[200px] sm:max-w-[300px] text-[13px] cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
-                                                </TooltipTrigger>
-                                                <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
-                                                    <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
-                                                </TooltipContent>
-                                            </Tooltip>
+                                            <div className="flex flex-col min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-bold text-foreground text-[14px] truncate max-w-[200px]">{f.name}</span>
+                                                    <span onClick={() => handleNumberClick(f)} className="font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-md font-mono text-[12px] cursor-pointer transition-colors shrink-0">{f.number}</span>
+                                                </div>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="line-clamp-1 text-[13px] text-muted-foreground mt-0.5 cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
+                                                        <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <span className="text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-1 rounded-lg border border-amber-500/20">
+                                        <div className="flex items-center gap-2.5 shrink-0 pl-13 sm:pl-0">
+                                            <span className="text-[11px] font-bold bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-500/20">
                                                 {format(new Date(f.followupDate), 'MMM dd, yyyy')}
                                             </span>
-                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-7 px-2.5 rounded-lg text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 transition-colors shrink-0 text-[11px] font-bold gap-1.5">
-                                                <CheckCircle2 className="w-3 h-3" /> Done
+                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-8 px-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-500/20 hover:scale-105 active:scale-95 transition-all text-xs font-bold gap-1.5 border border-emerald-500/20 shadow-sm">
+                                                <CheckCircle2 className="w-4 h-4" /> Done
                                             </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-7 px-2.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors shrink-0 text-[11px] font-bold gap-1.5">
-                                                <Trash2 className="w-3 h-3" /> Delete
-                                            </Button>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(f.id)} className="h-8 w-8 rounded-lg bg-red-500/10 text-red-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/20 hover:scale-105 active:scale-95 transition-all border border-red-500/20 shadow-sm shrink-0">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Delete</TooltipContent>
+                                            </Tooltip>
                                         </div>
                                     </div>
                                 ))}
@@ -343,194 +363,188 @@ export default function FollowUpsPage() {
             )}
 
             {/* Tabs */}
-            <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl w-fit">
+            <div className="flex bg-muted/50 p-1 rounded-xl w-fit border border-border/50">
                 <button 
                     onClick={() => setActiveTab('pending')}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'pending' ? 'bg-white dark:bg-[#0d1117] text-primary shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                    className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'pending' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                 >
                     Pending ({pendingFollowUps.length})
                 </button>
                 <button 
                     onClick={() => setActiveTab('completed')}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'completed' ? 'bg-white dark:bg-[#0d1117] text-primary shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                    className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'completed' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                 >
                     Completed ({completedFollowUps.length})
                 </button>
             </div>
 
-            {/* Pending Table */}
+            {/* Pending List */}
             {activeTab === 'pending' && (
-            <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 overflow-hidden shadow-lg dark:shadow-none transition-colors">
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[860px] border-collapse">
-                        <thead>
-                            <tr className="text-left text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
-                                <th className="px-5 py-4">Date</th>
-                                <th className="px-5 py-4">Name</th>
-                                <th className="px-5 py-4">Number</th>
-                                <th className="px-5 py-4">Description</th>
-                                <th className="px-5 py-4">Requirement</th>
-                                <th className="px-5 py-4">Follow-up By</th>
-                                <th className="px-5 py-4">Deadline</th>
-                                <th className="px-5 py-4">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                            {isLoadingPending && pendingFollowUps.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="p-16 text-center">
-                                        <Loader2 className="w-8 h-8 mx-auto mb-4 text-primary animate-spin" />
-                                        <p className="text-sm text-muted-foreground">Loading follow-ups...</p>
-                                    </td>
-                                </tr>
-                            ) : pendingFollowUps.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="p-16 text-center">
-                                        <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center mx-auto mb-4">
-                                            <ClipboardList className="w-8 h-8 text-muted-foreground/40" />
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between px-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                        <span>Contact Details & Description</span>
+                        <span>Deadline & Actions</span>
+                    </div>
+                    {isLoadingPending && pendingFollowUps.length === 0 ? (
+                        <div className="card-surface p-16 text-center">
+                            <Loader2 className="w-8 h-8 mx-auto mb-4 text-primary animate-spin" />
+                            <p className="text-sm text-muted-foreground">Loading follow-ups...</p>
+                        </div>
+                    ) : pendingFollowUps.length === 0 ? (
+                        <div className="card-surface p-16 text-center">
+                            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                                <ClipboardList className="w-8 h-8 text-muted-foreground/40" />
+                            </div>
+                            <p className="text-base font-semibold mb-1.5 text-foreground">
+                                {searchQuery ? 'No results found' : 'No pending follow-ups found'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                {searchQuery ? `No follow-ups match "${searchQuery}".` : 'Start by adding a new follow-up for your daily tasks.'}
+                            </p>
+                        </div>
+                    ) : (
+                        pendingFollowUps.map((f) => {
+                            const isUrgent = upcomingFollowUps.some(u => u.id === f.id)
+                            return (
+                                <div key={f.id} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 card-surface hover:shadow-md transition-all group overflow-hidden">
+                                    {/* Urgency indicator strip */}
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${isUrgent ? 'bg-amber-500' : 'bg-transparent group-hover:bg-primary/20'} transition-colors`} />
+                                    
+                                    <div className="flex items-start gap-4 flex-1 min-w-0 pl-1">
+                                        <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-sm font-bold text-primary shrink-0">
+                                            {f.name.trim().length <= 2 ? <User className="w-5 h-5" /> : getInitials(f.name)}
                                         </div>
-                                        <p className="text-base font-semibold mb-1.5 text-slate-700 dark:text-white">
-                                            {searchQuery ? 'No results found' : 'No pending follow-ups found'}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {searchQuery ? `No follow-ups match "${searchQuery}".` : 'Start by adding a new follow-up for your daily tasks.'}
-                                        </p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                pendingFollowUps.map((f) => {
-                                    const isUrgent = upcomingFollowUps.some(u => u.id === f.id)
-                                    return (
-                                        <tr key={f.id} className={`group hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-all duration-200 ${isUrgent ? 'bg-amber-50/50 dark:bg-amber-500/[0.03]' : ''}`}>
-                                            <td className="px-5 py-4">
-                                                <div className="flex items-center gap-2.5 text-[13px] font-medium text-slate-600 dark:text-slate-300">
-                                                    <Calendar className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                                                    {format(new Date(f.createdAt), 'MMM dd, yyyy')}
-                                                </div>
-                                            </td>
-                                            <td className="px-5 py-4">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
-                                                        {f.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <span className="text-[14px] font-semibold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{f.name}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-5 py-4">
-                                                <div className="flex items-center gap-1.5 text-sm">
-                                                    <Phone className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
-                                                    <span onClick={() => handleNumberClick(f)} className="font-mono cursor-pointer text-primary hover:text-primary/80 hover:underline underline-offset-2 transition-colors text-[13px] font-semibold">{f.number}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-5 py-4 text-[13px] max-w-[200px]">
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <div className="line-clamp-1 cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
-                                                        <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </td>
-                                            <td className="px-5 py-4 text-[13px] max-w-[200px]">
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <div className="truncate text-slate-600 dark:text-slate-400 cursor-default">{f.requirement}</div>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
-                                                        <p>{f.requirement}</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </td>
-                                            <td className="px-5 py-4 text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                                                {f.createdBy?.fullName || '-'}
-                                            </td>
-                                            <td className="px-5 py-4">
-                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border ${isUrgent ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10'}`}>
-                                                    {format(new Date(f.followupDate), 'MMM dd, yyyy')}
+                                        <div className="flex flex-col flex-1 min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                <span className="font-extrabold text-foreground text-[15px] truncate max-w-[200px] sm:max-w-[300px]">{f.name}</span>
+                                                <span onClick={() => handleNumberClick(f)} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 hover:shadow-sm font-mono text-[13px] font-semibold cursor-pointer transition-all shrink-0">
+                                                    <Phone className="w-3 h-3" /> {f.number}
                                                 </span>
-                                            </td>
-                                            <td className="px-5 py-4">
-                                                <div className="flex gap-2">
-                                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all text-xs font-bold gap-1.5">
-                                                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-8 px-3 rounded-lg text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 transition-all text-xs font-bold gap-1.5">
-                                                        <CheckCircle2 className="w-3.5 h-3.5" /> Done
-                                                    </Button>
+                                            </div>
+                                            <div className="flex items-start gap-1.5">
+                                                <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                                                <div className="min-w-0 flex-1">
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <div className="line-clamp-1 text-[13px] text-muted-foreground cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent className="w-[320px] p-3 leading-relaxed">
+                                                            <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
+                                                        </TooltipContent>
+                                                    </Tooltip>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    )
-                                })
-                            )}
-                        </tbody>
-                    </table>
+                                            </div>
+                                            {f.requirement && (
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <Target className="w-3.5 h-3.5 text-emerald-600/70 dark:text-emerald-400/70 shrink-0" />
+                                                    <span className="text-[12px] font-medium text-emerald-700 dark:text-emerald-400/90 truncate">
+                                                        {f.requirement}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pl-14 sm:pl-0">
+                                        <div className="flex flex-col sm:items-end gap-1">
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border ${isUrgent ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 shadow-sm' : 'bg-muted/50 text-muted-foreground border-border'}`}>
+                                                {format(new Date(f.followupDate), 'MMM dd, yyyy')}
+                                            </span>
+                                            {f.createdBy && isAdmin && (
+                                                <span className="text-[11px] font-medium text-muted-foreground">
+                                                    by {f.createdBy.fullName.split(' ')[0]}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-9 px-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-500/20 hover:scale-105 active:scale-95 transition-all text-xs font-bold gap-1.5 border border-emerald-500/20 shadow-sm">
+                                                <CheckCircle2 className="w-4 h-4" /> Done
+                                            </Button>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(f.id)} className="h-9 w-9 rounded-xl bg-red-500/10 text-red-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/20 hover:scale-105 active:scale-95 transition-all border border-red-500/20 shadow-sm shrink-0">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Delete Follow-up</TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })
+                    )}
                 </div>
-            </div>
             )}
 
-            {/* Completed Follow-ups */}
+            {/* Completed List */}
             {activeTab === 'completed' && completedFollowUps.length > 0 && (
-                <div className="space-y-4">
-                    <div className="rounded-[20px] bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm transition-colors">
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[860px] border-collapse">
-                                <thead>
-                                     <tr className="text-left text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
-                                        <th className="px-5 py-4">Date</th>
-                                        <th className="px-5 py-4">Name</th>
-                                        <th className="px-5 py-4">Number</th>
-                                        <th className="px-5 py-4">Description</th>
-                                        <th className="px-5 py-4">Requirement</th>
-                                        {isAdmin && <th className="px-5 py-4">Team Member</th>}
-                                        <th className="px-5 py-4">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                                    {completedFollowUps.map((f) => (
-                                        <tr key={f.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors">
-                                            <td className="px-5 py-4 text-[13px] font-medium text-slate-600 dark:text-slate-400">{format(new Date(f.followupDate), 'MMM dd, yyyy')}</td>
-                                            <td className="px-5 py-4 text-[13px] font-semibold text-slate-800 dark:text-slate-200">{f.name}</td>
-                                            <td className="px-5 py-4 text-[13px] font-mono font-medium text-slate-600 dark:text-slate-400">{f.number}</td>
-                                            <td className="px-5 py-4 text-[13px] max-w-[200px]">
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <div className="line-clamp-1 cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
-                                                        <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </td>
-                                            <td className="px-5 py-4 text-[13px] max-w-[200px]">
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <div className="truncate text-slate-600 dark:text-slate-400 cursor-default">{f.requirement}</div>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
-                                                        <p>{f.requirement}</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </td>
-                                            {isAdmin && (
-                                                <td className="px-5 py-4">
-                                                    <span className="text-[12px] font-semibold text-slate-600 dark:text-slate-300">
-                                                        {f.createdBy?.fullName || '—'}
-                                                    </span>
-                                                </td>
-                                            )}
-                                            <td className="px-5 py-4">
-                                                <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id)} className="h-8 px-3 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all text-xs font-bold gap-1.5">
-                                                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between px-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                        <span>Contact Details & Description</span>
+                        <span>Completed Date & Actions</span>
                     </div>
+                    {completedFollowUps.map((f) => (
+                        <div key={f.id} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 card-surface hover:shadow-md transition-all group overflow-hidden">
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/30" />
+                            
+                            <div className="flex items-start gap-4 flex-1 min-w-0 pl-1">
+                                <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 border border-border flex items-center justify-center text-sm font-bold text-muted-foreground shrink-0 opacity-70">
+                                    {f.name.trim().length <= 2 ? <User className="w-5 h-5" /> : getInitials(f.name)}
+                                </div>
+                                <div className="flex flex-col flex-1 min-w-0 opacity-80">
+                                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                                        <span className="font-extrabold text-foreground text-[15px] truncate max-w-[200px] sm:max-w-[300px]">{f.name}</span>
+                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted text-muted-foreground font-mono text-[13px] font-semibold shrink-0">
+                                            <Phone className="w-3 h-3" /> {f.number}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start gap-1.5">
+                                        <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                                        <div className="min-w-0 flex-1">
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <div className="line-clamp-1 text-[13px] text-muted-foreground cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
+                                                </TooltipTrigger>
+                                                <TooltipContent className="w-[320px] p-3 leading-relaxed">
+                                                    <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                    </div>
+                                    {f.requirement && (
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            <Target className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                            <span className="text-[12px] font-medium text-muted-foreground truncate">
+                                                {f.requirement}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pl-14 sm:pl-0">
+                                <div className="flex flex-col sm:items-end gap-1">
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border bg-emerald-500/5 text-emerald-600 dark:text-emerald-500 border-emerald-500/20 shadow-sm">
+                                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> {format(new Date(f.followupDate), 'MMM dd, yyyy')}
+                                    </span>
+                                    {f.createdBy && isAdmin && (
+                                        <span className="text-[11px] font-medium text-muted-foreground">
+                                            by {f.createdBy.fullName.split(' ')[0]}
+                                        </span>
+                                    )}
+                                </div>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" onClick={() => handleDelete(f.id)} className="h-9 w-9 rounded-xl bg-red-500/10 text-red-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/20 hover:scale-105 active:scale-95 transition-all border border-red-500/20 shadow-sm shrink-0">
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Delete Follow-up</TooltipContent>
+                                </Tooltip>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
 
