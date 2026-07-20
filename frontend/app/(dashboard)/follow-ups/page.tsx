@@ -72,7 +72,7 @@ export default function FollowUpsPage() {
     const [editRequirement, setEditRequirement] = useState('')
     const [editFollowupDate, setEditFollowupDate] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
-    const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending')
+    const [activeTab, setActiveTab] = useState<'attention' | 'pending' | 'completed'>('attention')
     const isAdmin = user?.role === 'ADMIN'
 
     // Admin: selected user filter (null = all users)
@@ -225,7 +225,7 @@ export default function FollowUpsPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Daily Follow Ups</h1>
+                    <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">Daily Follow Ups</h1>
                     <p className="text-sm text-muted-foreground mt-1.5 font-medium">Manage and track your follow-up tasks.</p>
                 </div>
                 <Dialog open={open} onOpenChange={setOpen}>
@@ -380,68 +380,15 @@ export default function FollowUpsPage() {
             )}
 
 
-            {/* Alert for upcoming follow-ups */}
-            {upcomingFollowUps.length > 0 && (
-                <div className="rounded-[20px] bg-amber-500/10 border border-amber-500/20 p-4 md:p-6 shadow-sm">
-                    <div className="flex items-start gap-4 md:gap-5">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-inner">
-                            <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-amber-800 dark:text-amber-400 text-lg md:text-xl mb-1 mt-0.5 tracking-tight">
-                                Attention Needed
-                            </h3>
-                            <p className="text-amber-700/80 dark:text-amber-500/80 font-medium text-sm mb-4">
-                                You have {upcomingFollowUps.length} follow-up{upcomingFollowUps.length > 1 ? 's' : ''} due soon.
-                            </p>
-                            <div className="flex flex-col gap-2.5">
-                                {upcomingFollowUps.map(f => (
-                                    <div key={f.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-card hover:bg-accent transition-all duration-200 px-4 py-3 rounded-xl border border-border shadow-sm">
-                                        <div className="flex items-center gap-3.5 mb-3 sm:mb-0 min-w-0">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isValidName(f.name) ? 'bg-amber-100 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 border' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 border'}`}>
-                                                {isValidName(f.name) ? getInitials(f.name) : <User className="w-4 h-4" />}
-                                            </div>
-                                            <div className="flex flex-col min-w-0">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="font-bold text-foreground text-[14px] truncate max-w-[200px]">{f.name}</span>
-                                                    <span onClick={() => handleNumberClick(f)} className="font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-md font-mono text-[12px] cursor-pointer transition-colors shrink-0">{f.number}</span>
-                                                </div>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <div className="line-clamp-1 text-[13px] text-muted-foreground mt-0.5 cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="w-[280px] sm:w-[320px] p-3 leading-relaxed">
-                                                        <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2.5 shrink-0 pl-13 sm:pl-0">
-                                            <span className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${getUrgencyStyles(getUrgency(f.followupDate))}`}>
-                                                {format(new Date(f.followupDate), 'MMM dd, yyyy')}
-                                            </span>
-                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-8 px-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-500/20 hover:scale-105 active:scale-95 transition-all text-xs font-bold gap-1.5 border border-emerald-500/20 shadow-sm">
-                                                <CheckCircle2 className="w-4 h-4" /> Done
-                                            </Button>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(f.id)} className="h-8 w-8 rounded-lg bg-red-500/10 text-red-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/20 hover:scale-105 active:scale-95 transition-all border border-red-500/20 shadow-sm shrink-0">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>Delete</TooltipContent>
-                                            </Tooltip>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Tabs */}
-            <div className="flex bg-muted/50 p-1 rounded-xl w-fit border border-border/50">
+            <div className="flex bg-muted/50 p-1 rounded-xl w-fit border border-border/50 mb-1">
+                <button 
+                    onClick={() => setActiveTab('attention')}
+                    className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'attention' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+                >
+                    <AlertTriangle className={`w-4 h-4 ${activeTab === 'attention' ? 'text-amber-500' : 'text-amber-500/60'}`} />
+                    Attention ({upcomingFollowUps.length})
+                </button>
                 <button 
                     onClick={() => setActiveTab('pending')}
                     className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'pending' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
@@ -456,8 +403,8 @@ export default function FollowUpsPage() {
                 </button>
             </div>
 
-            {/* Pending List */}
-            {activeTab === 'pending' && (
+            {/* Attention or Pending List */}
+            {(activeTab === 'attention' || activeTab === 'pending') && (
                 <div className="space-y-3">
                     <div className="flex items-center justify-between px-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
                         <span>Contact Details & Description</span>
@@ -468,21 +415,20 @@ export default function FollowUpsPage() {
                             <Loader2 className="w-8 h-8 mx-auto mb-4 text-primary animate-spin" />
                             <p className="text-sm text-muted-foreground">Loading follow-ups...</p>
                         </div>
-                    ) : pendingFollowUps.length === 0 ? (
+                    ) : (activeTab === 'attention' ? upcomingFollowUps : pendingFollowUps).length === 0 ? (
                         <div className="card-surface p-16 text-center">
                             <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
                                 <ClipboardList className="w-8 h-8 text-muted-foreground/40" />
                             </div>
                             <p className="text-base font-semibold mb-1.5 text-foreground">
-                                {searchQuery ? 'No results found' : 'No pending follow-ups found'}
+                                {searchQuery ? 'No results found' : (activeTab === 'attention' ? 'No follow-ups need immediate attention' : 'No pending follow-ups found')}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                                {searchQuery ? `No follow-ups match "${searchQuery}".` : 'Start by adding a new follow-up for your daily tasks.'}
+                                {searchQuery ? `No follow-ups match "${searchQuery}".` : (activeTab === 'attention' ? 'You are all caught up on urgent tasks!' : 'Start by adding a new follow-up for your daily tasks.')}
                             </p>
                         </div>
                     ) : (
-                        pendingFollowUps.map((f) => {
-                            const isUrgent = upcomingFollowUps.some(u => u.id === f.id)
+                        (activeTab === 'attention' ? upcomingFollowUps : pendingFollowUps).map((f) => {
                             return (
                                 <div key={f.id} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 card-surface hover:shadow-md transition-all group overflow-hidden">
                                     {/* Urgency indicator strip */}
