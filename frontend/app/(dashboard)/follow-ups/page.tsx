@@ -10,21 +10,42 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useFollowUpStore, FollowUp } from '@/stores/followUpStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/hooks/use-toast'
-import { format, isBefore, addDays, startOfDay } from 'date-fns'
+import { format, isBefore, addDays, startOfDay, isSameDay } from 'date-fns'
 import { useConfirm } from '@/components/ui/confirm-provider'
 import RichTextEditor from '@/components/RichTextEditor'
 import DOMPurify from 'dompurify'
 import { useQuery } from '@tanstack/react-query'
 import { followUpsAPI } from '@/lib/api'
 
+const isValidName = (name: string) => {
+    if (!name) return false
+    const trimmed = name.trim()
+    if (trimmed.length <= 1) return false
+    if (/\d/.test(trimmed)) return false
+    return true
+}
+
 const getInitials = (name: string) => {
-    if (!name || name.trim().length === 0) return '?'
     const words = name.trim().split(/\s+/)
     if (words.length > 1) {
         return (words[0][0] + words[words.length - 1][0]).toUpperCase()
     }
     const single = words[0].replace(/[^a-zA-Z]/g, '')
     return single.length > 0 ? single.slice(0, 2).toUpperCase() : '?'
+}
+
+const getUrgency = (dateString: string) => {
+    const date = startOfDay(new Date(dateString))
+    const today = startOfDay(new Date())
+    if (isBefore(date, today)) return 'overdue'
+    if (isSameDay(date, today)) return 'today'
+    return 'future'
+}
+
+const getUrgencyStyles = (urgency: string) => {
+    if (urgency === 'overdue') return 'bg-red-500 text-white border-red-600 shadow-sm'
+    if (urgency === 'today') return 'bg-amber-500 text-white border-amber-600 shadow-sm'
+    return 'bg-muted/50 text-muted-foreground border-border'
 }
 
 const stripHtml = (html: string) => {
@@ -375,8 +396,8 @@ export default function FollowUpsPage() {
                                 {upcomingFollowUps.map(f => (
                                     <div key={f.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-card hover:bg-accent transition-all duration-200 px-4 py-3 rounded-xl border border-border shadow-sm">
                                         <div className="flex items-center gap-3.5 mb-3 sm:mb-0 min-w-0">
-                                            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-700 dark:text-amber-400 shrink-0">
-                                                {f.name.trim().length <= 2 ? <User className="w-4 h-4" /> : getInitials(f.name)}
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isValidName(f.name) ? 'bg-amber-100 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 border' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 border'}`}>
+                                                {isValidName(f.name) ? getInitials(f.name) : <User className="w-4 h-4" />}
                                             </div>
                                             <div className="flex flex-col min-w-0">
                                                 <div className="flex flex-wrap items-center gap-2">
@@ -394,7 +415,7 @@ export default function FollowUpsPage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2.5 shrink-0 pl-13 sm:pl-0">
-                                            <span className="text-[11px] font-bold bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-500/20">
+                                            <span className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${getUrgencyStyles(getUrgency(f.followupDate))}`}>
                                                 {format(new Date(f.followupDate), 'MMM dd, yyyy')}
                                             </span>
                                             <Button variant="ghost" size="sm" onClick={() => handleComplete(f.id)} className="h-8 px-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-500/20 hover:scale-105 active:scale-95 transition-all text-xs font-bold gap-1.5 border border-emerald-500/20 shadow-sm">
@@ -463,11 +484,11 @@ export default function FollowUpsPage() {
                             return (
                                 <div key={f.id} className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 card-surface hover:shadow-md transition-all group overflow-hidden">
                                     {/* Urgency indicator strip */}
-                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${isUrgent ? 'bg-amber-500' : 'bg-transparent group-hover:bg-primary/20'} transition-colors`} />
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${getUrgency(f.followupDate) === 'overdue' ? 'bg-red-500' : getUrgency(f.followupDate) === 'today' ? 'bg-amber-500' : 'bg-transparent group-hover:bg-primary/20'} transition-colors`} />
                                     
                                     <div className="flex items-start gap-4 flex-1 min-w-0 pl-1">
-                                        <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-sm font-bold text-primary shrink-0">
-                                            {f.name.trim().length <= 2 ? <User className="w-5 h-5" /> : getInitials(f.name)}
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${isValidName(f.name) ? 'bg-primary/10 border-primary/20 text-primary border' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400 border'}`}>
+                                            {isValidName(f.name) ? getInitials(f.name) : <User className="w-5 h-5" />}
                                         </div>
                                         <div className="flex flex-col flex-1 min-w-0">
                                             <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -481,7 +502,7 @@ export default function FollowUpsPage() {
                                                 <div className="min-w-0 flex-1">
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
-                                                            <div className="line-clamp-1 text-[13px] text-muted-foreground cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
+                                                            <div className="line-clamp-1 text-[13px] font-medium text-slate-700 dark:text-slate-300 cursor-default [&_*]:inline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
                                                         </TooltipTrigger>
                                                         <TooltipContent className="w-[320px] p-3 leading-relaxed">
                                                             <div className="[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.description) }} />
@@ -491,8 +512,8 @@ export default function FollowUpsPage() {
                                             </div>
                                             {f.requirement && (
                                                 <div className="flex items-center gap-1.5 mt-1">
-                                                    <Target className="w-3.5 h-3.5 text-emerald-600/70 dark:text-emerald-400/70 shrink-0" />
-                                                    <span className="text-[12px] font-medium text-emerald-700 dark:text-emerald-400/90 truncate">
+                                                    <Target className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                                    <span className="text-[13px] font-semibold text-emerald-800 dark:text-emerald-400 truncate">
                                                         {f.requirement}
                                                     </span>
                                                 </div>
@@ -502,7 +523,7 @@ export default function FollowUpsPage() {
                                     
                                     <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pl-14 sm:pl-0">
                                         <div className="flex flex-col sm:items-end gap-1">
-                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border ${isUrgent ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 shadow-sm' : 'bg-muted/50 text-muted-foreground border-border'}`}>
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border ${getUrgencyStyles(getUrgency(f.followupDate))}`}>
                                                 {format(new Date(f.followupDate), 'MMM dd, yyyy')}
                                             </span>
                                             {f.createdBy && isAdmin && (
@@ -545,7 +566,7 @@ export default function FollowUpsPage() {
                             
                             <div className="flex items-start gap-4 flex-1 min-w-0 pl-1">
                                 <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 border border-border flex items-center justify-center text-sm font-bold text-muted-foreground shrink-0 opacity-70">
-                                    {f.name.trim().length <= 2 ? <User className="w-5 h-5" /> : getInitials(f.name)}
+                                    {isValidName(f.name) ? getInitials(f.name) : <User className="w-5 h-5" />}
                                 </div>
                                 <div className="flex flex-col flex-1 min-w-0 opacity-80">
                                     <div className="flex flex-wrap items-center gap-2 mb-1">
