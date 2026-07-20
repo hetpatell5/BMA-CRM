@@ -235,11 +235,13 @@ export default function FollowUpsPage() {
                             <span>Add Follow Up</span>
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[480px] rounded-[20px] border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0d1117] shadow-2xl">
-                        <DialogHeader>
-                            <DialogTitle className="text-lg font-bold">Add New Follow Up</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                    <DialogContent className="sm:max-w-[480px] max-h-[90vh] flex flex-col rounded-[20px] border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0d1117] shadow-2xl p-0 overflow-hidden">
+                        <div className="px-6 pt-6 pb-4 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] shrink-0">
+                            <DialogHeader>
+                                <DialogTitle className="text-lg font-bold">Add New Follow Up</DialogTitle>
+                            </DialogHeader>
+                        </div>
+                        <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4 overflow-y-auto scrollbar-thin">
                             <div className="space-y-2">
                                 <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Name</Label>
                                 <Input id="name" placeholder="Contact name" value={name} onChange={e => setName(e.target.value)} required className="rounded-xl h-10 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 focus:border-primary" />
@@ -627,9 +629,9 @@ export default function FollowUpsPage() {
 
             {/* Follow-up Details Dialog */}
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-                <DialogContent className="sm:max-w-[620px] rounded-[20px] border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0d1117] shadow-2xl p-0 overflow-hidden">
+                <DialogContent className="sm:max-w-[620px] max-h-[90vh] flex flex-col rounded-[20px] border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0d1117] shadow-2xl p-0 overflow-hidden">
                     {/* Dialog Header with gradient accent */}
-                    <div className="px-6 pt-6 pb-4 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
+                    <div className="px-6 pt-6 pb-4 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] shrink-0">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
@@ -641,7 +643,7 @@ export default function FollowUpsPage() {
                     </div>
 
                     {selectedFollowUp && (
-                        <div className="px-6 py-5 space-y-6">
+                        <div className="px-6 py-5 space-y-6 overflow-y-auto scrollbar-thin">
                             {/* Contact Info Row */}
                             <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5">
                                 <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-lg font-bold text-primary shrink-0">
