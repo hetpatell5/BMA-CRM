@@ -1486,30 +1486,32 @@ router.post('/segregate', async (req, res, next) => {
             ...queryParams
         );
 
-        // ── Flat equal split: floor(total/n) each, remainder → random members ──
+        // ── Programme-aware round-robin distribution ─────────────────────────
+        // Group records by their programme/degree first, then distribute each
+        // group round-robin across assignees so that every degree's records are
+        // spread evenly. This prevents a flat slice from concentrating all records
+        // of one degree in a single assignee's file.
         const perAssignee = {}; // assigneeId → {name, ids[]}
         for (const a of assignees) perAssignee[a.id] = { name: a.fullName, ids: [] };
 
         const n = assignees.length;
-        const total = rows.length;
-        const base = Math.floor(total / n);   // records each member gets
-        const remainder = total % n;           // leftover records
 
-        // Assign base records sequentially
-        for (let i = 0; i < n; i++) {
-            const a = assignees[i];
-            const start = i * base;
-            perAssignee[a.id].ids = rows.slice(start, start + base).map(r => r.id);
+        // 1. Group row IDs by programme (preserving insertion order = ORDER BY id ASC)
+        const progGroups = new Map(); // prog → id[]
+        for (const row of rows) {
+            const prog = row.prog || 'Unknown';
+            if (!progGroups.has(prog)) progGroups.set(prog, []);
+            progGroups.get(prog).push(row.id);
         }
 
-        // Distribute remainder records randomly (pick unique random members)
-        const remainderStart = base * n;
-        const remainderPool = [...Array(n).keys()]; // indices 0..n-1
-        for (let r = 0; r < remainder; r++) {
-            // Pick a random remaining index from the pool
-            const pick = Math.floor(Math.random() * remainderPool.length);
-            const idx = remainderPool.splice(pick, 1)[0];
-            perAssignee[assignees[idx].id].ids.push(rows[remainderStart + r].id);
+        // 2. For each programme group, distribute its records round-robin across assignees.
+        //    This guarantees that for K records of a degree and N assignees:
+        //      - floor(K/N) assignees get ceil(K/N) records, the rest get floor(K/N)
+        for (const [, ids] of progGroups) {
+            for (let i = 0; i < ids.length; i++) {
+                const assigneeIndex = i % n;
+                perAssignee[assignees[assigneeIndex].id].ids.push(ids[i]);
+            }
         }
 
         if (dryRun) {
