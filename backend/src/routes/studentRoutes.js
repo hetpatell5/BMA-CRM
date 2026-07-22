@@ -1486,17 +1486,19 @@ router.post('/segregate', async (req, res, next) => {
             ...queryParams
         );
 
-        // ── Programme-aware round-robin distribution ─────────────────────────
-        // Group records by their programme/degree first, then distribute each
-        // group round-robin across assignees so that every degree's records are
-        // spread evenly. This prevents a flat slice from concentrating all records
-        // of one degree in a single assignee's file.
+        // ── Programme-aware round-robin with rotating offset ─────────────────
+        // Groups records by programme, distributes each group round-robin.
+        // A globalOffset rotates the starting assignee for each new programme
+        // group so the "extra" (remainder) records from each group land on
+        // different assignees — not always assignee 0. This keeps both:
+        //   • Degree-wise distribution: each assignee gets ⌊K/N⌋ or ⌈K/N⌉ of each degree
+        //   • Overall totals:           each assignee gets ⌊T/N⌋ or ⌈T/N⌉ overall
         const perAssignee = {}; // assigneeId → {name, ids[]}
         for (const a of assignees) perAssignee[a.id] = { name: a.fullName, ids: [] };
 
         const n = assignees.length;
 
-        // 1. Group row IDs by programme (preserving insertion order = ORDER BY id ASC)
+        // 1. Group row IDs by programme (preserving ORDER BY id ASC order)
         const progGroups = new Map(); // prog → id[]
         for (const row of rows) {
             const prog = row.prog || 'Unknown';
@@ -1504,14 +1506,18 @@ router.post('/segregate', async (req, res, next) => {
             progGroups.get(prog).push(row.id);
         }
 
-        // 2. For each programme group, distribute its records round-robin across assignees.
-        //    This guarantees that for K records of a degree and N assignees:
-        //      - floor(K/N) assignees get ceil(K/N) records, the rest get floor(K/N)
+        // 2. Distribute each group round-robin starting from a rotating offset.
+        //    After each group, advance the offset by (groupSize % n) so the
+        //    next group's starting assignee shifts, spreading remainder records
+        //    evenly across all members over many programme groups.
+        let globalOffset = 0;
         for (const [, ids] of progGroups) {
             for (let i = 0; i < ids.length; i++) {
-                const assigneeIndex = i % n;
+                const assigneeIndex = (globalOffset + i) % n;
                 perAssignee[assignees[assigneeIndex].id].ids.push(ids[i]);
             }
+            // Advance offset so the next group starts where this one left off
+            globalOffset = (globalOffset + ids.length) % n;
         }
 
         if (dryRun) {
