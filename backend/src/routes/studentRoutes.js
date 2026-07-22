@@ -244,7 +244,7 @@ router.get('/meta/import-field-values', async (req, res, next) => {
                    AND import_batch_id IN (${placeholders})
                    AND JSON_EXTRACT(custom_fields, '$."${escapedField}"') IS NOT NULL
                    AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) NOT IN ('null','')
-                 ORDER BY val ASC LIMIT 300`,
+                 ORDER BY val ASC`,
                 ...uniqueIds.map(id => BigInt(id))
             );
         } else {
@@ -254,7 +254,7 @@ router.get('/meta/import-field-values', async (req, res, next) => {
                  WHERE source = 'excel_import'
                    AND JSON_EXTRACT(custom_fields, '$."${escapedField}"') IS NOT NULL
                    AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedField}"')) NOT IN ('null','')
-                 ORDER BY val ASC LIMIT 300`
+                 ORDER BY val ASC`
             );
         }
 
