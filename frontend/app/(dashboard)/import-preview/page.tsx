@@ -7,7 +7,7 @@ import {
     Search, ChevronLeft, ChevronRight, Users, RefreshCw,
     ChevronDown, X, SlidersHorizontal, FolderOpen,
     ArrowUpCircle, Download, Tag, GraduationCap,
-    CheckCircle2, AlertTriangle, Loader2, ExternalLink, XCircle,
+    CheckCircle2, AlertTriangle, Loader2, ExternalLink, XCircle, ShoppingBag,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -1056,10 +1056,10 @@ export default function ImportPreviewPage() {
                                             {key}
                                         </th>
                                     ))}
-                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-[100px] z-30 w-[130px] min-w-[130px] shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-[60px] z-30 w-[110px] min-w-[110px] shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
                                         Status
                                     </th>
-                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-0 z-30 w-[100px] min-w-[100px]">
+                                    <th className="p-2 text-center font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-0 z-30 w-[60px] min-w-[60px]">
                                         Action
                                     </th>
                                 </tr>
@@ -1070,8 +1070,8 @@ export default function ImportPreviewPage() {
                                         <tr key={i} className="border-b border-border">
                                             <td className="p-3"><Skeleton className="h-4 w-4" /></td>
                                             {Array(8).fill(0).map((__, j) => <td key={j} className="p-3"><Skeleton className="h-4 w-24" /></td>)}
-                                            <td className="p-3 sticky right-[100px] bg-white dark:bg-slate-900 w-[130px] min-w-[130px]"><Skeleton className="h-7 w-24" /></td>
-                                            <td className="p-3 sticky right-0 bg-white dark:bg-slate-900 w-[100px] min-w-[100px]"><Skeleton className="h-7 w-20" /></td>
+                                            <td className="p-3 sticky right-[60px] bg-white dark:bg-slate-900 w-[110px] min-w-[110px]"><Skeleton className="h-7 w-20" /></td>
+                                            <td className="p-3 sticky right-0 bg-white dark:bg-slate-900 w-[60px] min-w-[60px]"><Skeleton className="h-7 w-8" /></td>
                                         </tr>
                                     ))
                                 ) : students.length === 0 ? (
@@ -1110,7 +1110,7 @@ export default function ImportPreviewPage() {
                                                 ))}
                                                 {/* IGNOU Status cell */}
                                                 <td className={cn(
-                                                    "p-2 border-l border-border text-[13px] w-[130px] min-w-[130px] sticky right-[100px] z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]",
+                                                    "p-2 border-l border-border text-[13px] w-[110px] min-w-[110px] sticky right-[60px] z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]",
                                                     isSelected
                                                         ? "bg-[#edf5ff] dark:bg-[#1a233a]"
                                                         : "bg-white group-hover/row:bg-slate-50 dark:bg-[#0d1322] dark:group-hover/row:bg-[#151d30]"
@@ -1148,22 +1148,22 @@ export default function ImportPreviewPage() {
 
                                                 </td>
                                                 <td className={cn(
-                                                    "p-2 border-l border-border sticky right-0 z-20 w-[100px] min-w-[100px]",
+                                                    "p-2 border-l border-border sticky right-0 z-20 w-[60px] min-w-[60px] flex justify-center items-center h-[41px]",
                                                     isSelected
                                                         ? "bg-[#edf5ff] dark:bg-[#1a233a]"
                                                         : "bg-white group-hover/row:bg-slate-50 dark:bg-[#0d1322] dark:group-hover/row:bg-[#151d30]"
                                                 )} onClick={e => e.stopPropagation()}>
                                                     <Button
-                                                        variant="outline" size="sm"
-                                                        className="h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 whitespace-nowrap gap-1"
+                                                        variant="outline" size="icon"
+                                                        title="Convert to order"
+                                                        className="h-7 w-7 text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                                         onClick={async (e) => { 
                                                             e.stopPropagation()
                                                             if (await confirm('Mark this record as an Order?')) promoteRowMutation.mutate(student.id) 
                                                         }}
                                                         disabled={isPromoting || promoteSelectionMutation.isPending}
                                                     >
-                                                        {isPromoting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
-                                                        Order
+                                                        {isPromoting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ShoppingBag className="w-3.5 h-3.5" />}
                                                     </Button>
                                                 </td>
                                             </tr>
