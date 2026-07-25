@@ -1056,10 +1056,10 @@ export default function ImportPreviewPage() {
                                             {key}
                                         </th>
                                     ))}
-                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-[100px] z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-[100px] z-30 w-[130px] min-w-[130px] shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
                                         Status
                                     </th>
-                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-0 z-30 w-[100px] min-w-[100px]">
+                                    <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-0 z-30 w-[100px] min-w-[100px]">
                                         Action
                                     </th>
                                 </tr>
@@ -1070,7 +1070,8 @@ export default function ImportPreviewPage() {
                                         <tr key={i} className="border-b border-border">
                                             <td className="p-3"><Skeleton className="h-4 w-4" /></td>
                                             {Array(8).fill(0).map((__, j) => <td key={j} className="p-3"><Skeleton className="h-4 w-24" /></td>)}
-                                            <td className="p-3 sticky right-0 bg-background"><Skeleton className="h-7 w-28" /></td>
+                                            <td className="p-3 sticky right-[100px] bg-white dark:bg-slate-900 w-[130px] min-w-[130px]"><Skeleton className="h-7 w-24" /></td>
+                                            <td className="p-3 sticky right-0 bg-white dark:bg-slate-900 w-[100px] min-w-[100px]"><Skeleton className="h-7 w-20" /></td>
                                         </tr>
                                     ))
                                 ) : students.length === 0 ? (
@@ -1109,8 +1110,10 @@ export default function ImportPreviewPage() {
                                                 ))}
                                                 {/* IGNOU Status cell */}
                                                 <td className={cn(
-                                                    "p-2 border-border text-[13px] min-w-[130px] sticky right-[100px] z-10 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]",
-                                                    isSelected ? "bg-primary/5" : "bg-background group-hover/row:bg-slate-50 dark:bg-background dark:group-hover/row:bg-[#101625]"
+                                                    "p-2 border-l border-border text-[13px] w-[130px] min-w-[130px] sticky right-[100px] z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]",
+                                                    isSelected
+                                                        ? "bg-[#edf5ff] dark:bg-[#1a233a]"
+                                                        : "bg-white group-hover/row:bg-slate-50 dark:bg-[#0d1322] dark:group-hover/row:bg-[#151d30]"
                                                 )}>
                                                     {!ignouCheck ? (
                                                         <span className="text-[11px] text-muted-foreground">—</span>
@@ -1145,8 +1148,10 @@ export default function ImportPreviewPage() {
 
                                                 </td>
                                                 <td className={cn(
-                                                    "p-2 border-border sticky right-0 z-20 w-[80px] min-w-[80px]",
-                                                    isSelected ? "bg-primary/5" : "bg-background group-hover/row:bg-slate-50 dark:bg-background dark:group-hover/row:bg-[#101625]"
+                                                    "p-2 border-l border-border sticky right-0 z-20 w-[100px] min-w-[100px]",
+                                                    isSelected
+                                                        ? "bg-[#edf5ff] dark:bg-[#1a233a]"
+                                                        : "bg-white group-hover/row:bg-slate-50 dark:bg-[#0d1322] dark:group-hover/row:bg-[#151d30]"
                                                 )} onClick={e => e.stopPropagation()}>
                                                     <Button
                                                         variant="outline" size="sm"
