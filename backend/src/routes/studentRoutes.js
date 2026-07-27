@@ -1441,7 +1441,7 @@ router.post('/segregate', async (req, res, next) => {
         const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
         if (!isAdmin) return res.status(403).json({ success: false, message: 'Only admins and managers can segregate data' });
 
-        const { assigneeIds, importBatchIds: batchIdsRaw, programmes: programmesFilter, customField: cfRaw, dryRun } = req.body;
+        const { assigneeIds, importBatchIds: batchIdsRaw, programmes: programmesFilter, customField: cfRaw, dryRun, studentIds: studentIdsRaw } = req.body;
         if (!assigneeIds || !Array.isArray(assigneeIds) || assigneeIds.length === 0) {
             return res.status(400).json({ success: false, message: 'assigneeIds array is required' });
         }
@@ -1453,25 +1453,39 @@ router.post('/segregate', async (req, res, next) => {
         });
         if (assignees.length === 0) return res.status(400).json({ success: false, message: 'No valid assignee IDs provided' });
 
+        // ── Mode 1: explicit student IDs (checkbox selection from UI) ─────────
+        // When the user has ticked specific rows, segregate only those records.
+        // We skip all batch/filter logic and query directly by ID.
+        const useExplicitIds = Array.isArray(studentIdsRaw) && studentIdsRaw.length > 0;
+
         // Build WHERE clause for the raw SQL query
         const whereParts = [`source = 'excel_import'`];
         const queryParams = [];
-        if (batchIdsRaw && Array.isArray(batchIdsRaw) && batchIdsRaw.length > 0) {
-            whereParts.push(`import_batch_id IN (${batchIdsRaw.map(() => '?').join(', ')})`);
-            batchIdsRaw.forEach(id => queryParams.push(BigInt(id)));
-        }
-        const cfEntries = cfRaw && typeof cfRaw === 'object' ? Object.entries(cfRaw).filter(([k, v]) => k && v) : [];
-        for (const [k, v] of cfEntries) {
-            const ek = k.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-            const vals = String(v).split(',').map(s => s.trim()).filter(Boolean);
-            if (!vals.length) continue;
-            whereParts.push(`JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${ek}"')) IN (${vals.map(() => '?').join(', ')})`);
-            vals.forEach(val => queryParams.push(val));
+
+        if (useExplicitIds) {
+            // Filter to exactly the selected student IDs
+            whereParts.push(`id IN (${studentIdsRaw.map(() => '?').join(', ')})`);
+            studentIdsRaw.forEach(id => queryParams.push(BigInt(id)));
+        } else {
+            // ── Mode 2: batch + custom-field filters (filter-panel selection) ──
+            if (batchIdsRaw && Array.isArray(batchIdsRaw) && batchIdsRaw.length > 0) {
+                whereParts.push(`import_batch_id IN (${batchIdsRaw.map(() => '?').join(', ')})`);
+                batchIdsRaw.forEach(id => queryParams.push(BigInt(id)));
+            }
+            const cfEntries = cfRaw && typeof cfRaw === 'object' ? Object.entries(cfRaw).filter(([k, v]) => k && v) : [];
+            for (const [k, v] of cfEntries) {
+                const ek = k.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                const vals = String(v).split(',').map(s => s.trim()).filter(Boolean);
+                if (!vals.length) continue;
+                whereParts.push(`JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${ek}"')) IN (${vals.map(() => '?').join(', ')})`);
+                vals.forEach(val => queryParams.push(val));
+            }
         }
         const whereSQL = whereParts.join(' AND ');
 
         // Prog column: use first CF filter key, else scan common names
-        const progCfKey = cfEntries.length > 0 ? cfEntries[0][0] : null;
+        const cfEntries2 = !useExplicitIds && cfRaw && typeof cfRaw === 'object' ? Object.entries(cfRaw).filter(([k, v]) => k && v) : [];
+        const progCfKey = cfEntries2.length > 0 ? cfEntries2[0][0] : null;
         let selectExpr;
         if (progCfKey) {
             const ek = progCfKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"');

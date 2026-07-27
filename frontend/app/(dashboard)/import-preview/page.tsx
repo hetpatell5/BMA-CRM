@@ -487,12 +487,19 @@ export default function ImportPreviewPage() {
     const handleSegregatePreview = async () => {
         if (selectedAssignees.length === 0) { toast({ title: 'Select team members first', variant: 'destructive' }); return }
         const cfFilters = buildCfFilters()
+        const useSelected = selectedIds.length > 0
         try {
             setSegregateLoading(true)
             const res = await studentsAPI.segregate({
                 assigneeIds: selectedAssignees,
-                importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
-                ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
+                // If rows are ticked, only segregate those rows; otherwise use batch/filter scope
+                ...(useSelected
+                    ? { studentIds: selectedIds }
+                    : {
+                        importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
+                        ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
+                    }
+                ),
                 dryRun: true,
             })
             setSegregatePreview(res.data.data?.summary || [])
@@ -504,15 +511,23 @@ export default function ImportPreviewPage() {
     const handleGenerateCSVs = async () => {
         if (selectedAssignees.length === 0) { toast({ title: 'Select team members first', variant: 'destructive' }); return }
         const cfFilters = buildCfFilters()
+        const useSelected = selectedIds.length > 0
         try {
             setSegregateLoading(true)
             const res = await studentsAPI.segregate({
                 assigneeIds: selectedAssignees,
-                importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
-                ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
+                // If rows are ticked, only segregate those rows; otherwise use batch/filter scope
+                ...(useSelected
+                    ? { studentIds: selectedIds }
+                    : {
+                        importBatchIds: importBatchIds.size > 0 ? Array.from(importBatchIds) : undefined,
+                        ...(Object.keys(cfFilters).length > 0 ? { customField: cfFilters } : {}),
+                    }
+                ),
             })
             const d = res.data.data
             setCsvPlanResult({ planId: d.planId, totalStudents: d.totalStudents, members: d.members })
+            setShowSegregateModal(false) // close modal so downloads are visible on main page
             toast({ title: 'XLSXs Ready!', description: `${Number(d.totalStudents).toLocaleString()} records split across ${d.members.length} members.`, variant: 'success' })
         } catch (err: any) {
             toast({ title: 'Generation Failed', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' })
@@ -600,8 +615,22 @@ export default function ImportPreviewPage() {
     }
 
 
-    // ── IGNOU Export (Excel with IGNOU columns appended) ──────────────────
-    const handleIgnouExport = (onlyPending = false) => {
+    // ── IGNOU Export ──────────────────────────────────────────────────────
+    const [isIgnouExporting, setIsIgnouExporting] = useState(false)
+    const handleIgnouExport = async (onlyPending = false) => {
+        // If we have checked student IDs, use the by-students POST endpoint
+        // (fixes empty export when rows were selected rather than a full batch)
+        if (checkedStudentIds.length > 0) {
+            try {
+                setIsIgnouExporting(true)
+                await ignouAPI.exportByStudents(checkedStudentIds)
+                toast({ title: 'Export Downloaded', description: 'Pending IGNOU data exported successfully.' })
+            } catch (err: any) {
+                toast({ title: 'Export Failed', description: err?.response?.data?.message || 'Could not export.', variant: 'destructive' })
+            } finally { setIsIgnouExporting(false) }
+            return
+        }
+        // Fallback: batch mode export (requires a single batch to be selected)
         if (!importBatchId) {
             toast({ title: 'Select a batch first', description: 'Use the filter sidebar to select an import batch.', variant: 'destructive' })
             return
@@ -609,8 +638,6 @@ export default function ImportPreviewPage() {
         const url = ignouAPI.getExportUrl(importBatchId, onlyPending)
         const link = document.createElement('a')
         link.href = url
-
-        // Smart filename: batch name + pending suffix + date
         const today = new Date().toISOString().split('T')[0]
         const batchName = filterOptions?.importBatches?.find((b: any) => b.id === importBatchId)?.fileName?.split('.')[0] || importBatchId
         const suffix = onlyPending ? '_pending' : ''
@@ -719,7 +746,7 @@ export default function ImportPreviewPage() {
                             onClick={() => { setSegregatePreview(null); setCsvPlanResult(null); setShowSegregateModal(true) }}
                         >
                             <Users className="w-4 h-4" />
-                            <span className="hidden sm:inline">Segregate</span>
+                            <span className="hidden sm:inline">Segregate{selectedIds.length > 0 ? ` (${selectedIds.length} selected)` : ''}</span>
                         </Button>
                     )}
                 </div>
@@ -757,15 +784,16 @@ export default function ImportPreviewPage() {
                                     ? <><GraduationCap className="w-4 h-4" />Check {selectedIds.length} Selected</>
                                     : <><GraduationCap className="w-4 h-4" />Check IGNOU {importBatchId ? 'Batch' : 'Status'}</>}
                         </Button>
-                        {importBatchId && (
-                            <>
-                                <Button size="sm" variant="outline" className="gap-2 h-9 border-indigo-500/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10" onClick={() => handleIgnouExport(false)}>
-                                    <Download className="w-4 h-4" />Export with IGNOU
-                                </Button>
-                                <Button size="sm" variant="outline" className="gap-2 h-9 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10" onClick={() => handleIgnouExport(true)}>
-                                    <AlertTriangle className="w-4 h-4" />Pending Only
-                                </Button>
-                            </>
+                        {/* Pending Only button — works in both batch and selected-rows mode */}
+                        {(importBatchId || checkedStudentIds.length > 0) && (
+                            <Button
+                                size="sm" variant="outline"
+                                className="gap-2 h-9 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                                onClick={() => handleIgnouExport(true)}
+                                disabled={isIgnouExporting}
+                            >
+                                {isIgnouExporting ? <><RefreshCw className="w-4 h-4 animate-spin" />Exporting…</> : <><AlertTriangle className="w-4 h-4" />Pending Only</>}
+                            </Button>
                         )}
                     </div>
                 </div>
@@ -806,6 +834,46 @@ export default function ImportPreviewPage() {
                     </div>
                 )}
             </div>
+            )}
+
+            {/* ── Persistent XLSX Download Panel (after segregation, survives modal close) ── */}
+            {isAdminManager && csvPlanResult && (
+                <div className="rounded-xl border border-violet-500/30 bg-gradient-to-r from-violet-500/5 via-purple-500/5 to-indigo-500/5 dark:from-violet-500/10 dark:via-purple-500/10 dark:to-indigo-500/10 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <p className="font-semibold text-sm text-violet-700 dark:text-violet-400">
+                                ✅ XLSXs Ready — {Number(csvPlanResult.totalStudents).toLocaleString()} records split across {csvPlanResult.members.length} members
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Plans expire after 6 hours. Download before closing the page.</p>
+                        </div>
+                        <button
+                            onClick={() => setCsvPlanResult(null)}
+                            className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {csvPlanResult.members.map((m: any) => (
+                            <div key={m.assigneeId} className="flex items-center justify-between gap-3 rounded-lg border border-violet-200 dark:border-violet-500/20 bg-background/60 px-3 py-2">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">{m.assigneeName}</p>
+                                    <p className="text-xs text-muted-foreground">{formatNumber(m.count)} records</p>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white shrink-0 h-8"
+                                    onClick={() => handleDownloadMemberCSV(m)}
+                                    disabled={downloadingId === m.assigneeId}
+                                >
+                                    {downloadingId === m.assigneeId
+                                        ? <><RefreshCw className="w-3 h-3 animate-spin" />…</>
+                                        : <><Download className="w-3 h-3" />{m.assigneeName.split(' ')[0]}.xlsx</>}
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             )}
 
             {/* ── Search & Filter Bar ── */}
@@ -1491,11 +1559,19 @@ export default function ImportPreviewPage() {
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                            <div className="rounded-lg bg-slate-50 dark:bg-white/5 p-3 text-sm space-y-1">
+                            <div className={cn("rounded-lg p-3 text-sm space-y-1", selectedIds.length > 0 ? "bg-violet-50 dark:bg-violet-500/10 border border-violet-300/40" : "bg-slate-50 dark:bg-white/5")}>
                                 <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-2">Applied Scope</p>
-                                <p><span className="text-muted-foreground">Batches: </span>{importBatchIds.size > 0 ? `${importBatchIds.size} selected` : 'All'}</p>
-                                <p><span className="text-muted-foreground">Programme: </span>{activeFilters['Programme']?.size > 0 ? Array.from(activeFilters['Programme']).join(', ') : 'All programmes'}</p>
-                                <p><span className="text-muted-foreground">Visible records: </span>{formatNumber(pagination.total)}</p>
+                                {selectedIds.length > 0 ? (
+                                    <p className="font-semibold text-violet-700 dark:text-violet-400">
+                                        ✓ {selectedIds.length} hand-picked rows (checkbox selection) — only these will be segregated
+                                    </p>
+                                ) : (
+                                    <>
+                                        <p><span className="text-muted-foreground">Batches: </span>{importBatchIds.size > 0 ? `${importBatchIds.size} selected` : 'All'}</p>
+                                        <p><span className="text-muted-foreground">Programme: </span>{activeFilters['Programme']?.size > 0 ? Array.from(activeFilters['Programme']).join(', ') : 'All programmes'}</p>
+                                        <p><span className="text-muted-foreground">Visible records: </span>{formatNumber(pagination.total)}</p>
+                                    </>
+                                )}
                             </div>
 
                             <div>

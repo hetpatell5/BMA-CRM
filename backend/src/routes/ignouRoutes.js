@@ -302,4 +302,109 @@ router.get('/export/:batchId', async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
+// ── POST /api/ignou/export/by-students ──────────────────────────────────────
+// Export pending-only IGNOU data for explicit student IDs (selected-rows mode)
+router.post('/export/by-students', async (req, res, next) => {
+    try {
+        const { studentIds } = req.body;
+        if (!Array.isArray(studentIds) || studentIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'studentIds array required' });
+        }
+
+        const bigIds = studentIds.map(id => BigInt(id));
+
+        // Fetch students + their IGNOU check data
+        const students = await prisma.student.findMany({
+            where: { id: { in: bigIds } },
+            select: {
+                id: true, fullName: true, enrollmentNo: true, programme: true,
+                phone: true, email: true, customFields: true,
+                ignouChecks: {
+                    select: {
+                        checkStatus: true, totalItems: true, submittedCount: true,
+                        pendingCount: true, pendingCourses: true, checkedAt: true,
+                    },
+                },
+            },
+            orderBy: { id: 'asc' },
+        });
+
+        // Only keep those with pending assignments
+        const filtered = students.filter(s => (s.ignouChecks[0]?.pendingCount ?? 0) > 0);
+
+        // Determine column order from customFields._columnOrder
+        let columnOrder = [];
+        for (const s of students) {
+            const order = s.customFields?._columnOrder;
+            if (Array.isArray(order) && order.length > 0) { columnOrder = order; break; }
+        }
+        if (columnOrder.length === 0 && students.length > 0) {
+            const sample = students[0].customFields || {};
+            columnOrder = Object.keys(sample).filter(k => !k.startsWith('_'));
+        }
+
+        const workbook  = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Pending Assignments');
+
+        const ignouHeaders = ['IGNOU Status', 'Total Assignments', 'Submitted', 'Pending Count', 'Pending Courses', 'Last IGNOU Check'];
+        const headers = [...columnOrder, ...ignouHeaders];
+        worksheet.addRow(headers);
+
+        worksheet.getRow(1).eachCell(cell => {
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+        worksheet.getRow(1).height = 20;
+
+        filtered.forEach(student => {
+            const cf    = student.customFields || {};
+            const check = student.ignouChecks?.[0];
+
+            const originalCells = columnOrder.map(col => {
+                const v = cf[col];
+                if (v === null || v === undefined) return '';
+                if (Array.isArray(v)) return v.join(', ');
+                return String(v);
+            });
+
+            const igStatus = !check ? 'NOT_CHECKED'
+                : check.checkStatus === 'DONE' && check.pendingCount > 0 ? 'HAS_PENDING'
+                : check.checkStatus;
+
+            const ignouCells = [
+                igStatus,
+                check?.totalItems    ?? '',
+                check?.submittedCount ?? '',
+                check?.pendingCount  ?? '',
+                check?.pendingCourses || '',
+                check?.checkedAt ? new Date(check.checkedAt).toLocaleDateString('en-IN') : '',
+            ];
+
+            const row = worksheet.addRow([...originalCells, ...ignouCells]);
+
+            // Highlight pending columns in red
+            if ((check?.pendingCount ?? 0) > 0) {
+                const pendingColIdx = columnOrder.length + 4;
+                const coursesColIdx = columnOrder.length + 5;
+                [pendingColIdx, coursesColIdx].forEach(ci => {
+                    row.getCell(ci).font = { bold: true, color: { argb: 'FFCC0000' } };
+                    row.getCell(ci).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF0F0' } };
+                });
+            }
+        });
+
+        worksheet.columns.forEach((col, i) => {
+            col.width = Math.min(Math.max((headers[i] || '').length + 4, 12), 40);
+        });
+        worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+        const today = new Date().toISOString().split('T')[0];
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="pending_ignou_${today}.xlsx"`);
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (err) { next(err); }
+});
+
 export default router;

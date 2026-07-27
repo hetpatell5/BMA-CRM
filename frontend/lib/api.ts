@@ -147,7 +147,7 @@ export const studentsAPI = {
                 ...(batchIds && batchIds.length > 0 ? { batchIds: batchIds.join(',') } : {}),
             }
         }),
-    segregate: (data: { assigneeIds: number[], importBatchIds?: string[], programmes?: string[], customField?: Record<string, string>, dryRun?: boolean }) =>
+    segregate: (data: { assigneeIds: number[], importBatchIds?: string[], programmes?: string[], customField?: Record<string, string>, dryRun?: boolean, studentIds?: string[] }) =>
         api.post('/students/segregate', data),
 }
 
@@ -336,6 +336,18 @@ export const ignouAPI = {
     retryErrors:    (batchId: string) => api.post(`/ignou/retry/batch/${batchId}`),
     /** Delete all check records for a batch */
     deleteBatch:    (batchId: string) => api.delete(`/ignou/batch/${batchId}`),
+    /** Export pending IGNOU data for explicit student IDs (selected-rows mode) */
+    exportByStudents: async (studentIds: string[]): Promise<void> => {
+        const { default: apiInst } = await import('@/lib/api')
+        const res = await (apiInst as any).post('/ignou/export/by-students', { studentIds }, { responseType: 'blob' })
+        const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        const url  = URL.createObjectURL(blob)
+        const a    = document.createElement('a')
+        a.href     = url
+        a.download = `pending_ignou_${new Date().toISOString().split('T')[0]}.xlsx`
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+    },
     /** Build direct Excel export URL (uses token auth) */
     getExportUrl: (batchId: string, onlyPending?: boolean): string => {
         const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
