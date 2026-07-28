@@ -973,9 +973,10 @@ router.get('/', async (req, res, next) => {
         // Telecallers: only see excel_import records assigned to them via _telecallerOwners
         if (isTelecaller && where.source === 'excel_import') {
             const telecallerId = req.user.id;
+            const searchObj = JSON.stringify({ id: telecallerId });
             const ownerRows = await prisma.$queryRawUnsafe(
-                `SELECT id FROM students WHERE JSON_SEARCH(JSON_EXTRACT(custom_fields, '$._telecallerOwners'), 'one', ?, NULL, '$[*].id') IS NOT NULL`,
-                String(telecallerId)
+                `SELECT id FROM students WHERE JSON_CONTAINS(JSON_EXTRACT(custom_fields, '$._telecallerOwners'), ?) = 1`,
+                searchObj
             );
             const ownerIds = ownerRows.map(r => BigInt(r.id));
             if (where.id && where.id.in) {
@@ -1739,14 +1740,16 @@ router.post('/segregate/assign', async (req, res, next) => {
             const { id, fullName, role, staffRole, ids } = perAssignee[assignee.id];
             if (ids.length === 0) continue;
 
-            const ownerEntry = JSON.stringify([{
-                id,
-                name: fullName,
-                role,
-                staffRole: staffRole || null,
-                addedAt: new Date().toISOString(),
-                sharePercent: 100,
-            }]);
+            const patchData = JSON.stringify({
+                _telecallerOwners: [{
+                    id,
+                    name: fullName,
+                    role,
+                    staffRole: staffRole || null,
+                    addedAt: new Date().toISOString(),
+                    sharePercent: 100,
+                }]
+            });
 
             // Process in batches to avoid huge IN() clauses
             for (let i = 0; i < ids.length; i += BATCH) {
@@ -1754,9 +1757,9 @@ router.post('/segregate/assign', async (req, res, next) => {
                 const placeholders = batchIds.map(() => '?').join(', ');
                 await prisma.$executeRawUnsafe(
                     `UPDATE students
-                     SET custom_fields = JSON_SET(COALESCE(custom_fields, '{}'), '$._telecallerOwners', CAST(? AS JSON))
+                     SET custom_fields = JSON_MERGE_PATCH(COALESCE(custom_fields, '{}'), ?)
                      WHERE id IN (${placeholders})`,
-                    ownerEntry,
+                    patchData,
                     ...batchIds
                 );
                 totalAssigned += batchIds.length;
