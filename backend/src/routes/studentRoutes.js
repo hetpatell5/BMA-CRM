@@ -12,7 +12,7 @@ import ExcelJS from 'exceljs';
 
 // Temp directory for storing segregation plan files (expire after 24h)
 const SEG_PLANS_DIR = path.join(os.tmpdir(), 'bma-seg-plans');
-try { fs.mkdirSync(SEG_PLANS_DIR, { recursive: true }); } catch (_) {}
+try { fs.mkdirSync(SEG_PLANS_DIR, { recursive: true }); } catch (_) { }
 
 // Internal customField keys to exclude from CSV exports
 const CF_INTERNAL_KEYS = new Set([
@@ -40,11 +40,11 @@ const readCustomFieldObject = (customFields) => (
         : {}
 );
 
-const normalizeTelecallerOwner = (entry) => {   
+const normalizeTelecallerOwner = (entry) => {
     if (!entry || typeof entry !== 'object') return null;
 
     const parsedId = entry.id === null || entry.id === undefined || entry.id === ''
-        ? null 
+        ? null
         : Number(entry.id);
     const name = String(entry.name || entry.fullName || '').trim();
 
@@ -329,10 +329,10 @@ router.get('/meta/filters', async (req, res, next) => {
         });
 
         // Sort all arrays alphabetically
-        const sortedProgrammes      = programmes.map(p => p.programme).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        const sortedProgrammes = programmes.map(p => p.programme).filter(Boolean).sort((a, b) => a.localeCompare(b));
         const sortedRegionalCenters = regionalCenters.map(r => r.regionalCenter).filter(Boolean).sort((a, b) => a.localeCompare(b));
-        const sortedSubjects        = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
-        const customFieldKeys       = Array.from(customFieldKeysSet).sort((a, b) => a.localeCompare(b));
+        const sortedSubjects = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
+        const customFieldKeys = Array.from(customFieldKeysSet).sort((a, b) => a.localeCompare(b));
 
         res.json({
             success: true,
@@ -397,10 +397,10 @@ router.get('/export/excel', async (req, res, next) => {
             ];
         }
 
-        if (status)         where.status = status;
-        if (programme)      where.programme = { equals: programme };
+        if (status) where.status = status;
+        if (programme) where.programme = { equals: programme };
         if (regionalCenter) where.regionalCenter = { equals: regionalCenter };
-        if (subject)        where.subjects = { array_contains: [subject] };
+        if (subject) where.subjects = { array_contains: [subject] };
 
         // ── Custom field filters ─────────────────────────────────────────────────
         const customFieldFilters = req.query.customField;
@@ -1412,7 +1412,7 @@ router.post('/promote-import-batch/:importBatchId', async (req, res, next) => {
         const batchId = BigInt(req.params.importBatchId);
 
         const result = await prisma.student.updateMany({
-            where: { 
+            where: {
                 importBatchId: batchId,
                 source: 'excel_import'
             },
@@ -1636,6 +1636,143 @@ router.get('/segregate/xlsx/:planId/:assigneeId', async (req, res, next) => {
         res.setHeader('Content-Disposition', `attachment; filename="${safeName}_segregated.xlsx"`);
         await workbook.xlsx.write(res);
         res.end();
+    } catch (error) { next(error); }
+});
+
+
+// ── Assign segregated records directly to member dashboards ──────────────────
+// POST /api/students/segregate/assign
+// Same round-robin logic as /segregate, but instead of generating XLSXs it
+// writes _telecallerOwners into each student's customFields so the assigned
+// telecaller sees those records on their Data page.
+router.post('/segregate/assign', async (req, res, next) => {
+    try {
+        const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
+        if (!isAdmin) return res.status(403).json({ success: false, message: 'Only admins and managers can segregate data' });
+
+        const { assigneeIds, importBatchIds: batchIdsRaw, customField: cfRaw, studentIds: studentIdsRaw } = req.body;
+        if (!assigneeIds || !Array.isArray(assigneeIds) || assigneeIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'assigneeIds array is required' });
+        }
+
+        // Validate assignees
+        const assignees = await prisma.user.findMany({
+            where: { id: { in: assigneeIds.map(Number) }, status: 'ACTIVE' },
+            select: { id: true, fullName: true, role: true, staffRole: true },
+        });
+        if (assignees.length === 0) return res.status(400).json({ success: false, message: 'No valid assignee IDs provided' });
+
+        // Build WHERE clause — same dual-mode logic as /segregate
+        const useExplicitIds = Array.isArray(studentIdsRaw) && studentIdsRaw.length > 0;
+        const whereParts = [`source = 'excel_import'`];
+        const queryParams = [];
+
+        if (useExplicitIds) {
+            whereParts.push(`id IN (${studentIdsRaw.map(() => '?').join(', ')})`);
+            studentIdsRaw.forEach(id => queryParams.push(BigInt(id)));
+        } else {
+            if (batchIdsRaw && Array.isArray(batchIdsRaw) && batchIdsRaw.length > 0) {
+                whereParts.push(`import_batch_id IN (${batchIdsRaw.map(() => '?').join(', ')})`);
+                batchIdsRaw.forEach(id => queryParams.push(BigInt(id)));
+            }
+            const cfEntries = cfRaw && typeof cfRaw === 'object' ? Object.entries(cfRaw).filter(([k, v]) => k && v) : [];
+            for (const [k, v] of cfEntries) {
+                const ek = k.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                const vals = String(v).split(',').map(s => s.trim()).filter(Boolean);
+                if (!vals.length) continue;
+                whereParts.push(`JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"${ek}\"')) IN (${vals.map(() => '?').join(', ')})`);
+                vals.forEach(val => queryParams.push(val));
+            }
+        }
+        const whereSQL = whereParts.join(' AND ');
+
+        // Fetch (id, prog) — lightweight
+        const cfEntries2 = !useExplicitIds && cfRaw && typeof cfRaw === 'object' ? Object.entries(cfRaw).filter(([k, v]) => k && v) : [];
+        const progCfKey = cfEntries2.length > 0 ? cfEntries2[0][0] : null;
+        let selectExpr;
+        if (progCfKey) {
+            const ek = progCfKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            selectExpr = `id, COALESCE(JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"${ek}\"')), programme, 'Unknown') AS prog`;
+        } else {
+            selectExpr = `id, COALESCE(programme, JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"Programme\"')), JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"PROGRAMME\"')), JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"programme\"')), 'Unknown') AS prog`;
+        }
+
+        const rows = await prisma.$queryRawUnsafe(
+            `SELECT ${selectExpr} FROM students WHERE ${whereSQL} ORDER BY id ASC`,
+            ...queryParams
+        );
+
+        if (rows.length === 0) {
+            return res.json({ success: true, data: { assigned: 0, members: [] } });
+        }
+
+        // ── Programme-aware round-robin with rotating offset ─────────────────
+        const n = assignees.length;
+        const perAssignee = {};
+        for (const a of assignees) perAssignee[a.id] = { ...a, ids: [] };
+
+        const progGroups = new Map();
+        for (const row of rows) {
+            const prog = row.prog || 'Unknown';
+            if (!progGroups.has(prog)) progGroups.set(prog, []);
+            progGroups.get(prog).push(row.id);
+        }
+
+        let globalOffset = 0;
+        for (const [, ids] of progGroups) {
+            for (let i = 0; i < ids.length; i++) {
+                const assigneeIndex = (globalOffset + i) % n;
+                perAssignee[assignees[assigneeIndex].id].ids.push(ids[i]);
+            }
+            globalOffset = (globalOffset + ids.length) % n;
+        }
+
+        // ── Write _telecallerOwners to DB in batches ─────────────────────────
+        // For each assignee, update all their records to set _telecallerOwners
+        // to a single-entry array containing that assignee. This is how the
+        // telecaller Data page query (JSON_SEARCH on _telecallerOwners[*].id)
+        // finds records belonging to each member.
+        const BATCH = 500;
+        let totalAssigned = 0;
+
+        for (const assignee of assignees) {
+            const { id, fullName, role, staffRole, ids } = perAssignee[assignee.id];
+            if (ids.length === 0) continue;
+
+            const ownerEntry = JSON.stringify([{
+                id,
+                name: fullName,
+                role,
+                staffRole: staffRole || null,
+                addedAt: new Date().toISOString(),
+                sharePercent: 100,
+            }]);
+
+            // Process in batches to avoid huge IN() clauses
+            for (let i = 0; i < ids.length; i += BATCH) {
+                const batchIds = ids.slice(i, i + BATCH);
+                const placeholders = batchIds.map(() => '?').join(', ');
+                await prisma.$executeRawUnsafe(
+                    `UPDATE students
+                     SET custom_fields = JSON_SET(COALESCE(custom_fields, '{}'), '$._telecallerOwners', CAST(? AS JSON))
+                     WHERE id IN (${placeholders})`,
+                    ownerEntry,
+                    ...batchIds
+                );
+                totalAssigned += batchIds.length;
+            }
+        }
+
+        const summary = assignees.map(a => ({
+            assigneeId: a.id,
+            assigneeName: a.fullName,
+            count: perAssignee[a.id].ids.length,
+        }));
+
+        res.json({
+            success: true,
+            data: { assigned: totalAssigned, members: summary }
+        });
     } catch (error) { next(error); }
 });
 

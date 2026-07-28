@@ -245,13 +245,11 @@ export default function ImportPreviewPage() {
     const [filterSearch, setFilterSearch] = useState('')
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({ imports: true })
 
-    // ── Segregation state ──────────────────────────────────────────────────
+    // ── Segregation state ──────────────────────────────────────────────────────
     const [showSegregateModal, setShowSegregateModal] = useState(false)
     const [segregatePreview, setSegregatePreview]     = useState<any[] | null>(null)
-    const [csvPlanResult, setCsvPlanResult]           = useState<{ planId: string; totalStudents: number; members: any[] } | null>(null)
     const [selectedAssignees, setSelectedAssignees]   = useState<number[]>([])
     const [segregateLoading, setSegregateLoading]     = useState(false)
-    const [downloadingId, setDownloadingId]           = useState<number | null>(null)
 
     // Compatibility shim: single batch ID for IGNOU / old helpers
     const importBatchId = importBatchIds.size === 1 ? Array.from(importBatchIds)[0] : ''
@@ -470,7 +468,7 @@ export default function ImportPreviewPage() {
         u.role === 'ADMIN' || u.role === 'MANAGER' || (u.role === 'STAFF' && u.staffRole === 'TELECALLER')
     )
 
-    // ── Segregation — Generate CSVs (NO DB writes) ─────────────────────────
+    // ── Segregation ─────────────────────────────────────────────────────
     const buildCfFilters = () => {
         const cfFilters: Record<string, string> = {}
         for (const [k, vals] of Object.entries(activeFilters)) {
@@ -484,6 +482,7 @@ export default function ImportPreviewPage() {
         return cfFilters
     }
 
+    // Preview (dry run) — same logic as before for the preview table
     const handleSegregatePreview = async () => {
         if (selectedAssignees.length === 0) { toast({ title: 'Select team members first', variant: 'destructive' }); return }
         const cfFilters = buildCfFilters()
@@ -492,7 +491,6 @@ export default function ImportPreviewPage() {
             setSegregateLoading(true)
             const res = await studentsAPI.segregate({
                 assigneeIds: selectedAssignees,
-                // If rows are ticked, only segregate those rows; otherwise use batch/filter scope
                 ...(useSelected
                     ? { studentIds: selectedIds }
                     : {
@@ -508,15 +506,15 @@ export default function ImportPreviewPage() {
         } finally { setSegregateLoading(false) }
     }
 
-    const handleGenerateCSVs = async () => {
+    // Assign: write _telecallerOwners to DB — records appear on each member's Data page
+    const handleSegregateAssign = async () => {
         if (selectedAssignees.length === 0) { toast({ title: 'Select team members first', variant: 'destructive' }); return }
         const cfFilters = buildCfFilters()
         const useSelected = selectedIds.length > 0
         try {
             setSegregateLoading(true)
-            const res = await studentsAPI.segregate({
+            const res = await studentsAPI.segregateAssign({
                 assigneeIds: selectedAssignees,
-                // If rows are ticked, only segregate those rows; otherwise use batch/filter scope
                 ...(useSelected
                     ? { studentIds: selectedIds }
                     : {
@@ -526,33 +524,22 @@ export default function ImportPreviewPage() {
                 ),
             })
             const d = res.data.data
-            setCsvPlanResult({ planId: d.planId, totalStudents: d.totalStudents, members: d.members })
-            setShowSegregateModal(false) // close modal so downloads are visible on main page
-            toast({ title: 'XLSXs Ready!', description: `${Number(d.totalStudents).toLocaleString()} records split across ${d.members.length} members.`, variant: 'success' })
+            const summary = (d.members as any[]).map((m: any) => `${m.assigneeName}: ${Number(m.count).toLocaleString()}`).join(' · ')
+            toast({
+                title: `✅ Assigned ${Number(d.assigned).toLocaleString()} records!`,
+                description: summary,
+                variant: 'success',
+            })
+            setShowSegregateModal(false)
+            setSegregatePreview(null)
+            setSelectedAssignees([])
         } catch (err: any) {
-            toast({ title: 'Generation Failed', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' })
+            toast({ title: 'Assignment Failed', description: err?.response?.data?.message || 'Failed.', variant: 'destructive' })
         } finally { setSegregateLoading(false) }
     }
 
-    const handleDownloadMemberCSV = async (member: { assigneeId: number; assigneeName: string; downloadUrl: string }) => {
-        try {
-            setDownloadingId(member.assigneeId)
-            const { default: apiInst } = await import('@/lib/api')
-            const res = await (apiInst as any).get(member.downloadUrl.replace('/api/', '/'), { responseType: 'blob' })
-            const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-            const blobUrl = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = blobUrl
-            a.download = `${member.assigneeName.replace(/[^a-z0-9]/gi, '_')}_segregated.xlsx`
-            document.body.appendChild(a); a.click(); document.body.removeChild(a)
-            URL.revokeObjectURL(blobUrl)
-        } catch (err: any) {
-            toast({ title: 'Download Failed', description: err?.response?.data?.message || 'Could not download file.', variant: 'destructive' })
-        } finally { setDownloadingId(null) }
-    }
-
     const resetSegregateModal = () => {
-        setShowSegregateModal(false); setSegregatePreview(null); setCsvPlanResult(null); setSelectedAssignees([])
+        setShowSegregateModal(false); setSegregatePreview(null); setSelectedAssignees([])
     }
 
     // ── Export (CSV) ─────────────────────────────────────────────────────────
@@ -743,7 +730,7 @@ export default function ImportPreviewPage() {
                             size="sm"
                             variant="outline"
                             className="gap-2 border-violet-500/30 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10"
-                            onClick={() => { setSegregatePreview(null); setCsvPlanResult(null); setShowSegregateModal(true) }}
+                            onClick={() => { setSegregatePreview(null); setShowSegregateModal(true) }}
                         >
                             <Users className="w-4 h-4" />
                             <span className="hidden sm:inline">Segregate{selectedIds.length > 0 ? ` (${selectedIds.length} selected)` : ''}</span>
@@ -836,45 +823,7 @@ export default function ImportPreviewPage() {
             </div>
             )}
 
-            {/* ── Persistent XLSX Download Panel (after segregation, survives modal close) ── */}
-            {isAdminManager && csvPlanResult && (
-                <div className="rounded-xl border border-violet-500/30 bg-gradient-to-r from-violet-500/5 via-purple-500/5 to-indigo-500/5 dark:from-violet-500/10 dark:via-purple-500/10 dark:to-indigo-500/10 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <div>
-                            <p className="font-semibold text-sm text-violet-700 dark:text-violet-400">
-                                ✅ XLSXs Ready — {Number(csvPlanResult.totalStudents).toLocaleString()} records split across {csvPlanResult.members.length} members
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">Plans expire after 6 hours. Download before closing the page.</p>
-                        </div>
-                        <button
-                            onClick={() => setCsvPlanResult(null)}
-                            className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {csvPlanResult.members.map((m: any) => (
-                            <div key={m.assigneeId} className="flex items-center justify-between gap-3 rounded-lg border border-violet-200 dark:border-violet-500/20 bg-background/60 px-3 py-2">
-                                <div className="min-w-0">
-                                    <p className="text-sm font-medium truncate">{m.assigneeName}</p>
-                                    <p className="text-xs text-muted-foreground">{formatNumber(m.count)} records</p>
-                                </div>
-                                <Button
-                                    size="sm"
-                                    className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white shrink-0 h-8"
-                                    onClick={() => handleDownloadMemberCSV(m)}
-                                    disabled={downloadingId === m.assigneeId}
-                                >
-                                    {downloadingId === m.assigneeId
-                                        ? <><RefreshCw className="w-3 h-3 animate-spin" />…</>
-                                        : <><Download className="w-3 h-3" />{m.assigneeName.split(' ')[0]}.xlsx</>}
-                                </Button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+
 
             {/* ── Search & Filter Bar ── */}
             <div className="border border-border rounded-xl p-3 flex flex-col sm:flex-row gap-3 flex-wrap">
@@ -1623,48 +1572,18 @@ export default function ImportPreviewPage() {
                                 <p className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-500/10 rounded-lg px-3 py-2">No records matched the current filter scope.</p>
                             )}
 
-                            {/* CSV download links after generation */}
-                            {csvPlanResult && (
-                                <div>
-                                    <p className="font-semibold text-sm mb-1 text-emerald-600 dark:text-emerald-400">
-                                        XLSXs ready — {Number(csvPlanResult.totalStudents).toLocaleString()} records split across {csvPlanResult.members.length} members
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mb-3">Plans expire after 6 hours. Download before closing.</p>
-                                    <div className="space-y-2">
-                                        {csvPlanResult.members.map((m: any) => (
-                                            <div key={m.assigneeId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
-                                                <div>
-                                                    <p className="text-sm font-medium">{m.assigneeName}</p>
-                                                    <p className="text-xs text-muted-foreground">{formatNumber(m.count)} records</p>
-                                                </div>
-                                                <Button
-                                                    size="sm"
-                                                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
-                                                    onClick={() => handleDownloadMemberCSV(m)}
-                                                    disabled={downloadingId === m.assigneeId}
-                                                >
-                                                    {downloadingId === m.assigneeId
-                                                        ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Downloading…</>
-                                                        : <><Download className="w-3.5 h-3.5" />{m.assigneeName.split(' ')[0]}.xlsx</>
-                                                    }
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
                         <div className="p-4 border-t border-border flex items-center justify-between gap-3">
                             <Button variant="outline" onClick={resetSegregateModal}>Close</Button>
                             <div className="flex items-center gap-2">
                                 <Button variant="outline" className="gap-2" onClick={handleSegregatePreview} disabled={selectedAssignees.length === 0 || segregateLoading}>
-                                    {segregateLoading && !csvPlanResult ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                    {segregateLoading && !segregatePreview ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                                     Preview
                                 </Button>
-                                <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleGenerateCSVs} disabled={selectedAssignees.length === 0 || segregateLoading}>
-                                    {segregateLoading && csvPlanResult === null && segregatePreview !== null ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                    Generate XLSXs
+                                <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleSegregateAssign} disabled={selectedAssignees.length === 0 || segregateLoading}>
+                                    {segregateLoading && segregatePreview !== null ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                                    Assign to Members
                                 </Button>
                             </div>
 

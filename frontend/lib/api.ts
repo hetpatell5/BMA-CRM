@@ -149,6 +149,9 @@ export const studentsAPI = {
         }),
     segregate: (data: { assigneeIds: number[], importBatchIds?: string[], programmes?: string[], customField?: Record<string, string>, dryRun?: boolean, studentIds?: string[] }) =>
         api.post('/students/segregate', data),
+    /** Assign segregated records directly to member dashboards (DB write — no XLSX) */
+    segregateAssign: (data: { assigneeIds: number[], importBatchIds?: string[], customField?: Record<string, string>, studentIds?: string[] }) =>
+        api.post('/students/segregate/assign', data),
 }
 
 // Leads API
