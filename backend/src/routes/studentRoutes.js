@@ -940,52 +940,10 @@ router.get('/', async (req, res, next) => {
         if (req.user.role === 'STAFF' && !isTelecaller) {
             where.assignedGuideId = req.user.id;
         }
-        // Telecallers on the Data page see only records where _telecallerOwners includes their user ID
+        // Telecallers on the Data page: only see excel_import records assigned to them.
+        // We use the assigned_by_id column directly — simple integer equality, no JSON needed.
         if (isTelecaller && where.source === 'excel_import') {
-            // We'll filter via raw SQL intersection after the cfFilter step below
-            // Store flag so we can apply it post-cf-filter
-        }
-
-        // If custom field filters are present, get matching IDs via raw SQL first
-        if (cfFilterEntries.length > 0) {
-            // Build WHERE clauses for each cf filter using JSON_EXTRACT
-            const cfWhereParts = cfFilterEntries.map(({ key, values }) => {
-                const escapedKey = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-                const placeholders = values.map(() => '?').join(', ');
-                return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedKey}"')) IN (${placeholders})`;
-            });
-            const cfParams = cfFilterEntries.flatMap(({ values }) => values);
-
-            const cfRows = await prisma.$queryRawUnsafe(
-                `SELECT id FROM students WHERE ${cfWhereParts.join(' AND ')}`,
-                ...cfParams
-            );
-            const cfMatchingIds = cfRows.map(r => Number(r.id));
-
-            // Intersect with any existing id filter
-            if (where.id && where.id.in) {
-                where.id.in = where.id.in.filter(id => cfMatchingIds.includes(Number(id)));
-            } else {
-                where.id = { in: cfMatchingIds.map(id => BigInt(id)) };
-            }
-        }
-
-        // Telecallers: only see excel_import records assigned to them via _telecallerOwners
-        if (isTelecaller && where.source === 'excel_import') {
-            const telecallerId = req.user.id;
-            // Use JSON_EXTRACT with numeric comparison — works regardless of JSON spacing
-            // format. Checks if the 'id' field of the first element equals the telecaller's ID.
-            const ownerRows = await prisma.$queryRawUnsafe(
-                `SELECT id FROM students WHERE JSON_EXTRACT(custom_fields, '$._telecallerOwners[0].id') = ?`,
-                Number(telecallerId)
-            );
-            const ownerIds = ownerRows.map(r => BigInt(r.id));
-            if (where.id && where.id.in) {
-                const existing = new Set(where.id.in.map(id => BigInt(id).toString()));
-                where.id.in = ownerIds.filter(id => existing.has(id.toString()));
-            } else {
-                where.id = { in: ownerIds };
-            }
+            where.assignedById = req.user.id;
         }
 
         const total = await prisma.student.count({ where });
@@ -1729,35 +1687,23 @@ router.post('/segregate/assign', async (req, res, next) => {
             globalOffset = (globalOffset + ids.length) % n;
         }
 
-        // ── Write _telecallerOwners to each student's customFields ──────────────
-        // Use raw SQL instead of Prisma ORM update() to avoid schema-version issues.
-        // The production DB may have an older schema missing some columns that
-        // Prisma would reference in a full UPDATE statement.
-        // JSON_SET on the raw JSON text column is safe since custom_fields is a STRING type.
-        const BATCH = 100;
+        // ── Write assigned_by_id to each student record ──────────────────────────
+        // Simple integer column update — no JSON, no CAST, works on all MySQL versions.
+        // assigned_by_id tracks which telecaller owns this record for their Data page.
+        const BATCH = 500;
         let totalAssigned = 0;
 
         for (const assignee of assignees) {
-            const { id, fullName, role, staffRole, ids } = perAssignee[assignee.id];
+            const { id, ids } = perAssignee[assignee.id];
             if (ids.length === 0) continue;
-
-            // Build the owner fields — use JSON_OBJECT to avoid CAST(? AS JSON) syntax error
-            const ownerName = fullName;
-            const ownerRole = role;
-            const ownerStaffRole = staffRole || null;
-            const ownerAddedAt = new Date().toISOString();
 
             for (let i = 0; i < ids.length; i += BATCH) {
                 const batchIds = ids.slice(i, i + BATCH).map(x => BigInt(x));
                 const placeholders = batchIds.map(() => '?').join(', ');
 
-                // Use JSON_OBJECT with individual params — works on all MySQL/MariaDB versions
                 await prisma.$executeRawUnsafe(
-                    `UPDATE students
-                     SET custom_fields = JSON_SET(COALESCE(custom_fields, '{}'), '$._telecallerOwners',
-                         JSON_ARRAY(JSON_OBJECT('id', ?, 'name', ?, 'role', ?, 'staffRole', ?, 'addedAt', ?, 'sharePercent', 100)))
-                     WHERE id IN (${placeholders})`,
-                    Number(id), ownerName, ownerRole, ownerStaffRole, ownerAddedAt,
+                    `UPDATE students SET assigned_by_id = ? WHERE id IN (${placeholders})`,
+                    Number(id),
                     ...batchIds
                 );
 
