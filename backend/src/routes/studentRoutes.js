@@ -1729,11 +1729,11 @@ router.post('/segregate/assign', async (req, res, next) => {
             globalOffset = (globalOffset + ids.length) % n;
         }
 
-        // ── Write _telecallerOwners to DB in batches via Prisma native update ──
-        // Using Prisma's update() handles JSON serialization correctly regardless
-        // of MySQL vs MariaDB engine. We read current customFields, merge the owner
-        // field, then write back. Done in batches of 200 for efficiency.
-        const BATCH = 200;
+        // ── Write _telecallerOwners to each student's customFields ──────────────
+        // Strategy: fetch full current customFields per batch, merge _telecallerOwners,
+        // then update via Prisma ORM (handles JSON serialization correctly cross-DB).
+        // We also handle Buffer returns from MySQL raw queries.
+        const BATCH = 100;
         let totalAssigned = 0;
 
         for (const assignee of assignees) {
@@ -1741,7 +1741,7 @@ router.post('/segregate/assign', async (req, res, next) => {
             if (ids.length === 0) continue;
 
             const ownerEntry = [{
-                id,
+                id: Number(id),          // ensure plain number, not BigInt
                 name: fullName,
                 role,
                 staffRole: staffRole || null,
@@ -1749,28 +1749,42 @@ router.post('/segregate/assign', async (req, res, next) => {
                 sharePercent: 100,
             }];
 
-            // Process in batches
             for (let i = 0; i < ids.length; i += BATCH) {
-                const batchIds = ids.slice(i, i + BATCH);
-                // Fetch existing customFields for all records in batch
+                const batchIds = ids.slice(i, i + BATCH).map(x => BigInt(x));
+                const placeholders = batchIds.map(() => '?').join(', ');
+
+                // Read existing custom_fields
                 const existing = await prisma.$queryRawUnsafe(
-                    `SELECT id, custom_fields FROM students WHERE id IN (${batchIds.map(() => '?').join(', ')})`,
+                    `SELECT id, custom_fields FROM students WHERE id IN (${placeholders})`,
                     ...batchIds
                 );
-                // Update each record individually via Prisma (handles JSON correctly)
-                await Promise.all(existing.map(async (rec) => {
+
+                for (const rec of existing) {
+                    // Parse custom_fields — handle string, object, or Buffer
                     let cf = {};
                     try {
-                        cf = typeof rec.custom_fields === 'string'
-                            ? JSON.parse(rec.custom_fields)
-                            : (rec.custom_fields && typeof rec.custom_fields === 'object' ? rec.custom_fields : {});
+                        const raw = rec.custom_fields;
+                        if (raw === null || raw === undefined) {
+                            cf = {};
+                        } else if (typeof raw === 'string') {
+                            cf = JSON.parse(raw);
+                        } else if (Buffer.isBuffer(raw)) {
+                            cf = JSON.parse(raw.toString('utf8'));
+                        } else if (typeof raw === 'object') {
+                            cf = { ...raw };
+                        }
                     } catch (_) { cf = {}; }
+
+                    // Set the telecaller owner field
                     cf._telecallerOwners = ownerEntry;
+
+                    // Update using Prisma's ORM (handles JSON type correctly)
                     await prisma.student.update({
-                        where: { id: rec.id },
+                        where: { id: BigInt(rec.id) },
                         data: { customFields: cf },
                     });
-                }));
+                }
+
                 totalAssigned += batchIds.length;
             }
         }
