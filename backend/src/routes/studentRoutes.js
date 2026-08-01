@@ -973,11 +973,11 @@ router.get('/', async (req, res, next) => {
         // Telecallers: only see excel_import records assigned to them via _telecallerOwners
         if (isTelecaller && where.source === 'excel_import') {
             const telecallerId = req.user.id;
-            // Use LIKE on the raw JSON text — Prisma serializes numbers without quotes,
-            // so a match on "id":123 is reliable regardless of MySQL/MariaDB version.
+            // Use JSON_EXTRACT with numeric comparison — works regardless of JSON spacing
+            // format. Checks if the 'id' field of the first element equals the telecaller's ID.
             const ownerRows = await prisma.$queryRawUnsafe(
-                `SELECT id FROM students WHERE JSON_EXTRACT(custom_fields, '$._telecallerOwners') IS NOT NULL AND custom_fields LIKE ?`,
-                `%"id":${telecallerId}%`
+                `SELECT id FROM students WHERE JSON_EXTRACT(custom_fields, '$._telecallerOwners[0].id') = ?`,
+                Number(telecallerId)
             );
             const ownerIds = ownerRows.map(r => BigInt(r.id));
             if (where.id && where.id.in) {
@@ -1730,9 +1730,10 @@ router.post('/segregate/assign', async (req, res, next) => {
         }
 
         // ── Write _telecallerOwners to each student's customFields ──────────────
-        // Strategy: fetch full current customFields per batch, merge _telecallerOwners,
-        // then update via Prisma ORM (handles JSON serialization correctly cross-DB).
-        // We also handle Buffer returns from MySQL raw queries.
+        // Use raw SQL instead of Prisma ORM update() to avoid schema-version issues.
+        // The production DB may have an older schema missing some columns that
+        // Prisma would reference in a full UPDATE statement.
+        // JSON_SET on the raw JSON text column is safe since custom_fields is a STRING type.
         const BATCH = 100;
         let totalAssigned = 0;
 
@@ -1740,50 +1741,25 @@ router.post('/segregate/assign', async (req, res, next) => {
             const { id, fullName, role, staffRole, ids } = perAssignee[assignee.id];
             if (ids.length === 0) continue;
 
-            const ownerEntry = [{
-                id: Number(id),          // ensure plain number, not BigInt
-                name: fullName,
-                role,
-                staffRole: staffRole || null,
-                addedAt: new Date().toISOString(),
-                sharePercent: 100,
-            }];
+            // Build the owner fields — use JSON_OBJECT to avoid CAST(? AS JSON) syntax error
+            const ownerName = fullName;
+            const ownerRole = role;
+            const ownerStaffRole = staffRole || null;
+            const ownerAddedAt = new Date().toISOString();
 
             for (let i = 0; i < ids.length; i += BATCH) {
                 const batchIds = ids.slice(i, i + BATCH).map(x => BigInt(x));
                 const placeholders = batchIds.map(() => '?').join(', ');
 
-                // Read existing custom_fields
-                const existing = await prisma.$queryRawUnsafe(
-                    `SELECT id, custom_fields FROM students WHERE id IN (${placeholders})`,
+                // Use JSON_OBJECT with individual params — works on all MySQL/MariaDB versions
+                await prisma.$executeRawUnsafe(
+                    `UPDATE students
+                     SET custom_fields = JSON_SET(COALESCE(custom_fields, '{}'), '$._telecallerOwners',
+                         JSON_ARRAY(JSON_OBJECT('id', ?, 'name', ?, 'role', ?, 'staffRole', ?, 'addedAt', ?, 'sharePercent', 100)))
+                     WHERE id IN (${placeholders})`,
+                    Number(id), ownerName, ownerRole, ownerStaffRole, ownerAddedAt,
                     ...batchIds
                 );
-
-                for (const rec of existing) {
-                    // Parse custom_fields — handle string, object, or Buffer
-                    let cf = {};
-                    try {
-                        const raw = rec.custom_fields;
-                        if (raw === null || raw === undefined) {
-                            cf = {};
-                        } else if (typeof raw === 'string') {
-                            cf = JSON.parse(raw);
-                        } else if (Buffer.isBuffer(raw)) {
-                            cf = JSON.parse(raw.toString('utf8'));
-                        } else if (typeof raw === 'object') {
-                            cf = { ...raw };
-                        }
-                    } catch (_) { cf = {}; }
-
-                    // Set the telecaller owner field
-                    cf._telecallerOwners = ownerEntry;
-
-                    // Update using Prisma's ORM (handles JSON type correctly)
-                    await prisma.student.update({
-                        where: { id: BigInt(rec.id) },
-                        data: { customFields: cf },
-                    });
-                }
 
                 totalAssigned += batchIds.length;
             }
