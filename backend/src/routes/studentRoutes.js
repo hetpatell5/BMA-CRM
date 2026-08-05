@@ -550,10 +550,13 @@ router.post('/bulk-update', async (req, res, next) => {
 // Bulk delete - MUST be before /:id route
 router.post('/bulk-delete', async (req, res, next) => {
     try {
-        if (req.user.role !== 'ADMIN' && req.user.role !== 'MANAGER') {
+        const isTelecaller = req.user.role === 'STAFF' && req.user.staffRole === 'TELECALLER';
+        const isAdminManager = req.user.role === 'ADMIN' || req.user.role === 'MANAGER';
+
+        if (!isAdminManager && !isTelecaller) {
             return res.status(403).json({
                 success: false,
-                message: 'Only admins and managers can delete orders',
+                message: 'Only admins, managers, and telecallers can delete records',
             });
         }
 
@@ -568,9 +571,21 @@ router.post('/bulk-delete', async (req, res, next) => {
 
         const bigIntIds = ids.map(id => BigInt(id));
 
-        const result = await prisma.student.deleteMany({
-            where: { id: { in: bigIntIds } },
-        });
+        let result;
+        if (isTelecaller) {
+            // Telecallers can only delete their own assigned records
+            result = await prisma.student.deleteMany({
+                where: {
+                    id: { in: bigIntIds },
+                    assignedById: req.user.id,   // only their own records
+                    source: 'excel_import',
+                },
+            });
+        } else {
+            result = await prisma.student.deleteMany({
+                where: { id: { in: bigIntIds } },
+            });
+        }
 
         res.json({
             success: true,

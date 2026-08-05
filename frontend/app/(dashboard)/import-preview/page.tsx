@@ -227,6 +227,7 @@ export default function ImportPreviewPage() {
     const { user: currentUser } = useAuthStore()
 
     const isAdminManager = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+    const isTelecaller = currentUser?.role === 'STAFF' && currentUser?.staffRole === 'TELECALLER'
 
     // ── State ──────────────────────────────────────────────────────────────
     const [search, setSearch]         = useState(searchParams.get('search') || '')
@@ -739,8 +740,8 @@ export default function ImportPreviewPage() {
                 </div>
             </div>
 
-            {/* ── IGNOU Assignment Status Checker Toolbar (Admin/Manager only) ── */}
-            {isAdminManager && selectedIds.length > 0 && (
+            {/* ── IGNOU Assignment Status Checker Toolbar (Admin/Manager + Telecaller) ── */}
+            {(isAdminManager || isTelecaller) && selectedIds.length > 0 && (
             <div className="rounded-xl border border-border bg-gradient-to-r from-indigo-500/5 via-violet-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:via-violet-500/10 dark:to-purple-500/10 p-4 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
@@ -889,15 +890,40 @@ export default function ImportPreviewPage() {
             {selectedIds.length > 0 && (
                 <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20 animate-fade-in">
                     <span className="text-sm font-medium text-primary">{selectedIds.length} selected</span>
-                    <Button
-                        size="sm"
-                        className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-8"
-                        onClick={async () => { if (await confirm(`Mark ${selectedIds.length} selected record(s) as Order?`)) promoteSelectionMutation.mutate(selectedIds) }}
-                        disabled={promoteSelectionMutation.isPending}
-                    >
-                        {promoteSelectionMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
-                        Mark as Order
-                    </Button>
+                    {isAdminManager && (
+                        <Button
+                            size="sm"
+                            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-8"
+                            onClick={async () => { if (await confirm(`Mark ${selectedIds.length} selected record(s) as Order?`)) promoteSelectionMutation.mutate(selectedIds) }}
+                            disabled={promoteSelectionMutation.isPending}
+                        >
+                            {promoteSelectionMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
+                            Mark as Order
+                        </Button>
+                    )}
+                    {(isAdminManager || isTelecaller) && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 h-8"
+                            onClick={async () => {
+                                if (await confirm(`Delete ${selectedIds.length} selected record(s)? This cannot be undone.`)) {
+                                    try {
+                                        const res = await studentsAPI.bulkDelete(selectedIds)
+                                        const count = res.data.data?.count ?? selectedIds.length
+                                        setSelectedIds([])
+                                        queryClient.invalidateQueries({ queryKey: ['import-preview'] })
+                                        toast({ title: `${count} record(s) deleted`, variant: 'success' })
+                                    } catch (err: any) {
+                                        toast({ title: 'Delete Failed', description: err?.response?.data?.message || 'Could not delete records.', variant: 'destructive' })
+                                    }
+                                }
+                            }}
+                        >
+                            <XCircle className="w-3.5 h-3.5" />
+                            Delete ({selectedIds.length})
+                        </Button>
+                    )}
                     <button onClick={() => setSelectedIds([])} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 ml-auto">
                         Clear selection
                     </button>
