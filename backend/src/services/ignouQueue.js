@@ -216,21 +216,45 @@ export async function enqueueStudent(studentId) {
 /**
  * Enqueue a specific list of student IDs (checkbox-selected rows).
  * Properly RESETS the global counter so the progress bar starts fresh.
- * Skips students already DONE.
+ * Falls back to custom_fields when enrollmentNo/programme are null in DB columns.
  */
 export async function enqueueStudentsBulk(studentIds) {
     const bigIds = studentIds.map(id => BigInt(id));
 
-    const students = await prisma.student.findMany({
-        where: {
-            id:           { in: bigIds },
-            enrollmentNo: { not: null },
-            programme:    { not: null },
-        },
-        select: { id: true, enrollmentNo: true, programme: true, fullName: true },
+    // Fetch ALL selected students — including those with null enrollmentNo/programme
+    const allStudents = await prisma.student.findMany({
+        where: { id: { in: bigIds } },
+        select: { id: true, enrollmentNo: true, programme: true, fullName: true, customFields: true },
     });
 
-    const missing = studentIds.length - students.length; // no enrollment/programme
+    // Common custom_fields key names for enrollment number and programme
+    const ENROLL_KEYS = ['enrollment no', 'enrolment no', 'enrollment number', 'enrolment number',
+        'enrollmentno', 'enrolmentno', 'enrollment', 'enrolment', 'enroll no', 'enrol no'];
+    const PROG_KEYS   = ['programme', 'program', 'course programme', 'programme name'];
+
+    function findCfValue(cf, keys) {
+        if (!cf || typeof cf !== 'object') return null;
+        for (const [k, v] of Object.entries(cf)) {
+            if (keys.includes(k.trim().toLowerCase()) && v && String(v).trim()) {
+                return String(v).trim();
+            }
+        }
+        return null;
+    }
+
+    // Resolve enrollmentNo and programme — DB column first, then customFields
+    const students = allStudents.map(s => {
+        let cf = s.customFields;
+        if (typeof cf === 'string') { try { cf = JSON.parse(cf); } catch { cf = {}; } }
+        else if (Buffer.isBuffer(cf)) { try { cf = JSON.parse(cf.toString('utf8')); } catch { cf = {}; } }
+
+        const enrollmentNo = s.enrollmentNo || findCfValue(cf, ENROLL_KEYS);
+        const programme    = s.programme    || findCfValue(cf, PROG_KEYS);
+
+        return { id: s.id, enrollmentNo, programme, fullName: s.fullName };
+    }).filter(s => s.enrollmentNo && s.programme); // only those with both values
+
+    const missing = studentIds.length - students.length;
 
     if (students.length === 0) return { queued: 0, skipped: 0, missing };
 
