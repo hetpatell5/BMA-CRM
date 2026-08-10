@@ -961,6 +961,31 @@ router.get('/', async (req, res, next) => {
             where.assignedById = req.user.id;
         }
 
+        // Apply custom field filters (Programme, Regional Center, etc.)
+        // Works for all roles — ANDed with any existing where conditions.
+        if (cfFilterEntries.length > 0) {
+            const cfWhereParts = cfFilterEntries.map(({ key, values }) => {
+                const escapedKey = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                const placeholders = values.map(() => '?').join(', ');
+                return `JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$."${escapedKey}"')) IN (${placeholders})`;
+            });
+            const cfParams = cfFilterEntries.flatMap(({ values }) => values);
+
+            const cfRows = await prisma.$queryRawUnsafe(
+                `SELECT id FROM students WHERE ${cfWhereParts.join(' AND ')}`,
+                ...cfParams
+            );
+            const cfMatchingIds = cfRows.map(r => BigInt(r.id));
+
+            // Intersect with any existing id filter
+            if (where.id && where.id.in) {
+                const existing = new Set(where.id.in.map(id => BigInt(id).toString()));
+                where.id.in = cfMatchingIds.filter(id => existing.has(id.toString()));
+            } else {
+                where.id = { in: cfMatchingIds };
+            }
+        }
+
         const total = await prisma.student.count({ where });
 
         // Fetch students WITHOUT relation select (Prisma client may not have assignedGuide type yet)

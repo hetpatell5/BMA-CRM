@@ -994,8 +994,8 @@ export default function ImportPreviewPage() {
                         )}
 
                         <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
-            {/* Import Batches — multi-select with Select All */}
-                            {filterOptions?.importBatches?.length > 0 && (
+            {/* Import Batches — multi-select with Select All (Admin/Manager only, not telecallers) */}
+                            {!isTelecaller && filterOptions?.importBatches?.length > 0 && (
                                 <div>
                                     <button
                                         className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
