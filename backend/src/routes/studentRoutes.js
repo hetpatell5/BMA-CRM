@@ -266,10 +266,11 @@ router.get('/meta/import-field-values', async (req, res, next) => {
 });
 
 // Get filter options (for dropdowns) - MUST be before /:id route
-// ?scope=orders — excludes excel_import rows so Orders page only shows real order data
-// ── In-memory cache for filter options (avoids 5 DB queries on every page load) ──
+// ?scope=orders — returns full filter options for Orders page
+// (default / import scope) — returns only importBatches; column filters come from student data itself
+// ── In-memory cache for filter options (avoids heavy DB queries on every page load) ──
 const _filtersCache = new Map(); // key → { data, expiresAt }
-const FILTERS_TTL_MS = 30_000;   // 30 seconds
+const FILTERS_TTL_MS = 5 * 60_000; // 5 minutes — filter data rarely changes mid-session
 
 router.get('/meta/filters', async (req, res, next) => {
     try {
@@ -282,82 +283,83 @@ router.get('/meta/filters', async (req, res, next) => {
             return res.json({ success: true, data: cached.data });
         }
 
-        // When called from the Orders page, exclude bulk-imported records so the
-        // Programme / Regional Center lists only contain real order values.
-        const scopeWhere = isOrdersScope ? { NOT: { source: 'excel_import' } } : {};
+        let responseData;
 
-        const [programmes, regionalCenters, studentsWithSubjects, importBatches, studentsForCF] = await Promise.all([
-            prisma.student.findMany({
-                select: { programme: true },
-                distinct: ['programme'],
-                where: { programme: { not: null }, ...scopeWhere },
-            }),
-            prisma.student.findMany({
-                select: { regionalCenter: true },
-                distinct: ['regionalCenter'],
-                where: { regionalCenter: { not: null }, ...scopeWhere },
-            }),
-            prisma.student.findMany({
-                select: { subjects: true },
-                where: { subjects: { not: null }, ...scopeWhere },
-            }),
-            // Completed import batches — only relevant on Import Preview page (scope !== orders)
-            isOrdersScope
-                ? Promise.resolve([])
-                : prisma.importHistory.findMany({
-                    where: { status: 'COMPLETED', importType: 'STUDENTS' },
-                    select: { id: true, fileName: true, importedCount: true, createdAt: true },
-                    orderBy: { createdAt: 'desc' },
+        if (!isOrdersScope) {
+            // ── Import / Data page scope ─────────────────────────────────────
+            // Only importBatches is needed here — column filter options come
+            // from the student records themselves (collectCustomFieldColumns).
+            // Running the other 4 queries here wastes 3-5 seconds for nothing.
+            const importBatches = await prisma.importHistory.findMany({
+                where: { status: 'COMPLETED', importType: 'STUDENTS' },
+                select: { id: true, fileName: true, importedCount: true, createdAt: true },
+                orderBy: { createdAt: 'desc' },
+            });
+
+            responseData = {
+                programmes: [],
+                regionalCenters: [],
+                subjects: [],
+                customFieldKeys: [],
+                statuses: ['NEW_LEAD', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED', 'REPORT_IN_PROGRESS', 'SHIPPED', 'ALL_DONE'],
+                importBatches: importBatches.map(b => ({
+                    id: b.id.toString(),
+                    fileName: b.fileName,
+                    importedCount: b.importedCount,
+                    createdAt: b.createdAt,
+                })),
+            };
+        } else {
+            // ── Orders page scope — run full queries ─────────────────────────
+            const scopeWhere = { NOT: { source: 'excel_import' } };
+
+            const [programmes, regionalCenters, studentsWithSubjects, studentsForCF] = await Promise.all([
+                prisma.student.findMany({
+                    select: { programme: true },
+                    distinct: ['programme'],
+                    where: { programme: { not: null }, ...scopeWhere },
                 }),
-            // Scan customFields for unique keys — limit to excel_import to reduce rows scanned
-            prisma.student.findMany({
-                select: { customFields: true },
-                where: { customFields: { not: null }, source: 'excel_import' },
-                take: 500,
-            }),
-        ]);
+                prisma.student.findMany({
+                    select: { regionalCenter: true },
+                    distinct: ['regionalCenter'],
+                    where: { regionalCenter: { not: null }, ...scopeWhere },
+                }),
+                prisma.student.findMany({
+                    select: { subjects: true },
+                    where: { subjects: { not: null }, ...scopeWhere },
+                }),
+                prisma.student.findMany({
+                    select: { customFields: true },
+                    where: { customFields: { not: null }, ...scopeWhere },
+                    take: 200,
+                }),
+            ]);
 
-        // Extract unique subjects from all students' subjects arrays
-        const subjectsSet = new Set();
-        studentsWithSubjects.forEach(student => {
-            if (student.subjects && Array.isArray(student.subjects)) {
-                student.subjects.forEach(subject => {
-                    if (subject && subject.trim()) {
-                        subjectsSet.add(subject.trim());
-                    }
-                });
-            }
-        });
+            const subjectsSet = new Set();
+            studentsWithSubjects.forEach(s => {
+                if (s.subjects && Array.isArray(s.subjects)) {
+                    s.subjects.forEach(sub => { if (sub && sub.trim()) subjectsSet.add(sub.trim()); });
+                }
+            });
 
-        // Collect unique custom field keys across all students
-        const customFieldKeysSet = new Set();
-        studentsForCF.forEach(s => {
-            if (s.customFields && typeof s.customFields === 'object') {
-                Object.keys(s.customFields).forEach(k => {
-                    if (k && k.trim() && !k.startsWith('_')) customFieldKeysSet.add(k.trim());
-                });
-            }
-        });
+            const customFieldKeysSet = new Set();
+            studentsForCF.forEach(s => {
+                if (s.customFields && typeof s.customFields === 'object') {
+                    Object.keys(s.customFields).forEach(k => {
+                        if (k && k.trim() && !k.startsWith('_')) customFieldKeysSet.add(k.trim());
+                    });
+                }
+            });
 
-        // Sort all arrays alphabetically
-        const sortedProgrammes = programmes.map(p => p.programme).filter(Boolean).sort((a, b) => a.localeCompare(b));
-        const sortedRegionalCenters = regionalCenters.map(r => r.regionalCenter).filter(Boolean).sort((a, b) => a.localeCompare(b));
-        const sortedSubjects = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
-        const customFieldKeys = Array.from(customFieldKeysSet).sort((a, b) => a.localeCompare(b));
-
-        const responseData = {
-            programmes: sortedProgrammes,
-            regionalCenters: sortedRegionalCenters,
-            subjects: sortedSubjects,
-            customFieldKeys,
-            statuses: ['NEW_LEAD', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED', 'REPORT_IN_PROGRESS', 'SHIPPED', 'ALL_DONE'],
-            importBatches: importBatches.map(b => ({
-                id: b.id.toString(),
-                fileName: b.fileName,
-                importedCount: b.importedCount,
-                createdAt: b.createdAt,
-            })),
-        };
+            responseData = {
+                programmes: programmes.map(p => p.programme).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+                regionalCenters: regionalCenters.map(r => r.regionalCenter).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+                subjects: Array.from(subjectsSet).sort((a, b) => a.localeCompare(b)),
+                customFieldKeys: Array.from(customFieldKeysSet).sort((a, b) => a.localeCompare(b)),
+                statuses: ['NEW_LEAD', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED', 'REPORT_IN_PROGRESS', 'SHIPPED', 'ALL_DONE'],
+                importBatches: [],
+            };
+        }
 
         // Store in cache
         _filtersCache.set(cacheKey, { data: responseData, expiresAt: Date.now() + FILTERS_TTL_MS });
