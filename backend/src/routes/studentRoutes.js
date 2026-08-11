@@ -986,41 +986,48 @@ router.get('/', async (req, res, next) => {
             }
         }
 
-        const total = await prisma.student.count({ where });
+        // ── Run count + findMany in parallel (saves 1-2 seconds) ─────────────
+        const [total, students] = await Promise.all([
+            prisma.student.count({ where }),
+            prisma.student.findMany({
+                where,
+                skip,
+                take: limitNum,
+                orderBy: { [sortBy]: sortOrder },
+                select: {
+                    id: true,
+                    controlNumber: true,
+                    enrollmentNo: true,
+                    fullName: true,
+                    email: true,
+                    phone: true,
+                    course: true,
+                    programme: true,
+                    batchYear: true,
+                    status: true,
+                    city: true,
+                    state: true,
+                    regionalCenter: true,
+                    subjects: true,
+                    customFields: true,
+                    source: true,
+                    createdAt: true,
+                },
+            }),
+        ]);
 
-        // Fetch students WITHOUT relation select (Prisma client may not have assignedGuide type yet)
-        const students = await prisma.student.findMany({
-            where,
-            skip,
-            take: limitNum,
-            orderBy: { [sortBy]: sortOrder },
-            select: {
-                id: true,
-                controlNumber: true,
-                enrollmentNo: true,
-                fullName: true,
-                email: true,
-                phone: true,
-                course: true,
-                programme: true,
-                batchYear: true,
-                status: true,
-                city: true,
-                state: true,
-                regionalCenter: true,
-                subjects: true,
-                customFields: true,
-                source: true,
-                createdAt: true,
-            },
-        });
-
-        await applyOrderIdBackfill(students, readSettings());
+        // ── Skip backfill for excel_import (telecaller data) ─────────────────
+        // excel_import records don't need order IDs generated; skipping avoids
+        // up to 50 sequential DB UPDATEs per page load (saves 1-3 seconds).
+        const isExcelPage = where.source === 'excel_import';
+        if (!isExcelPage) {
+            await applyOrderIdBackfill(students, readSettings());
+        }
 
         // Get student IDs (as numbers for raw SQL)
         const studentIds = students.map(s => s.id);
 
-        // Fetch the assigned_guide_id column + guide info via raw SQL (bypass Prisma client type limit)
+        // ── Fetch guide info in one JOIN query ───────────────────────────────
         let guideMap = {};
         if (studentIds.length > 0) {
             const rows = await prisma.$queryRaw`
