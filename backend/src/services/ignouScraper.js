@@ -149,17 +149,25 @@ function parseGradeCardTable(html) {
 
 /**
  * Fetch and parse grade card for one student from gradecard.ignou.ac.in.
+ * type=4 → current grade card status (the correct URL parameter).
  * NOTE: programme code must NOT be URL-encoded (IGNOU rejects MCA%5FNEW; needs MCA_NEW).
  */
 async function checkGradeCard(enrollmentNo, programme) {
     const prog = normaliseProgramme(programme);
-    // Enrolment no is user input — encode it. Programme is alphanumeric+underscore — keep literal.
-    const url  = `${IGNOU_GRADECARD_URL}?eno=${encodeURIComponent(enrollmentNo)}&prog=${prog}&type=1`;
+    // type=4 is the parameter for "current grade card" — type=1 returns empty/different data
+    const url  = `${IGNOU_GRADECARD_URL}?eno=${encodeURIComponent(enrollmentNo)}&prog=${prog}&type=4`;
     const response = await axios.get(url, { timeout: HTTP_TIMEOUT_MS, headers: AXIOS_HEADERS, maxRedirects: 3 });
     const gradeCardRows     = parseGradeCardTable(response.data);
     const completedCount    = gradeCardRows.filter(r => r.isCompleted).length;
+    // Any status that isn't exactly COMPLETED counts as not completed (e.g. "NOT COMPLETED")
     const notCompletedCount = gradeCardRows.filter(r => !r.isCompleted).length;
-    return { gradeCardRows, totalCourses: gradeCardRows.length, completedCount, notCompletedCount };
+    return {
+        gradeCardRows,
+        totalCourses: gradeCardRows.length,
+        completedCount,
+        notCompletedCount,
+        noData: gradeCardRows.length === 0,
+    };
 }
 
 

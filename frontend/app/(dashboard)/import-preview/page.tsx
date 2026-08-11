@@ -1257,7 +1257,7 @@ export default function ImportPreviewPage() {
             {ignouModal && (() => {
                 const assignRows: any[]   = ignouModal.assignmentRows  || []
                 const gradeRows: any[]    = ignouModal.gradeCardRows    || []
-                const gradeCardLink = `https://gradecard.ignou.ac.in/view_gradecard.aspx?eno=${ignouModal.enrollmentNo}&prog=${ignouModal.programme}&type=1`
+                const gradeCardLink = `https://gradecard.ignou.ac.in/view_gradecard.aspx?eno=${ignouModal.enrollmentNo}&prog=${ignouModal.programme}&type=4`
                 const assignLink    = `https://isms.ignou.ac.in/changeadmdata/StatusAssignment.asp?submit=1&enrno=${ignouModal.enrollmentNo}&program=${ignouModal.programme}`
                 // Cross-reference: grade card map by course
                 const gradeMap: Record<string, any> = {}
@@ -1422,7 +1422,17 @@ export default function ImportPreviewPage() {
                                             </div>
                                         )}
 
-                                        {notCompleted.length === 0 && pendingAssign.length === 0 && (
+                                        {/* Grade card data not yet available (was checked with old bug / re-check needed) */}
+                                        {notCompleted.length === 0 && pendingAssign.length === 0 && gradeRows.length === 0 && (
+                                            <div className="text-center py-10 space-y-2">
+                                                <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-2" />
+                                                <p className="font-semibold text-amber-600 dark:text-amber-400">Grade card data not loaded</p>
+                                                <p className="text-xs text-muted-foreground">This student was checked before the grade card fix.<br />Re-run the IGNOU check to fetch the latest grade card data.</p>
+                                            </div>
+                                        )}
+
+                                        {/* Genuinely all done */}
+                                        {notCompleted.length === 0 && pendingAssign.length === 0 && gradeRows.length > 0 && (
                                             <div className="text-center py-12">
                                                 <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
                                                 <p className="font-semibold text-emerald-600 dark:text-emerald-400">All courses completed!</p>
