@@ -267,9 +267,20 @@ router.get('/meta/import-field-values', async (req, res, next) => {
 
 // Get filter options (for dropdowns) - MUST be before /:id route
 // ?scope=orders — excludes excel_import rows so Orders page only shows real order data
+// ── In-memory cache for filter options (avoids 5 DB queries on every page load) ──
+const _filtersCache = new Map(); // key → { data, expiresAt }
+const FILTERS_TTL_MS = 30_000;   // 30 seconds
+
 router.get('/meta/filters', async (req, res, next) => {
     try {
         const isOrdersScope = req.query.scope === 'orders';
+        const cacheKey = isOrdersScope ? 'orders' : 'import';
+
+        // Serve from cache if fresh
+        const cached = _filtersCache.get(cacheKey);
+        if (cached && Date.now() < cached.expiresAt) {
+            return res.json({ success: true, data: cached.data });
+        }
 
         // When called from the Orders page, exclude bulk-imported records so the
         // Programme / Regional Center lists only contain real order values.
@@ -298,10 +309,10 @@ router.get('/meta/filters', async (req, res, next) => {
                     select: { id: true, fileName: true, importedCount: true, createdAt: true },
                     orderBy: { createdAt: 'desc' },
                 }),
-            // Scan customFields for unique keys
+            // Scan customFields for unique keys — limit to excel_import to reduce rows scanned
             prisma.student.findMany({
                 select: { customFields: true },
-                where: { customFields: { not: null }, ...scopeWhere },
+                where: { customFields: { not: null }, source: 'excel_import' },
                 take: 500,
             }),
         ]);
@@ -334,22 +345,24 @@ router.get('/meta/filters', async (req, res, next) => {
         const sortedSubjects = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
         const customFieldKeys = Array.from(customFieldKeysSet).sort((a, b) => a.localeCompare(b));
 
-        res.json({
-            success: true,
-            data: {
-                programmes: sortedProgrammes,
-                regionalCenters: sortedRegionalCenters,
-                subjects: sortedSubjects,
-                customFieldKeys,
-                statuses: ['NEW_LEAD', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED', 'REPORT_IN_PROGRESS', 'SHIPPED', 'ALL_DONE'],
-                importBatches: importBatches.map(b => ({
-                    id: b.id.toString(),
-                    fileName: b.fileName,
-                    importedCount: b.importedCount,
-                    createdAt: b.createdAt,
-                })),
-            },
-        });
+        const responseData = {
+            programmes: sortedProgrammes,
+            regionalCenters: sortedRegionalCenters,
+            subjects: sortedSubjects,
+            customFieldKeys,
+            statuses: ['NEW_LEAD', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED', 'REPORT_IN_PROGRESS', 'SHIPPED', 'ALL_DONE'],
+            importBatches: importBatches.map(b => ({
+                id: b.id.toString(),
+                fileName: b.fileName,
+                importedCount: b.importedCount,
+                createdAt: b.createdAt,
+            })),
+        };
+
+        // Store in cache
+        _filtersCache.set(cacheKey, { data: responseData, expiresAt: Date.now() + FILTERS_TTL_MS });
+
+        res.json({ success: true, data: responseData });
     } catch (error) {
         next(error);
     }

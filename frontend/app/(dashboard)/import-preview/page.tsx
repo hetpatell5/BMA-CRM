@@ -330,12 +330,16 @@ export default function ImportPreviewPage() {
             const res = await studentsAPI.getAll(serverParams)
             return res.data.data
         },
+        staleTime: 10_000,
+        gcTime: 60_000,
     })
 
     // ── Filter options (import batches etc.) ───────────────────────────────
     const { data: filterOptions } = useQuery({
         queryKey: ['student-filters'],
         queryFn: async () => (await studentsAPI.getFilters()).data.data,
+        staleTime: 60_000,
+        gcTime: 120_000,
     })
 
     // ── IGNOU results — batch mode ────────────────────────────────────────────
