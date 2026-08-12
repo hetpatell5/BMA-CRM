@@ -635,6 +635,7 @@ router.post('/process/:importId', async (req, res, next) => {
             const leadsToCreate   = [];
             const batchErrors     = [];
             let   batchFailed     = 0;
+            let   batchCompareSkipped = 0; // rows skipped by compareEnrollmentSet check
 
             for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
                 const row = rows[rowIdx];
@@ -738,7 +739,7 @@ router.post('/process/:importId', async (req, res, next) => {
                             if (enrollToCheck) {
                                 const normalized = String(enrollToCheck).trim().toLowerCase();
                                 if (compareEnrollmentSet.has(normalized)) {
-                                    accumulate(0, 0, 1, 0, []);
+                                    batchCompareSkipped++; // track locally, added to accumulate at end
                                     continue;
                                 }
                             }
@@ -796,7 +797,9 @@ router.post('/process/:importId', async (req, res, next) => {
                     }
                 }
             }
-            accumulate(imp, 0, skp, batchFailed, batchErrors.slice(0, 3));
+            // batchCompareSkipped = rows filtered out before DB insert (compare-based)
+            // skp = rows that reached DB but were skipped by Prisma's skipDuplicates
+            accumulate(imp, 0, skp + batchCompareSkipped, batchFailed, batchErrors.slice(0, 3));
         }
 
         // ── Background processing: stream file & insert in batches ────────────
