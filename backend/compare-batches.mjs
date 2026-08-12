@@ -16,7 +16,7 @@ const prisma = new PrismaClient();
 async function main() {
     const [batchA, batchB] = process.argv.slice(2);
 
-    if (!batchA || !batchB) {
+    if (!batchA) {
         console.error('\nUsage: node compare-batches.mjs <batchId1> <batchId2>');
         console.error('Example: node compare-batches.mjs 12 15\n');
         console.error('To find your batch IDs, run: node compare-batches.mjs list\n');
@@ -37,6 +37,12 @@ async function main() {
         });
         console.log('');
         return;
+    }
+
+    if (!batchB) {
+        console.error('\nError: Please provide a second batch ID to compare against.');
+        console.error('Usage: node compare-batches.mjs <batchId1> <batchId2>\n');
+        process.exit(1);
     }
 
     console.log(`\n=== Comparing Batch ${batchA} vs Batch ${batchB} ===\n`);
