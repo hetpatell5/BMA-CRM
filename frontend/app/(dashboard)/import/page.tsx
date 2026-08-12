@@ -39,6 +39,7 @@ export default function ImportPage() {
     const [uploadData, setUploadData] = useState<any>(null)
     const [columnMapping, setColumnMapping] = useState<Record<string, string>>({})
     const [duplicateHandling, setDuplicateHandling] = useState<'skip' | 'update' | 'force'>('force')
+    const [compareWithBatchId, setCompareWithBatchId] = useState<string>('')
     const [progress, setProgress] = useState({ progress: 0, imported: 0, failed: 0 })
     const [result, setResult] = useState<any>(null)
     // Track which import IDs are being deleted (background delete runs after HTTP response)
@@ -218,6 +219,7 @@ export default function ImportPage() {
                 columnMapping,
                 duplicateHandling,
                 filePath: uploadData.filePath,
+                ...(duplicateHandling === 'skip' && compareWithBatchId ? { compareWithBatchId } : {}),
             })
             return response.data
         },
@@ -376,9 +378,12 @@ export default function ImportPage() {
         setStep('upload')
         setUploadData(null)
         setColumnMapping({})
+        setDuplicateHandling('force')
+        setCompareWithBatchId('')
         setProgress({ progress: 0, imported: 0, failed: 0 })
         setResult(null)
     }
+
 
     // --- MAPPING UI HELPERS ---
 
@@ -552,16 +557,50 @@ export default function ImportPage() {
                     <div className="glass rounded-xl p-6">
                         <h3 className="font-semibold mb-4">Duplicate Handling Strategy</h3>
                         <div className="flex flex-wrap items-center gap-3">
-                            <Button variant={duplicateHandling === 'force' ? 'default' : 'outline'} onClick={() => setDuplicateHandling('force')} className="gap-2">
+                            <Button variant={duplicateHandling === 'force' ? 'default' : 'outline'} onClick={() => { setDuplicateHandling('force'); setCompareWithBatchId('') }} className="gap-2">
                                 Import As-Is
                             </Button>
                             <Button variant={duplicateHandling === 'skip' ? 'default' : 'outline'} onClick={() => setDuplicateHandling('skip')} className="gap-2">
                                 Skip Duplicates
                             </Button>
-                            <Button variant={duplicateHandling === 'update' ? 'default' : 'outline'} onClick={() => setDuplicateHandling('update')} className="gap-2">
+                            <Button variant={duplicateHandling === 'update' ? 'default' : 'outline'} onClick={() => { setDuplicateHandling('update'); setCompareWithBatchId('') }} className="gap-2">
                                 Update Existing Records
                             </Button>
                         </div>
+
+                        {/* Compare-with file selector — only shown when Skip Duplicates is active */}
+                        {duplicateHandling === 'skip' && (
+                            <div className="mt-4 p-4 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                                <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-2">
+                                    Compare against which existing file?
+                                </p>
+                                <p className="text-xs text-muted-foreground mb-3">
+                                    Rows whose Enrollment Number already exists in the selected file will be skipped.
+                                    Leave blank to skip against the entire database (slower).
+                                </p>
+                                <select
+                                    id="compare-batch-select"
+                                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    value={compareWithBatchId}
+                                    onChange={e => setCompareWithBatchId(e.target.value)}
+                                >
+                                    <option value="">— Skip against full database (default) —</option>
+                                    {historyData?.imports
+                                        ?.filter((h: any) => h.status === 'COMPLETED')
+                                        ?.map((h: any) => (
+                                            <option key={h.id} value={String(h.id)}>
+                                                {h.fileName} ({h.importedCount?.toLocaleString() ?? '?'} rows)
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+                                {compareWithBatchId && (
+                                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                                        ✓ Will skip rows already present in selected file
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center justify-between pt-2">

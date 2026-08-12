@@ -532,7 +532,7 @@ router.get('/resume/:importId', async (req, res, next) => {
 router.post('/process/:importId', async (req, res, next) => {
     try {
         const { importId } = req.params;
-        const { columnMapping, duplicateHandling = 'force' } = req.body;
+        const { columnMapping, duplicateHandling = 'force', compareWithBatchId } = req.body;
 
         if (!columnMapping || Object.keys(columnMapping).length === 0) {
             return res.status(400).json({ success: false, message: 'Column mapping is required' });
@@ -565,6 +565,27 @@ router.post('/process/:importId', async (req, res, next) => {
         const io = req.app.get('io');
         const isCSVFile = /\.csv$/i.test(filePath2) || /\.csv$/i.test(importRecord.fileName || '');
         const BATCH_SIZE = 500;
+
+        // ── Build comparison Set for skip-duplicates against a specific existing batch ──
+        // If compareWithBatchId is provided AND duplicateHandling is 'skip',
+        // we load all enrollmentNo values from that batch into memory and
+        // filter them out before inserting — instead of relying on DB unique constraints.
+        let compareEnrollmentSet = null;
+        if (duplicateHandling === 'skip' && compareWithBatchId) {
+            try {
+                const compareRows = await prisma.$queryRaw`
+                    SELECT enrollment_no FROM students
+                    WHERE import_batch_id = ${BigInt(compareWithBatchId)}
+                      AND enrollment_no IS NOT NULL
+                      AND enrollment_no != ''
+                `;
+                compareEnrollmentSet = new Set(compareRows.map(r => String(r.enrollment_no).trim().toLowerCase()));
+                console.log(`[import] Loaded ${compareEnrollmentSet.size} enrollment numbers from batch ${compareWithBatchId} for duplicate comparison`);
+            } catch (cmpErr) {
+                console.error(`[import] Failed to load comparison batch ${compareWithBatchId}:`, cmpErr.message);
+                // Non-fatal: fall back to normal DB-level skip
+            }
+        }
 
         // ── processBatch: insert rows into DB with sub-batching & error logging ──
         async function processBatch(rows, hdrs, colMapping, dupHandling, record, impId, userId, accumulate) {
@@ -663,7 +684,20 @@ router.post('/process/:importId', async (req, res, next) => {
                             .forEach(k => { if (mappedData[k] != null) studentData[k] = mappedData[k]; });
                         if (mappedData.subjects && mappedData.subjects.length > 0) studentData.subjects = mappedData.subjects;
                         if (mappedData.customFields && Object.keys(mappedData.customFields).length > 0) studentData.customFields = mappedData.customFields;
+
+                        // ── Compare-batch duplicate check ──
+                        // If user chose a specific file to compare against, skip any row
+                        // whose enrollmentNo already exists in that file.
+                        if (compareEnrollmentSet && mappedData.enrollmentNo) {
+                            const normalized = String(mappedData.enrollmentNo).trim().toLowerCase();
+                            if (compareEnrollmentSet.has(normalized)) {
+                                accumulate(0, 0, 1, 0, []);
+                                continue;
+                            }
+                        }
+
                         studentsToCreate.push(studentData);
+
                     } else {
                         const srcMap = { website: 'WEBSITE', referral: 'REFERRAL', 'social media': 'SOCIAL_MEDIA', socialmedia: 'SOCIAL_MEDIA', 'walk in': 'WALK_IN', walkin: 'WALK_IN', 'phone inquiry': 'PHONE_INQUIRY', phoneinquiry: 'PHONE_INQUIRY', phone: 'PHONE_INQUIRY', manual: 'MANUAL', 'excel import': 'EXCEL_IMPORT', other: 'OTHER' };
                         const prMap  = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH', urgent: 'URGENT' };
@@ -1042,18 +1076,27 @@ router.delete('/history/:id', async (req, res, next) => {
 
 
         if (['PENDING', 'FAILED', 'PROCESSING'].includes(importRecord.status)) {
-            // For non-completed imports: just nullify batch refs and delete history record
-            await prisma.$executeRawUnsafe(
-                `UPDATE students SET import_batch_id = NULL WHERE import_batch_id = ${Number(id)}`
-            );
+            // For non-completed imports: delete any partial student rows for this batch,
+            // then delete the history record.
+            // Previously this NULLified import_batch_id instead of deleting — that left
+            // orphaned rows in the DB and caused count mismatches. Fixed here.
+            const batchIdNum = parseInt(id, 10);
+            let deletedPartial = 0;
+            try {
+                deletedPartial = await prisma.$executeRaw`DELETE FROM students WHERE import_batch_id = ${batchIdNum}`;
+            } catch (delErr) {
+                console.error(`[delete-import] Failed to delete partial rows for batch ${batchIdNum}:`, delErr.message);
+            }
             await prisma.importHistory.delete({ where: { id: BigInt(id) } });
+            console.log(`[delete-import] Deleted ${deletedPartial} partial rows + history record for batch ${batchIdNum}`);
 
             return res.json({
                 success: true,
-                message: 'Import record deleted successfully',
-                data: { deletedOrdersCount: 0 },
+                message: 'Import record and any partial data deleted successfully',
+                data: { deletedOrdersCount: deletedPartial },
             });
         }
+
 
         // deleteRecords=false on a COMPLETED import ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â not allowed
         return res.status(400).json({
