@@ -1036,7 +1036,8 @@ router.get('/', async (req, res, next) => {
         // MySQL JSON sorts object keys alphabetically, breaking display order.
         // We stored the original header order in importHistory.columnMapping._columnOrder at import time.
         // Priority: explicit query param batch > single importBatchIds param > first student's batch
-        let columnOrder: string[] | null = null;
+        let columnOrder = null;
+
         const explicitBatchId =
             importBatchId ||
             (req.query.importBatchIds?.split(',').filter(Boolean).length === 1
