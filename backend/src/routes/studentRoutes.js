@@ -1001,10 +1001,8 @@ router.get('/', async (req, res, next) => {
             }
         }
 
-        // ── Run count + findMany in parallel (saves 1-2 seconds) ─────────────
-        // Also fetch batch column order if filtering by a single importBatch
-        const batchId = importBatchId || (req.query.importBatchIds?.split(',').length === 1 ? req.query.importBatchIds : null);
-        const [total, students, batchRecord] = await Promise.all([
+        // ── Run count + findMany in parallel ──────────────────────────────────────
+        const [total, students] = await Promise.all([
             prisma.student.count({ where }),
             prisma.student.findMany({
                 where,
@@ -1029,22 +1027,37 @@ router.get('/', async (req, res, next) => {
                     customFields: true,
                     source: true,
                     createdAt: true,
+                    importBatchId: true,  // needed to resolve column order when no batch filter is set
                 },
             }),
-            // Fetch batch column order when a single batch is selected
-            batchId ? prisma.importHistory.findUnique({
-                where: { id: BigInt(batchId) },
-                select: { columnMapping: true },
-            }) : Promise.resolve(null),
         ]);
 
-        // Extract column order from batch record (stored as columnMapping._columnOrder)
-        const columnOrder = (() => {
-            if (!batchRecord?.columnMapping) return null;
-            const cm = batchRecord.columnMapping;
-            if (Array.isArray(cm._columnOrder) && cm._columnOrder.length > 0) return cm._columnOrder;
-            return null;
-        })();
+        // ── Resolve column order from importHistory ────────────────────────────
+        // MySQL JSON sorts object keys alphabetically, breaking display order.
+        // We stored the original header order in importHistory.columnMapping._columnOrder at import time.
+        // Priority: explicit query param batch > single importBatchIds param > first student's batch
+        let columnOrder: string[] | null = null;
+        const explicitBatchId =
+            importBatchId ||
+            (req.query.importBatchIds?.split(',').filter(Boolean).length === 1
+                ? req.query.importBatchIds.split(',')[0].trim()
+                : null);
+        const fallbackBatchId = !explicitBatchId && students.length > 0 && students[0].importBatchId
+            ? students[0].importBatchId.toString()
+            : null;
+        const effectiveBatchId = explicitBatchId || fallbackBatchId;
+        if (effectiveBatchId) {
+            try {
+                const batchRecord = await prisma.importHistory.findUnique({
+                    where: { id: BigInt(effectiveBatchId) },
+                    select: { columnMapping: true },
+                });
+                const cm = batchRecord?.columnMapping;
+                if (cm && Array.isArray(cm._columnOrder) && cm._columnOrder.length > 0) {
+                    columnOrder = cm._columnOrder;
+                }
+            } catch (_) { /* column order unavailable — fall back to alphabetical */ }
+        }
 
         // ── Skip backfill for excel_import (telecaller data) ─────────────────
         // excel_import records don't need order IDs generated; skipping avoids

@@ -192,6 +192,7 @@ export const importAPI = {
     delete: (importId: string, deleteRecords?: boolean) => api.delete(`/import/history/${importId}`, { params: { deleteRecords } }),
     resume: (importId: string) => api.get(`/import/resume/${importId}`),
     getDetails: (importId: string) => api.get(`/import/history/${importId}`),
+    liveProgress: (importId: string) => api.get(`/import/live-progress/${importId}`),
     saveMapping: (confirmedMappings: Record<string, string>) => api.post('/import/save-mapping', { confirmedMappings }),
     uploadChunk: (uploadId: string, chunkIndex: number, totalChunks: number, chunk: Blob, fileName: string) => {
         const fd = new FormData()

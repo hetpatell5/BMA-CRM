@@ -13,6 +13,14 @@ import { readSettings } from './appSettingsRoutes.js';
 
 const router = express.Router();
 
+// ── In-memory live progress cache ────────────────────────────────────────────
+// The DB only stores importedCount at the END of an import, so HTTP polling
+// would always see 0% until completion. This cache stores live counts from
+// the streaming processor so polling clients get real intermediate progress.
+// Entries auto-delete 5 minutes after completion to avoid memory leaks.
+const importProgressCache = new Map(); // importId (string) → { progress, imported, failed, skipped, updated, status }
+
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -718,14 +726,23 @@ router.post('/process/:importId', async (req, res, next) => {
                 const total = Number(importRecord.totalRecords) || 1;
                 const done  = imported + failed + skipped;
                 const pct   = Math.min(99, Math.round((done / total) * 100));
-                io?.to(importId).emit('import-progress', { progress: pct, imported, failed, skipped, updated });
+                const payload = { progress: pct, imported, failed, skipped, updated, status: 'PROCESSING' };
+                io?.to(importId).emit('import-progress', payload);
+                // Also write to in-memory cache so HTTP polling gets live intermediate progress
+                // (the DB only stores importedCount at the very end of the import)
+                importProgressCache.set(String(importId), payload);
             };
+
+            // Seed cache immediately with PROCESSING status so the first HTTP poll
+            // gets a valid response even before ExcelJS finishes loading shared strings
+            importProgressCache.set(String(importId), { progress: 0, imported: 0, failed: 0, skipped: 0, updated: 0, status: 'PROCESSING' });
 
             // Emit immediately so frontend shows 0% right away — not a blank spinner.
             // ExcelJS takes 20-30s to cache shared strings for large XLSX before first row arrives.
             emitProgress();
             // Heartbeat: emit progress every 2s during file reading + row processing
             const heartbeat = setInterval(emitProgress, 2000);
+
 
             try {
                 if (isCSVFile) {
@@ -832,6 +849,13 @@ router.post('/process/:importId', async (req, res, next) => {
                 // ── Finalization ─────────────────────────────────────────────────
                 clearInterval(heartbeat);
 
+                // Mark cache as COMPLETED with final counts so any in-flight poll gets 100%
+                importProgressCache.set(String(importId), {
+                    progress: 100, imported, updated, skipped, failed, status: 'COMPLETED',
+                });
+                // Auto-cleanup after 5 min to avoid unbounded memory growth
+                setTimeout(() => importProgressCache.delete(String(importId)), 5 * 60 * 1000);
+
                 // Signal completion to frontend FIRST (before slow DB update)
                 io?.to(importId).emit('import-complete', { importId, imported, updated, skipped, failed });
 
@@ -878,7 +902,40 @@ router.post('/process/:importId', async (req, res, next) => {
 
 
 // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Save confirmed column mappings to learning memory ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+// ── Live progress endpoint (HTTP polling fallback) ────────────────────────────
+// Reads from in-memory cache written by the streaming processor every 2s.
+// This gives real intermediate progress without requiring WebSocket connectivity.
+router.get('/live-progress/:importId', async (req, res, next) => {
+    try {
+        const { importId } = req.params;
+        const cached = importProgressCache.get(String(importId));
+        if (cached) {
+            return res.json({ success: true, data: cached });
+        }
+        // Cache miss: fall back to DB status (handles page refreshes after completion)
+        const record = await prisma.importHistory.findUnique({
+            where: { id: BigInt(importId) },
+            select: { status: true, totalRecords: true, importedCount: true, failedCount: true, skippedCount: true, updatedCount: true },
+        });
+        if (!record) return res.status(404).json({ success: false, message: 'Import not found' });
+        const total = Number(record.totalRecords) || 1;
+        const done  = (record.importedCount || 0) + (record.failedCount || 0) + (record.skippedCount || 0);
+        const progress = record.status === 'COMPLETED' ? 100 : Math.min(99, Math.round((done / total) * 100));
+        res.json({ success: true, data: {
+            progress,
+            imported: record.importedCount || 0,
+            failed: record.failedCount || 0,
+            skipped: record.skippedCount || 0,
+            updated: record.updatedCount || 0,
+            status: record.status,
+        }});
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.post('/save-mapping', async (req, res, next) => {
+
     try {
         const { confirmedMappings } = req.body;
         // confirmedMappings: { [originalHeader: string]: fieldName: string }

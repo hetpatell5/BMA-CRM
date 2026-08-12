@@ -328,38 +328,30 @@ export default function ImportPage() {
                 console.error('Socket connection error:', error)
             })
 
-            // Polling fallback — catches progress when socket events are missed (e.g., page refresh, reconnect)
+            // Polling fallback — reads from the server's in-memory live cache (updated every 2s by the processor)
+            // This gives real intermediate progress even when socket events are missed
             const pollInterval = setInterval(async () => {
                 try {
-                    const response = await importAPI.getDetails(uploadData.importId)
-                    const importData = response.data.data
+                    const response = await importAPI.liveProgress(uploadData.importId)
+                    const liveData = response.data.data
 
-                    if (importData) {
-                        const total = importData.totalRecords || 1
-                        const processed = (importData.importedCount || 0) + (importData.skippedCount || 0) + (importData.failedCount || 0)
-
-                        if (importData.status === 'COMPLETED') {
-                            // Use 100% on COMPLETED — don't cap at 99%
-                            setProgress({
-                                progress: 100,
-                                imported: importData.importedCount || 0,
-                                failed: importData.failedCount || 0,
-                            })
+                    if (liveData) {
+                        if (liveData.status === 'COMPLETED') {
+                            setProgress({ progress: 100, imported: liveData.imported || 0, failed: liveData.failed || 0 })
                             if (!result) {
-                                setResult({ imported: importData.importedCount, failed: importData.failedCount })
+                                setResult({ imported: liveData.imported, failed: liveData.failed })
                                 setStep('complete')
                                 refetchHistory()
                             }
                             clearInterval(pollInterval)
-                        } else if (importData.status === 'FAILED') {
+                        } else if (liveData.status === 'FAILED') {
                             clearInterval(pollInterval)
                         } else {
-                            // Still in progress — show real percentage, capped at 99%
-                            const progressPercent = Math.min(Math.round((processed / total) * 100), 99)
+                            // Live intermediate progress from in-memory cache
                             setProgress(prev => ({
-                                progress: Math.max(prev.progress, progressPercent),
-                                imported: Math.max(prev.imported, importData.importedCount || 0),
-                                failed: Math.max(prev.failed, importData.failedCount || 0),
+                                progress: Math.max(prev.progress, liveData.progress || 0),
+                                imported: Math.max(prev.imported, liveData.imported || 0),
+                                failed: Math.max(prev.failed, liveData.failed || 0),
                             }))
                         }
                     }
@@ -367,6 +359,7 @@ export default function ImportPage() {
                     console.error('Polling error:', error)
                 }
             }, 2000)
+
 
             return () => {
                 socket.disconnect()
