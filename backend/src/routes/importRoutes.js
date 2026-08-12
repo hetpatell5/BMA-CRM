@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -721,8 +721,11 @@ router.post('/process/:importId', async (req, res, next) => {
                 io?.to(importId).emit('import-progress', { progress: pct, imported, failed, skipped, updated });
             };
 
-            // Heartbeat: emit progress every 3s even while reading large XLSX header
-            const heartbeat = setInterval(emitProgress, 3000);
+            // Emit immediately so frontend shows 0% right away — not a blank spinner.
+            // ExcelJS takes 20-30s to cache shared strings for large XLSX before first row arrives.
+            emitProgress();
+            // Heartbeat: emit progress every 2s during file reading + row processing
+            const heartbeat = setInterval(emitProgress, 2000);
 
             try {
                 if (isCSVFile) {
@@ -758,7 +761,19 @@ router.post('/process/:importId', async (req, res, next) => {
                     for await (const line of rl) {
                         const cleanLine = csvHeaders ? line : line.replace(/^\uFEFF/, '');
                         if (!cleanLine.trim()) continue;
-                        if (!csvHeaders) { csvHeaders = parseCSVLine(cleanLine); continue; }
+                        if (!csvHeaders) {
+                            csvHeaders = parseCSVLine(cleanLine);
+                            // ── Persist original column order to importHistory ──────────
+                            // MySQL JSON stores keys alphabetically, breaking display order.
+                            // Saving _columnOrder here (once per import, not per row) lets
+                            // the frontend restore the correct original column sequence.
+                            const cleanHeaders = csvHeaders.map(h => String(h ?? '').trim()).filter(Boolean);
+                            prisma.importHistory.update({
+                                where: { id: BigInt(importId) },
+                                data: { columnMapping: { ...(columnMapping || {}), _columnOrder: cleanHeaders } },
+                            }).catch(e => console.error('[Import] Failed to save _columnOrder:', e.message));
+                            continue;
+                        }
                         batch.push(parseCSVLine(line));
                         if (batch.length >= BATCH_SIZE) { await flushCSV(batch, csvHeaders); batch = []; }
                     }
@@ -793,6 +808,15 @@ router.post('/process/:importId', async (req, res, next) => {
                             if (xlsHeaders === null) {
                                 if (rowArr.some(c => String(c ?? '').trim() !== '')) {
                                     xlsHeaders = rowArr.map(h => String(h ?? '').trim());
+                                    // ── Persist original column order to importHistory ──────────
+                                    // MySQL JSON stores keys alphabetically, breaking display order.
+                                    // Saving _columnOrder here (once per import, not per row) lets
+                                    // the frontend restore the correct original column sequence.
+                                    const cleanHeaders = xlsHeaders.filter(Boolean);
+                                    prisma.importHistory.update({
+                                        where: { id: BigInt(importId) },
+                                        data: { columnMapping: { ...(columnMapping || {}), _columnOrder: cleanHeaders } },
+                                    }).catch(e => console.error('[Import] Failed to save _columnOrder:', e.message));
                                 }
                                 continue;
                             }

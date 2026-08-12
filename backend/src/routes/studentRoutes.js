@@ -1002,7 +1002,9 @@ router.get('/', async (req, res, next) => {
         }
 
         // ── Run count + findMany in parallel (saves 1-2 seconds) ─────────────
-        const [total, students] = await Promise.all([
+        // Also fetch batch column order if filtering by a single importBatch
+        const batchId = importBatchId || (req.query.importBatchIds?.split(',').length === 1 ? req.query.importBatchIds : null);
+        const [total, students, batchRecord] = await Promise.all([
             prisma.student.count({ where }),
             prisma.student.findMany({
                 where,
@@ -1029,7 +1031,20 @@ router.get('/', async (req, res, next) => {
                     createdAt: true,
                 },
             }),
+            // Fetch batch column order when a single batch is selected
+            batchId ? prisma.importHistory.findUnique({
+                where: { id: BigInt(batchId) },
+                select: { columnMapping: true },
+            }) : Promise.resolve(null),
         ]);
+
+        // Extract column order from batch record (stored as columnMapping._columnOrder)
+        const columnOrder = (() => {
+            if (!batchRecord?.columnMapping) return null;
+            const cm = batchRecord.columnMapping;
+            if (Array.isArray(cm._columnOrder) && cm._columnOrder.length > 0) return cm._columnOrder;
+            return null;
+        })();
 
         // ── Skip backfill for excel_import (telecaller data) ─────────────────
         // excel_import records don't need order IDs generated; skipping avoids
@@ -1107,6 +1122,8 @@ router.get('/', async (req, res, next) => {
                     total,
                     totalPages: Math.ceil(total / limitNum),
                 },
+                // Column order for import-preview display — overrides MySQL's alphabetical JSON key sorting
+                columnOrder: columnOrder || null,
             },
         });
     } catch (error) {

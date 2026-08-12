@@ -49,11 +49,16 @@ function isInternalKey(key: string) {
     return key.startsWith('_') || INTERNAL_KEYS.has(normalizeKey(key))
 }
 
-function collectCustomFieldColumns(students: any[]): string[] {
-    let columnOrder: string[] | null = null
-    for (const s of students) {
-        const order = s.customFields?._columnOrder
-        if (Array.isArray(order) && order.length > 0) { columnOrder = order; break }
+function collectCustomFieldColumns(students: any[], columnOrder?: string[] | null): string[] {
+    // Prefer columnOrder from the API response (stored in importHistory.columnMapping._columnOrder)
+    // MySQL sorts JSON keys alphabetically, so we cannot rely on per-student customFields key order.
+    // Fall back to per-student _columnOrder for backwards-compat with older imports.
+    let resolvedOrder: string[] | null = columnOrder && columnOrder.length > 0 ? columnOrder : null
+    if (!resolvedOrder) {
+        for (const s of students) {
+            const order = s.customFields?._columnOrder
+            if (Array.isArray(order) && order.length > 0) { resolvedOrder = order; break }
+        }
     }
     const allKeys = new Set<string>()
     students.forEach(s => {
@@ -63,10 +68,10 @@ function collectCustomFieldColumns(students: any[]): string[] {
             })
         }
     })
-    if (columnOrder) {
+    if (resolvedOrder) {
         const ordered: string[] = []
         const remaining = new Set(allKeys)
-        for (const h of columnOrder) {
+        for (const h of resolvedOrder) {
             const t = h.trim()
             if (allKeys.has(t)) { ordered.push(t); remaining.delete(t) }
         }
@@ -381,18 +386,22 @@ export default function ImportPreviewPage() {
     // ── Derived ────────────────────────────────────────────────────────────
     const students: any[]   = data?.students || []
     const pagination        = data?.pagination || { page: 1, totalPages: 1, total: 0 }
-    const customFieldCols   = collectCustomFieldColumns(students)
+    // columnOrder from the API = importHistory.columnMapping._columnOrder (set at import time).
+    // MySQL JSON sorts keys alphabetically, so per-student customFields key order is unreliable.
+    const batchColumnOrder: string[] | null = (data?.columnOrder && Array.isArray(data.columnOrder) && data.columnOrder.length > 0)
+        ? data.columnOrder
+        : null
+    const customFieldCols   = collectCustomFieldColumns(students, batchColumnOrder)
 
-    // Columns eligible for adaptive filtering: from _columnOrder, minus known unique-per-row identity columns
+    // Columns eligible for adaptive filtering: use the same authoritative column order
     const filterableCols = useMemo(() => {
-        let cols: string[] = customFieldCols
-        for (const s of students) {
-            const order = s.customFields?._columnOrder
-            if (Array.isArray(order) && order.length > 0) { cols = order as string[]; break }
-        }
+        const cols = batchColumnOrder && batchColumnOrder.length > 0
+            ? batchColumnOrder
+            : customFieldCols
         // Strip out identity columns that are useless as filters (always unique per row)
         return cols.filter(col => !isNonFilterableCol(col))
-    }, [students, customFieldCols])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [students, customFieldCols, batchColumnOrder])
 
     const activeFilterCount =
         (importBatchIds.size > 0 ? importBatchIds.size : 0) +
