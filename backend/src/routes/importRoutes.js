@@ -567,20 +567,62 @@ router.post('/process/:importId', async (req, res, next) => {
         const BATCH_SIZE = 500;
 
         // ── Build comparison Set for skip-duplicates against a specific existing batch ──
-        // If compareWithBatchId is provided AND duplicateHandling is 'skip',
-        // we load all enrollmentNo values from that batch into memory and
-        // filter them out before inserting — instead of relying on DB unique constraints.
+        // Checks both the standard enrollment_no column AND custom_fields JSON,
+        // because older imports may have stored enrollment number as a custom field.
         let compareEnrollmentSet = null;
         if (duplicateHandling === 'skip' && compareWithBatchId) {
             try {
-                const compareRows = await prisma.$queryRaw`
+                const bigCmpId = BigInt(compareWithBatchId);
+
+                // Step 1: try standard enrollment_no column
+                const stdSample = await prisma.$queryRaw`
                     SELECT enrollment_no FROM students
-                    WHERE import_batch_id = ${BigInt(compareWithBatchId)}
-                      AND enrollment_no IS NOT NULL
-                      AND enrollment_no != ''
+                    WHERE import_batch_id = ${bigCmpId}
+                      AND enrollment_no IS NOT NULL AND enrollment_no != ''
+                    LIMIT 1
                 `;
-                compareEnrollmentSet = new Set(compareRows.map(r => String(r.enrollment_no).trim().toLowerCase()));
-                console.log(`[import] Loaded ${compareEnrollmentSet.size} enrollment numbers from batch ${compareWithBatchId} for duplicate comparison`);
+
+                let cmpRows = [];
+                let cmpSource = 'none';
+
+                if (stdSample.length > 0) {
+                    cmpRows = await prisma.$queryRaw`
+                        SELECT enrollment_no as enroll FROM students
+                        WHERE import_batch_id = ${bigCmpId}
+                          AND enrollment_no IS NOT NULL AND enrollment_no != ''
+                    `;
+                    cmpSource = 'enrollment_no';
+                } else {
+                    // Step 2: try common key names inside custom_fields JSON
+                    const customKeys = ['Enrolment Number', 'Enrollment Number', 'enrollmentNo', 'ENROLMENT NUMBER', 'ENROLLMENT NUMBER'];
+                    for (const key of customKeys) {
+                        const jsonPath = `$."${key}"`;
+                        const sample = await prisma.$queryRaw`
+                            SELECT JSON_UNQUOTE(JSON_EXTRACT(custom_fields, ${jsonPath})) as enroll
+                            FROM students
+                            WHERE import_batch_id = ${bigCmpId}
+                              AND JSON_EXTRACT(custom_fields, ${jsonPath}) IS NOT NULL
+                              AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, ${jsonPath})) != ''
+                              AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, ${jsonPath})) != 'null'
+                            LIMIT 1
+                        `;
+                        if (sample.length > 0) {
+                            cmpRows = await prisma.$queryRaw`
+                                SELECT JSON_UNQUOTE(JSON_EXTRACT(custom_fields, ${jsonPath})) as enroll
+                                FROM students
+                                WHERE import_batch_id = ${bigCmpId}
+                                  AND JSON_EXTRACT(custom_fields, ${jsonPath}) IS NOT NULL
+                                  AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, ${jsonPath})) != ''
+                                  AND JSON_UNQUOTE(JSON_EXTRACT(custom_fields, ${jsonPath})) != 'null'
+                            `;
+                            cmpSource = `custom_fields["${key}"]`;
+                            break;
+                        }
+                    }
+                }
+
+                compareEnrollmentSet = new Set(cmpRows.map(r => String(r.enroll).trim().toLowerCase()));
+                console.log(`[import] Loaded ${compareEnrollmentSet.size} enrollment numbers from batch ${compareWithBatchId} (source: ${cmpSource}) for duplicate comparison`);
             } catch (cmpErr) {
                 console.error(`[import] Failed to load comparison batch ${compareWithBatchId}:`, cmpErr.message);
                 // Non-fatal: fall back to normal DB-level skip
@@ -686,13 +728,19 @@ router.post('/process/:importId', async (req, res, next) => {
                         if (mappedData.customFields && Object.keys(mappedData.customFields).length > 0) studentData.customFields = mappedData.customFields;
 
                         // ── Compare-batch duplicate check ──
-                        // If user chose a specific file to compare against, skip any row
-                        // whose enrollmentNo already exists in that file.
-                        if (compareEnrollmentSet && mappedData.enrollmentNo) {
-                            const normalized = String(mappedData.enrollmentNo).trim().toLowerCase();
-                            if (compareEnrollmentSet.has(normalized)) {
-                                accumulate(0, 0, 1, 0, []);
-                                continue;
+                        // Check enrollment from: standard field OR custom_fields of the incoming row
+                        if (compareEnrollmentSet) {
+                            const enrollToCheck =
+                                mappedData.enrollmentNo ||
+                                mappedData.customFields?.['Enrolment Number'] ||
+                                mappedData.customFields?.['Enrollment Number'] ||
+                                mappedData.customFields?.['enrollmentNo'];
+                            if (enrollToCheck) {
+                                const normalized = String(enrollToCheck).trim().toLowerCase();
+                                if (compareEnrollmentSet.has(normalized)) {
+                                    accumulate(0, 0, 1, 0, []);
+                                    continue;
+                                }
                             }
                         }
 
