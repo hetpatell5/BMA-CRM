@@ -5,7 +5,7 @@ import prisma from '../config/database.js';
 // During large imports many concurrent requests are made; without this the
 // prisma connection pool gets exhausted and auth fails with a 500.
 const USER_CACHE = new Map(); // userId → { role, staffRole, status, cachedAt }
-const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds — short enough that role changes apply without logout
 
 async function getCachedUser(userId) {
     const cached = USER_CACHE.get(userId);

@@ -275,7 +275,8 @@ const FILTERS_TTL_MS = 5 * 60_000; // 5 minutes — filter data rarely changes m
 router.get('/meta/filters', async (req, res, next) => {
     try {
         const isOrdersScope = req.query.scope === 'orders';
-        const cacheKey = isOrdersScope ? 'orders' : 'import';
+        // myAssignedBatches is user-specific, so cache key includes user ID
+        const cacheKey = isOrdersScope ? 'orders' : `import_${req.user.id}`;
 
         // Serve from cache if fresh
         const cached = _filtersCache.get(cacheKey);
@@ -283,18 +284,29 @@ router.get('/meta/filters', async (req, res, next) => {
             return res.json({ success: true, data: cached.data });
         }
 
+
         let responseData;
 
         if (!isOrdersScope) {
             // ── Import / Data page scope ─────────────────────────────────────
-            // Only importBatches is needed here — column filter options come
-            // from the student records themselves (collectCustomFieldColumns).
-            // Running the other 4 queries here wastes 3-5 seconds for nothing.
+            // importBatches = all files (for admin/manager "Imported Files" section)
+            // myAssignedBatches = files where this user has records assigned to them (all roles)
             const importBatches = await prisma.importHistory.findMany({
                 where: { status: 'COMPLETED', importType: 'STUDENTS' },
                 select: { id: true, fileName: true, importedCount: true, createdAt: true },
                 orderBy: { createdAt: 'desc' },
             });
+
+            // For "My Assigned Files" — find distinct batches where assigned_by_id = current user
+            const assignedBatchRows = await prisma.$queryRaw`
+                SELECT DISTINCT ih.id, ih.file_name as fileName, ih.imported_count as importedCount, ih.created_at as createdAt
+                FROM students s
+                INNER JOIN import_history ih ON ih.id = s.import_batch_id
+                WHERE s.assigned_by_id = ${req.user.id}
+                  AND s.source = 'excel_import'
+                  AND s.import_batch_id IS NOT NULL
+                ORDER BY ih.created_at DESC
+            `;
 
             responseData = {
                 programmes: [],
@@ -308,7 +320,14 @@ router.get('/meta/filters', async (req, res, next) => {
                     importedCount: b.importedCount,
                     createdAt: b.createdAt,
                 })),
+                myAssignedBatches: assignedBatchRows.map(b => ({
+                    id: b.id.toString(),
+                    fileName: b.fileName,
+                    importedCount: Number(b.importedCount),
+                    createdAt: b.createdAt,
+                })),
             };
+
         } else {
             // ── Orders page scope — run full queries ─────────────────────────
             const scopeWhere = { NOT: { source: 'excel_import' } };
@@ -970,11 +989,18 @@ router.get('/', async (req, res, next) => {
         if (req.user.role === 'STAFF' && !isTelecaller) {
             where.assignedGuideId = req.user.id;
         }
-        // Telecallers on the Data page: only see excel_import records assigned to them.
-        // We use the assigned_by_id column directly — simple integer equality, no JSON needed.
+        // assignedToMe=true: any role can request to see ONLY their segregated records.
+        // Telecallers on the Data page: this is always enforced (they can only see their rows).
+        // Admins/Managers: only applied when they explicitly request it via "My Assigned Files" filter.
+        const assignedToMe = req.query.assignedToMe === 'true';
         if (isTelecaller && where.source === 'excel_import') {
+            // Telecallers always see only their assigned rows
+            where.assignedById = req.user.id;
+        } else if (assignedToMe && where.source === 'excel_import') {
+            // Admin/Manager explicitly chose "My Assigned Files"
             where.assignedById = req.user.id;
         }
+
 
         // Apply custom field filters (Programme, Regional Center, etc.)
         // Works for all roles — ANDed with any existing where conditions.

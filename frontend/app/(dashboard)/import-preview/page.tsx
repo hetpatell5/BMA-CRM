@@ -246,6 +246,8 @@ export default function ImportPreviewPage() {
         const bid = searchParams.get('importBatchId') || searchParams.get('batchId') || ''
         return bid ? new Set([bid]) : new Set()
     })
+    // When true, the selected batchIds are from "My Assigned Files" — adds assignedToMe=true to query
+    const [assignedToMe, setAssignedToMe] = useState(false)
     // { "Regional Center": new Set(["Mumbai","Delhi"]), ... }
     const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({})
     const [filterSearch, setFilterSearch] = useState('')
@@ -312,6 +314,11 @@ export default function ImportPreviewPage() {
             p.importBatchIds = Array.from(importBatchIds).join(',')
         }
 
+        // If user is viewing their assigned files, restrict results to their rows
+        if (assignedToMe && importBatchIds.size > 0) {
+            p.assignedToMe = 'true'
+        }
+
         // Pass customField filters — skip when all values for a column are selected
         // (all selected = no filter; also prevents massive IN() causing MySQL timeouts)
         const cfParams: Record<string, string> = {}
@@ -325,7 +332,7 @@ export default function ImportPreviewPage() {
 
         return p
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, debouncedSearch, importBatchIds, activeFilters])
+    }, [page, debouncedSearch, importBatchIds, activeFilters, assignedToMe])
 
 
     // ── Main data query (server-side pagination) ───────────────────────────
@@ -421,13 +428,26 @@ export default function ImportPreviewPage() {
         })
     }
 
-    const clearAllFilters = () => { setImportBatchIds(new Set()); setActiveFilters({}) }
+    const clearAllFilters = () => { setImportBatchIds(new Set()); setActiveFilters({}); setAssignedToMe(false) }
 
-    // Toggle a batch ID in/out of the multi-select set
+    // Toggle a batch ID in/out of the multi-select set (for "All Imported Files" section)
     const toggleBatchId = (id: string) => {
+        setAssignedToMe(false) // switching to all-files mode
         setImportBatchIds(prev => {
             const next = new Set(prev)
             if (next.has(id)) next.delete(id); else next.add(id)
+            return next
+        })
+    }
+
+    // Toggle a batch ID in the "My Assigned Files" section
+    const toggleMyBatchId = (id: string) => {
+        setAssignedToMe(true)
+        setImportBatchIds(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id); else next.add(id)
+            // If nothing selected in my-assigned section, clear assignedToMe flag too
+            if (next.size === 0) setAssignedToMe(false)
             return next
         })
     }
@@ -1007,6 +1027,53 @@ export default function ImportPreviewPage() {
                         )}
 
                         <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
+                            {/* ── My Assigned Files — visible to ALL roles ── */}
+                            {filterOptions?.myAssignedBatches?.length > 0 && (
+                                <div>
+                                    <button
+                                        className="w-full flex items-center justify-between px-2 py-2 text-xs font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
+                                        onClick={() => toggleSection('myAssigned')}
+                                    >
+                                        <span className="flex items-center gap-1.5">
+                                            <Users className="w-3.5 h-3.5" />
+                                            My Assigned Files
+                                            {assignedToMe && importBatchIds.size > 0 && (
+                                                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 text-[10px] font-bold">
+                                                    {importBatchIds.size}
+                                                </span>
+                                            )}
+                                        </span>
+                                        <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', openSections.myAssigned && 'rotate-180')} />
+                                    </button>
+                                    {openSections.myAssigned && (
+                                        <div className="space-y-0.5 mb-3">
+                                            <p className="px-2 py-1 text-[10px] text-muted-foreground italic">
+                                                Files with data assigned to you
+                                            </p>
+                                            {filterOptions.myAssignedBatches
+                                                .filter((b: any) => !filterSearch || b.fileName.toLowerCase().includes(filterSearch.toLowerCase()))
+                                                .map((batch: any) => {
+                                                    const isActive = assignedToMe && importBatchIds.has(batch.id)
+                                                    return (
+                                                        <label key={`my_${batch.id}`} className={cn('flex items-start gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors', isActive ? 'bg-violet-50 dark:bg-violet-500/10' : 'hover:bg-slate-100 dark:hover:bg-white/5')}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isActive}
+                                                                onChange={() => toggleMyBatchId(batch.id)}
+                                                                className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 accent-violet-500 cursor-pointer shrink-0"
+                                                            />
+                                                            <div className="min-w-0">
+                                                                <p className="text-[13px] font-medium leading-tight truncate text-foreground">{batch.fileName}</p>
+                                                                <p className="text-[11px] text-muted-foreground mt-0.5">Your assigned records</p>
+                                                            </div>
+                                                        </label>
+                                                    )
+                                                })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
             {/* Import Batches — multi-select with Select All (Admin/Manager only, not telecallers) */}
                             {!isTelecaller && filterOptions?.importBatches?.length > 0 && (
                                 <div>
