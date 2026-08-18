@@ -315,10 +315,14 @@ export const followUpsAPI = {
     create: (data: any) => api.post('/follow-ups', data),
     update: (id: string, data: any) => api.put(`/follow-ups/${id}`, data),
     remove: (id: string) => api.delete(`/follow-ups/${id}`),
+    /** Create a follow-up from a Data page student row (name/phone auto-filled by backend) */
+    createFromStudent: (studentId: string, data: { description: string; requirement: string; followupDate: string }) =>
+        api.post(`/follow-ups/from-student/${studentId}`, data),
     // Admin-only
     getStats: () => api.get('/follow-ups/stats'),
     getTeamToday: () => api.get('/follow-ups/team-today'),
 }
+
 
 // IGNOU Assignment Status Checker API
 export const ignouAPI = {

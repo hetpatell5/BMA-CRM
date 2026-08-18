@@ -8,10 +8,11 @@ import {
     ChevronDown, X, SlidersHorizontal, FolderOpen,
     ArrowUpCircle, Download, Tag, GraduationCap,
     CheckCircle2, AlertTriangle, Loader2, ExternalLink, XCircle, ShoppingBag,
+    BellRing, Phone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { studentsAPI, ignouAPI, teamAPI } from '@/lib/api'
+import { studentsAPI, ignouAPI, teamAPI, followUpsAPI } from '@/lib/api'
 import { formatNumber, debounce } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useConfirm } from '@/components/ui/confirm-provider'
@@ -19,6 +20,7 @@ import { useAuthStore } from '@/stores/authStore'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { io as socketIO } from 'socket.io-client'
+import RichTextEditor from '@/components/RichTextEditor'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 // Columns that are unique per-row — never useful as filters
@@ -258,6 +260,64 @@ export default function ImportPreviewPage() {
     const [segregatePreview, setSegregatePreview]     = useState<any[] | null>(null)
     const [selectedAssignees, setSelectedAssignees]   = useState<number[]>([])
     const [segregateLoading, setSegregateLoading]     = useState(false)
+
+    // ── Follow-up modal state ──────────────────────────────────────────────────
+    const [followUpStudent, setFollowUpStudent] = useState<any | null>(null)  // the student row being followed up
+    const [fuDate, setFuDate]           = useState('')
+    const [fuDescription, setFuDescription] = useState('')
+    const [fuRequirement, setFuRequirement] = useState('')
+    const [fuLoading, setFuLoading]     = useState(false)
+
+    const openFollowUpModal = (student: any) => {
+        setFollowUpStudent(student)
+        setFuDate('')
+        setFuDescription('')
+        setFuRequirement('')
+    }
+    const closeFollowUpModal = () => setFollowUpStudent(null)
+
+    const handleSaveFollowUp = async () => {
+        if (!followUpStudent || !fuDate || !fuDescription || !fuRequirement) return
+        try {
+            setFuLoading(true)
+            await followUpsAPI.createFromStudent(String(followUpStudent.id), {
+                description: fuDescription,
+                requirement: fuRequirement,
+                followupDate: fuDate,
+            })
+            toast({ title: '✅ Follow-up added!', description: 'The record has been moved to the Follow-ups page.' })
+            closeFollowUpModal()
+            queryClient.invalidateQueries({ queryKey: ['import-preview'] })
+        } catch (err: any) {
+            toast({ title: 'Failed', description: err?.response?.data?.error || 'Could not add follow-up.', variant: 'destructive' })
+        } finally {
+            setFuLoading(false)
+        }
+    }
+
+    // Helper: extract display name + phone from a student row (mirrors backend logic)
+    const extractStudentContact = (student: any) => {
+        const cf = student.customFields || {}
+        let name = student.fullName || ''
+        if (!name) {
+            const nameKeys = ['name', 'full name', 'student name', 'candidate name', 'fullname']
+            for (const [k, v] of Object.entries(cf)) {
+                if (nameKeys.includes(k.trim().toLowerCase()) && v) { name = String(v).trim(); break }
+            }
+        }
+        if (!name) name = 'Unknown'
+
+        let phone = student.phone || student.alternatePhone || ''
+        if (!phone) {
+            const phoneKeys = ['mobile', 'mobile number', 'mobile no', 'phone', 'phone number', 'contact', 'contact number', 'whatsapp']
+            for (const [k, v] of Object.entries(cf)) {
+                if (phoneKeys.includes(k.trim().toLowerCase()) && v) { phone = String(v).trim(); break }
+            }
+        }
+        if (!phone) phone = 'N/A'
+        return { name, phone }
+    }
+
 
     // Compatibility shim: single batch ID for IGNOU / old helpers
     const importBatchId = importBatchIds.size === 1 ? Array.from(importBatchIds)[0] : ''
@@ -1182,8 +1242,8 @@ export default function ImportPreviewPage() {
                                     <th className="p-2 text-left font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-[60px] z-30 w-[110px] min-w-[110px] shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
                                         Status
                                     </th>
-                                    <th className="p-2 text-center font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-0 z-30 w-[60px] min-w-[60px]">
-                                        Action
+                                    <th className="p-2 text-center font-bold text-slate-500 dark:text-slate-200 border-l border-border whitespace-nowrap bg-slate-100 dark:bg-slate-800 sticky top-0 right-0 z-30 w-[110px] min-w-[110px]">
+                                        Actions
                                     </th>
                                 </tr>
                             </thead>
@@ -1271,23 +1331,48 @@ export default function ImportPreviewPage() {
 
                                                 </td>
                                                 <td className={cn(
-                                                    "p-2 border-l border-border sticky right-0 z-20 w-[60px] min-w-[60px] flex justify-center items-center h-[41px]",
+                                                    "p-2 border-l border-border sticky right-0 z-20 w-[110px] min-w-[110px]",
                                                     isSelected
                                                         ? "bg-[#edf5ff] dark:bg-[#1a233a]"
                                                         : "bg-white group-hover/row:bg-slate-50 dark:bg-[#0d1322] dark:group-hover/row:bg-[#151d30]"
                                                 )} onClick={e => e.stopPropagation()}>
-                                                    <Button
-                                                        variant="outline" size="icon"
-                                                        title="Convert to order"
-                                                        className="h-7 w-7 text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                        onClick={async (e) => { 
-                                                            e.stopPropagation()
-                                                            if (await confirm('Mark this record as an Order?')) promoteRowMutation.mutate(student.id) 
-                                                        }}
-                                                        disabled={isPromoting || promoteSelectionMutation.isPending}
-                                                    >
-                                                        {isPromoting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ShoppingBag className="w-3.5 h-3.5" />}
-                                                    </Button>
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        {/* ── Follow-up button ── */}
+                                                        {(isTelecaller || isAdminManager) && (() => {
+                                                            const isInFollowUp = cf._inFollowUp === true
+                                                            return (
+                                                                <Button
+                                                                    variant="outline" size="icon"
+                                                                    title={isInFollowUp ? 'Already in follow-up — click to add another' : 'Add follow-up'}
+                                                                    className={cn(
+                                                                        'h-7 w-7',
+                                                                        isInFollowUp
+                                                                            ? 'text-amber-600 border-amber-400/50 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100'
+                                                                            : 'text-blue-600 border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                                                                    )}
+                                                                    onClick={e => { e.stopPropagation(); openFollowUpModal(student) }}
+                                                                >
+                                                                    <BellRing className="w-3.5 h-3.5" />
+                                                                </Button>
+                                                            )
+                                                        })()}
+
+                                                        {/* ── Convert to Order button ── */}
+                                                        {isAdminManager && (
+                                                            <Button
+                                                                variant="outline" size="icon"
+                                                                title="Convert to order"
+                                                                className="h-7 w-7 text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation()
+                                                                    if (await confirm('Mark this record as an Order?')) promoteRowMutation.mutate(student.id)
+                                                                }}
+                                                                disabled={isPromoting || promoteSelectionMutation.isPending}
+                                                            >
+                                                                {isPromoting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ShoppingBag className="w-3.5 h-3.5" />}
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         )
@@ -1707,6 +1792,112 @@ export default function ImportPreviewPage() {
                     </div>
                 </div>
             )}
+
+            {/* ── Follow-up Modal ───────────────────────────────────────────────────── */}
+            {followUpStudent && (() => {
+                const { name, phone } = extractStudentContact(followUpStudent)
+                const initials = name.trim().split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() || '?'
+                const isInFollowUp = followUpStudent.customFields?._inFollowUp === true
+                return (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={closeFollowUpModal}>
+                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                        <div
+                            className="relative w-full max-w-[480px] max-h-[90vh] bg-white dark:bg-[#0d1117] rounded-[20px] border border-slate-200 dark:border-white/10 shadow-2xl flex flex-col overflow-hidden"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Header */}
+                            <div className="px-6 pt-5 pb-4 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] shrink-0 flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                                        <BellRing className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-bold text-foreground">Add Follow-up</h3>
+                                        {isInFollowUp && (
+                                            <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">⚠ Already in follow-up — adding another entry</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <button onClick={closeFollowUpModal} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-accent">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Scrollable body */}
+                            <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-5 space-y-5">
+
+                                {/* Person card (read-only) */}
+                                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                                    <div className="w-10 h-10 rounded-full bg-blue-500/15 border border-blue-500/20 flex items-center justify-center shrink-0">
+                                        <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{initials}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-sm text-foreground truncate">{name}</p>
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                            <Phone className="w-3 h-3" />{phone}
+                                        </p>
+                                    </div>
+                                    <span className="text-[10px] text-muted-foreground shrink-0">
+                                        {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </span>
+                                </div>
+
+                                {/* Next follow-up date */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                        <span className="text-orange-500">📅</span> Next Follow-up Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={fuDate}
+                                        onChange={e => setFuDate(e.target.value)}
+                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+                                    />
+                                </div>
+
+                                {/* Description */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                        <span>📋</span> Description
+                                    </label>
+                                    <RichTextEditor
+                                        value={fuDescription}
+                                        onChange={setFuDescription}
+                                        placeholder="Call notes, what was discussed…"
+                                    />
+                                </div>
+
+                                {/* Requirement */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                        <span className="text-green-500">🎯</span> Requirement
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={fuRequirement}
+                                        onChange={e => setFuRequirement(e.target.value)}
+                                        placeholder="e.g. MAHD, BCOMAF, Project…"
+                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="px-6 py-4 border-t border-slate-100 dark:border-white/5 shrink-0 flex items-center justify-between gap-3">
+                                <Button variant="outline" onClick={closeFollowUpModal} disabled={fuLoading}>Cancel</Button>
+                                <Button
+                                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                                    onClick={handleSaveFollowUp}
+                                    disabled={fuLoading || !fuDate || !fuDescription || !fuRequirement}
+                                >
+                                    {fuLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
+                                    Save Follow-up
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            })()}
 
         </div>
     )

@@ -6,6 +6,33 @@ const router = express.Router();
 // Helper to serialize BigInt
 BigInt.prototype.toJSON = function () { return this.toString() }
 
+// Helper: extract name and phone from a student record
+// Checks standard fields first, then scans customFields for name-like/phone-like keys
+function extractNameAndPhone(student) {
+    // --- Name ---
+    let name = student.fullName || '';
+    if (!name && student.customFields) {
+        const cf = student.customFields;
+        const nameKeys = ['name', 'full name', 'student name', 'candidate name', 'fullname'];
+        for (const [k, v] of Object.entries(cf)) {
+            if (nameKeys.includes(k.trim().toLowerCase()) && v) { name = String(v).trim(); break; }
+        }
+    }
+    if (!name) name = 'Unknown';
+
+    // --- Phone ---
+    let number = student.phone || student.alternatePhone || '';
+    if (!number && student.customFields) {
+        const cf = student.customFields;
+        const phoneKeys = ['mobile', 'mobile number', 'mobile no', 'phone', 'phone number', 'contact', 'contact number', 'whatsapp'];
+        for (const [k, v] of Object.entries(cf)) {
+            if (phoneKeys.includes(k.trim().toLowerCase()) && v) { number = String(v).trim(); break; }
+        }
+    }
+    if (!number) number = 'N/A';
+    return { name, number };
+}
+
 // GET /api/follow-ups — List follow-ups with pagination and filters
 // ADMIN/MANAGER: sees all users' follow-ups (can filter by ?userId=)
 // Others: only their own follow-ups
@@ -225,6 +252,56 @@ router.delete('/:id', async (req, res) => {
         res.json({ success: true, message: 'Follow-up completed and removed' });
     } catch (error) {
         console.error('Error deleting follow-up:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/follow-ups/from-student/:studentId
+// Creates a follow-up auto-filled from the student record, then marks the student as _inFollowUp
+router.post('/from-student/:studentId', async (req, res) => {
+    try {
+        const { description, requirement, followupDate } = req.body;
+        if (!description || !requirement || !followupDate) {
+            return res.status(400).json({ success: false, error: 'description, requirement and followupDate are required' });
+        }
+
+        const studentId = BigInt(req.params.studentId);
+
+        // Fetch the student to get name and phone
+        const student = await prisma.student.findUnique({
+            where: { id: studentId },
+            select: { id: true, fullName: true, phone: true, alternatePhone: true, customFields: true },
+        });
+        if (!student) return res.status(404).json({ success: false, error: 'Student not found' });
+
+        const { name, number } = extractNameAndPhone(student);
+
+        // Create the follow-up record
+        const followUp = await prisma.dailyFollowUp.create({
+            data: {
+                name,
+                number,
+                description,
+                requirement,
+                followupDate: new Date(followupDate),
+                createdById: req.user.id,
+            },
+            include: { createdBy: { select: { id: true, fullName: true } } }
+        });
+
+        // Mark the student row as in-follow-up via customFields._inFollowUp
+        const existingCf = student.customFields && typeof student.customFields === 'object' ? { ...student.customFields } : {};
+        existingCf._inFollowUp = true;
+        existingCf._inFollowUpDate = new Date().toISOString();
+        existingCf._followUpId = followUp.id.toString();
+        await prisma.student.update({
+            where: { id: studentId },
+            data: { customFields: existingCf },
+        });
+
+        res.status(201).json({ success: true, data: followUp });
+    } catch (error) {
+        console.error('Error creating follow-up from student:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
