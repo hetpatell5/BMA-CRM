@@ -779,9 +779,25 @@ router.post('/process/:importId', async (req, res, next) => {
                         const r = await prisma.student.createMany({ data: sub, skipDuplicates: dupHandling === 'skip' });
                         imp += r.count; skp += sub.length - r.count;
                     } catch (e) {
-                        // Log one error per sub-batch, count all rows as failed
-                        batchErrors.push({ rows: `${i}-${i + sub.length}`, error: e.message });
-                        batchFailed += sub.length;
+                        // Log full error to PM2 so we can diagnose it
+                        console.error(`[Import ${impId}] createMany failed rows ${i}-${i + sub.length}:`, e.message);
+                        // Fallback: try row-by-row so at least some rows succeed
+                        let rowFallbackFailed = 0;
+                        for (const rowData of sub) {
+                            try {
+                                await prisma.student.create({ data: rowData });
+                                imp++;
+                            } catch (rowErr) {
+                                // Only log the first unique error message to avoid spam
+                                const msg = rowErr.message || String(rowErr);
+                                if (!batchErrors.some(e => e.error === msg)) {
+                                    batchErrors.push({ row: 'batch', error: msg });
+                                    console.error(`[Import ${impId}] row-level create failed:`, msg);
+                                }
+                                rowFallbackFailed++;
+                            }
+                        }
+                        batchFailed += rowFallbackFailed;
                     }
                 }
             }
@@ -792,6 +808,7 @@ router.post('/process/:importId', async (req, res, next) => {
                         const r = await prisma.lead.createMany({ data: sub, skipDuplicates: dupHandling === 'skip' });
                         imp += r.count; skp += sub.length - r.count;
                     } catch (e) {
+                        console.error(`[Import ${impId}] lead createMany failed rows ${i}-${i + sub.length}:`, e.message);
                         batchErrors.push({ rows: `${i}-${i + sub.length}`, error: e.message });
                         batchFailed += sub.length;
                     }
@@ -801,6 +818,7 @@ router.post('/process/:importId', async (req, res, next) => {
             // skp = rows that reached DB but were skipped by Prisma's skipDuplicates
             accumulate(imp, 0, skp + batchCompareSkipped, batchFailed, batchErrors.slice(0, 3));
         }
+
 
         // ── Background processing: stream file & insert in batches ────────────
         setImmediate(async () => {
