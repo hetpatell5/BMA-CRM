@@ -13,6 +13,58 @@ import { readSettings } from './appSettingsRoutes.js';
 
 const router = express.Router();
 
+// ── Excel-safe date parser ───────────────────────────────────────────────────
+// Problem: IGNOU files store Date of Birth as Excel serial numbers (e.g. 33986).
+// new Date("33986") → JavaScript treats "33986" as a year → year AD 33,986 →
+// Prisma/MySQL rejects it with "Could not convert DateTime" error.
+//
+// Excel date serial: day count since Dec 30, 1899 (epoch = serial 0).
+// Serial 25569 = Jan 1, 1970 (Unix epoch).
+// Formula: realDate = new Date((serial - 25569) * 86400 * 1000)
+//
+// Also handles ISO strings, DD-MM-YYYY, MM/DD/YYYY, etc.
+// Returns null for any value that produces a year outside 1900-2050.
+function parseImportDate(val) {
+    if (val === null || val === undefined) return null;
+
+    // Already a JavaScript Date object (ExcelJS streaming reader auto-converts)
+    if (val instanceof Date) {
+        if (isNaN(val.getTime())) return null;
+        const y = val.getFullYear();
+        return (y >= 1900 && y <= 2050) ? val : null;
+    }
+
+    const s = String(val).trim();
+    if (!s || s === 'undefined' || s === 'null') return null;
+
+    // Pure integer → Excel date serial number
+    // Valid IGNOU range: serial ~1 (1900-01-01) to ~54787 (2050-01-01)
+    if (/^\d+$/.test(s)) {
+        const serial = parseInt(s, 10);
+        if (serial < 1 || serial > 55000) return null; // out of plausible range
+        const d = new Date((serial - 25569) * 86400 * 1000);
+        if (isNaN(d.getTime())) return null;
+        const y = d.getFullYear();
+        return (y >= 1900 && y <= 2050) ? d : null;
+    }
+
+    // DD-MM-YYYY or DD/MM/YYYY (common IGNOU format)
+    const ddmmyyyy = s.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{4})$/);
+    if (ddmmyyyy) {
+        const [, dd, mm, yyyy] = ddmmyyyy;
+        const d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}T00:00:00.000Z`);
+        if (isNaN(d.getTime())) return null;
+        const y = d.getFullYear();
+        return (y >= 1900 && y <= 2050) ? d : null;
+    }
+
+    // ISO string or anything else JavaScript can parse
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    return (y >= 1900 && y <= 2050) ? d : null;
+}
+
 // ── In-memory live progress cache ────────────────────────────────────────────
 // The DB only stores importedCount at the END of an import, so HTTP polling
 // would always see 0% until completion. This cache stores live counts from
@@ -700,8 +752,8 @@ router.post('/process/:importId', async (req, res, next) => {
 
                     if (mappedData.batchYear) mappedData.batchYear = parseInt(mappedData.batchYear) || null;
                     if (mappedData.semester)  mappedData.semester  = parseInt(mappedData.semester)  || null;
-                    if (mappedData.dateOfBirth)   { const d = new Date(mappedData.dateOfBirth);   mappedData.dateOfBirth   = isNaN(d.getTime()) ? null : d; }
-                    if (mappedData.admissionDate) { const d = new Date(mappedData.admissionDate); mappedData.admissionDate = isNaN(d.getTime()) ? null : d; }
+                    if (mappedData.dateOfBirth)   { mappedData.dateOfBirth   = parseImportDate(mappedData.dateOfBirth); }
+                    if (mappedData.admissionDate) { mappedData.admissionDate = parseImportDate(mappedData.admissionDate); }
 
                     Object.keys(mappedData).forEach(k => {
                         if (k !== 'subjects' && k !== 'customFields' && (mappedData[k] === null || mappedData[k] === undefined || mappedData[k] === '')) delete mappedData[k];
