@@ -26,6 +26,7 @@ import {
     IndianRupee,
     CreditCard,
     Hourglass,
+    MoreHorizontal,
 } from 'lucide-react'
 import { dashboardAPI } from '@/lib/api'
 import api from '@/lib/api'
@@ -42,8 +43,8 @@ import { TeamFollowUpsWidget } from '@/components/dashboard/team-followups-widge
 function StatCard({
     title,
     value,
-    change,
-    changeType,
+    change = '1.50%',
+    changeType = 'up',
     icon: Icon,
     iconContainerClassName,
     glowClassName,
@@ -61,47 +62,67 @@ function StatCard({
     className?: string
 }) {
     const Card = href ? Link : 'div'
-    
-    const changeParts = change ? change.split(' ') : []
-    const changeVal = changeParts.length > 0 ? changeParts[0] : ''
+    const isUp = changeType === 'up'
+
+    // Static sparkline paths for visual flair
+    const strokePath = isUp 
+        ? "M 0 25 L 10 20 L 20 25 L 30 10 L 40 15 L 50 5"
+        : "M 0 5 L 10 10 L 20 5 L 30 20 L 40 15 L 50 25"
+        
+    const fillPath = isUp
+        ? "M 0 25 L 10 20 L 20 25 L 30 10 L 40 15 L 50 5 L 50 30 L 0 30 Z"
+        : "M 0 5 L 10 10 L 20 5 L 30 20 L 40 15 L 50 25 L 50 30 L 0 30 Z"
+
+    const colorClass = isUp ? "text-emerald-500" : "text-rose-500"
+    const bgClass = isUp ? "bg-emerald-500/10" : "bg-rose-500/10"
+    const fillClass = isUp ? "fill-emerald-500/10" : "fill-rose-500/10"
+    const strokeClass = isUp ? "stroke-emerald-500" : "stroke-rose-500"
 
     return (
         <Card
             href={href || '#'}
             className={cn(
-                "stat-card-tile group p-5 transition-all duration-300 hover:-translate-y-0.5",
+                "group relative overflow-hidden rounded-[16px] bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300 dark:hover:border-white/20",
                 className
             )}
         >
-            <div className="flex items-start justify-between mb-8">
-                <div className={cn(
-                    "flex h-11 w-11 items-center justify-center rounded-xl border transition-all duration-300",
-                    iconContainerClassName || "icon-badge-primary border-primary/20"
-                )}>
-                    <Icon className="h-5 w-5" />
+            {/* Top row: Title and More Icon */}
+            <div className="flex items-center justify-between p-4 pb-3 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-transparent">
+                <h3 className="text-[14px] font-semibold text-slate-700 dark:text-slate-300">{title}</h3>
+                <div className="w-8 h-8 rounded-lg border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                    <MoreHorizontal className="w-4 h-4" />
                 </div>
-                {change && (
-                    <span
-                        className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-tight",
-                            changeType === 'up'
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/15'
-                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/15'
-                        )}
-                    >
-                        {changeType === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        {changeVal}
-                    </span>
-                )}
             </div>
             
-            <div className="space-y-1">
-                <div className="metric-number">{value}</div>
-                <p className="metric-label">{title}</p>
-            </div>
+            {/* Bottom Section */}
+            <div className="p-4 pt-5 flex items-end justify-between relative">
+                <div className="space-y-3 z-10 relative">
+                    <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                        {value}
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <span className={cn(
+                            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold",
+                            bgClass, colorClass
+                        )}>
+                            {isUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                            {change}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                            Than last week
+                        </span>
+                    </div>
+                </div>
 
-            {/* Corner glow */}
-            <div className={cn("absolute -right-4 -bottom-4 w-20 h-20 rounded-full blur-2xl transition-all duration-500 opacity-30 group-hover:opacity-60", glowClassName || "bg-primary/20")} />
+                {/* Sparkline Graphic */}
+                <div className="w-24 h-12 opacity-80 z-0">
+                    <svg viewBox="0 0 50 30" className="w-full h-full overflow-visible" preserveAspectRatio="none">
+                        <path d={fillPath} className={fillClass} />
+                        <path d={strokePath} fill="none" strokeWidth="1.5" className={strokeClass} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                </div>
+            </div>
         </Card>
     )
 }
