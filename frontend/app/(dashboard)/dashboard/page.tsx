@@ -27,6 +27,7 @@ import {
     CreditCard,
     Hourglass,
     MoreHorizontal,
+    Minus,
 } from 'lucide-react'
 import { dashboardAPI } from '@/lib/api'
 import api from '@/lib/api'
@@ -39,12 +40,99 @@ import { TelecallerDashboard } from '@/components/dashboard/telecaller-dashboard
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ComposedChart, Bar, Line } from 'recharts'
 import { TeamFollowUpsWidget } from '@/components/dashboard/team-followups-widget'
 
+// High-precision Stepped Sparkline Component matching reference UI
+function SteppedSparkline({
+    data = [0, 0, 0, 0, 0, 0, 0],
+    changeType = 'neutral',
+    id,
+}: {
+    data?: number[]
+    changeType?: 'up' | 'down' | 'neutral'
+    id: string
+}) {
+    const isUp = changeType === 'up'
+    const isDown = changeType === 'down'
+    const isNeutral = changeType === 'neutral' || (!isUp && !isDown)
+
+    const W = 88
+    const H = 38
+    const py = 4
+    const px = 2
+
+    const values = data && data.length > 0 ? data : [0, 0, 0, 0, 0, 0, 0]
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const allZero = max === 0 && min === 0
+    const allSame = max === min
+
+    const n = values.length
+    const dx = (W - 2 * px) / Math.max(1, n - 1)
+
+    const points: { x: number; y: number }[] = values.map((v, i) => {
+        const x = px + i * dx
+        let y = H - py
+        if (allZero) {
+            y = H - py - 2
+        } else if (allSame) {
+            y = H / 2
+        } else {
+            y = H - py - ((v - min) / (max - min)) * (H - 2 * py)
+        }
+        return { x, y }
+    })
+
+    // Generate Centered Step Path (curveStep)
+    let strokePath = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`
+    for (let i = 1; i < n; i++) {
+        const midX = (points[i - 1].x + points[i].x) / 2
+        strokePath += ` H ${midX.toFixed(1)} V ${points[i].y.toFixed(1)} H ${points[i].x.toFixed(1)}`
+    }
+
+    const fillPath = `${strokePath} V ${H} H ${points[0].x.toFixed(1)} Z`
+
+    const strokeColor = isUp ? '#10b981' : isDown ? '#f43f5e' : '#64748b'
+    const strokeOpacity = isNeutral ? 0.5 : 1
+    const gradientColor = isUp ? '#10b981' : isDown ? '#f43f5e' : '#64748b'
+    const topOpacity = isNeutral ? (allZero ? 0.05 : 0.12) : 0.32
+
+    const gradId = `spark-grad-${id.replace(/[^a-zA-Z0-9_-]/g, '')}`
+
+    return (
+        <div className="w-24 h-11 z-0 relative flex items-center justify-end">
+            <svg
+                viewBox={`0 0 ${W} ${H}`}
+                className="w-full h-full overflow-visible"
+                preserveAspectRatio="none"
+            >
+                <defs>
+                    <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={gradientColor} stopOpacity={topOpacity} />
+                        <stop offset="100%" stopColor={gradientColor} stopOpacity={0} />
+                    </linearGradient>
+                </defs>
+                <path d={fillPath} fill={`url(#${gradId})`} />
+                <path
+                    d={strokePath}
+                    fill="none"
+                    stroke={strokeColor}
+                    strokeWidth="1.75"
+                    strokeOpacity={strokeOpacity}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        </div>
+    )
+}
+
 // Stat Card Component
 function StatCard({
     title,
     value,
     change,
-    changeType = 'up',
+    changeType = 'neutral',
+    sparklineData,
+    id,
     icon: Icon,
     iconContainerClassName,
     glowClassName,
@@ -54,8 +142,10 @@ function StatCard({
     title: string
     value: number | string
     change?: string
-    changeType?: 'up' | 'down'
-    icon: any
+    changeType?: 'up' | 'down' | 'neutral'
+    sparklineData?: number[]
+    id?: string
+    icon?: any
     iconContainerClassName?: string
     glowClassName?: string
     href?: string
@@ -63,20 +153,14 @@ function StatCard({
 }) {
     const Card = href ? Link : 'div'
     const isUp = changeType === 'up'
+    const isDown = changeType === 'down'
+    const isNeutral = changeType === 'neutral' || (!isUp && !isDown)
 
-    // Static sparkline paths for visual flair
-    const strokePath = isUp 
-        ? "M 0 25 L 10 20 L 20 25 L 30 10 L 40 15 L 50 5"
-        : "M 0 5 L 10 10 L 20 5 L 30 20 L 40 15 L 50 25"
-        
-    const fillPath = isUp
-        ? "M 0 25 L 10 20 L 20 25 L 30 10 L 40 15 L 50 5 L 50 30 L 0 30 Z"
-        : "M 0 5 L 10 10 L 20 5 L 30 20 L 40 15 L 50 25 L 50 30 L 0 30 Z"
-
-    const colorClass = isUp ? "text-emerald-500" : "text-rose-500"
-    const bgClass = isUp ? "bg-emerald-500/10" : "bg-rose-500/10"
-    const fillClass = isUp ? "fill-emerald-500/10" : "fill-rose-500/10"
-    const strokeClass = isUp ? "stroke-emerald-500" : "stroke-rose-500"
+    const badgeColorClass = isUp
+        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+        : isDown
+        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+        : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20'
 
     return (
         <Card
@@ -104,10 +188,16 @@ function StatCard({
                     {change !== undefined && (
                         <div className="flex items-center gap-2">
                             <span className={cn(
-                                "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold",
-                                bgClass, colorClass
+                                "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold border",
+                                badgeColorClass
                             )}>
-                                {isUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                                {isUp ? (
+                                    <ArrowUpRight className="w-3 h-3" />
+                                ) : isDown ? (
+                                    <ArrowDownRight className="w-3 h-3" />
+                                ) : (
+                                    <Minus className="w-3 h-3" />
+                                )}
                                 {change}
                             </span>
                             <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
@@ -118,12 +208,7 @@ function StatCard({
                 </div>
 
                 {/* Sparkline Graphic */}
-                <div className="w-24 h-12 opacity-80 z-0">
-                    <svg viewBox="0 0 50 30" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                        <path d={fillPath} className={fillClass} />
-                        <path d={strokePath} fill="none" strokeWidth="1.5" className={strokeClass} strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                </div>
+                <SteppedSparkline data={sparklineData} changeType={changeType} id={id || title} />
             </div>
         </Card>
     )
@@ -177,6 +262,16 @@ function OrderBreakdownCard({ stats, total }: { stats: any, total: number }) {
             <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl -z-10" />
         </div>
     );
+}
+
+const getTrendType = (trend: number | undefined | null, isZeroValue: boolean = false): 'up' | 'down' | 'neutral' => {
+    if (isZeroValue || trend === undefined || trend === null || trend === 0) return 'neutral'
+    return trend > 0 ? 'up' : 'down'
+}
+
+const formatTrendChange = (trend: number | undefined | null, isZeroValue: boolean = false): string => {
+    if (isZeroValue || trend === undefined || trend === null || trend === 0) return '0%'
+    return `${Math.abs(trend)}%`
 }
 
 // Dashboard Page
@@ -294,58 +389,72 @@ export default function DashboardPage() {
                     ) : (
                         <>
                             <StatCard
+                                id="active-orders"
                                 title="Active Orders"
                                 value={formatNumber(stats?.students?.active || 0)}
-                                change={stats?.students?.trends ? `${Math.abs(stats.students.trends.active)}%` : '0%'}
-                                changeType={stats?.students?.trends?.active >= 0 ? 'up' : 'down'}
+                                change={formatTrendChange(stats?.students?.trends?.active, (stats?.students?.active || 0) === 0)}
+                                changeType={getTrendType(stats?.students?.trends?.active, (stats?.students?.active || 0) === 0)}
+                                sparklineData={stats?.students?.sparklines?.active}
                                 icon={Activity}
                                 iconContainerClassName="icon-badge-primary border-primary/20"
                                 glowClassName="bg-primary/20"
                                 href="/orders?status=REPORT_IN_PROGRESS"
                             />
                             <StatCard
+                                id="completed-orders"
                                 title="Completed Orders"
                                 value={formatNumber(stats?.students?.alumni || 0)}
-                                change={stats?.students?.trends ? `${Math.abs(stats.students.trends.completed)}%` : '0%'}
-                                changeType={stats?.students?.trends?.completed >= 0 ? 'up' : 'down'}
+                                change={formatTrendChange(stats?.students?.trends?.completed, (stats?.students?.alumni || 0) === 0)}
+                                changeType={getTrendType(stats?.students?.trends?.completed, (stats?.students?.alumni || 0) === 0)}
+                                sparklineData={stats?.students?.sparklines?.completed}
                                 icon={CheckCircle}
                                 iconContainerClassName="icon-badge-success border-emerald-500/20"
                                 glowClassName="bg-emerald-500/20"
                                 href="/orders?status=ALL_DONE"
                             />
                             <StatCard
+                                id="soft-copy-rev"
                                 title="Soft Copy Revenue"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.softCopyTotal)}
-                                change={paymentSummary?.trends ? `${Math.abs(paymentSummary.trends.softCopy)}%` : '0%'}
-                                changeType={paymentSummary?.trends?.softCopy >= 0 ? 'up' : 'down'}
+                                change={formatTrendChange(paymentSummary?.trends?.softCopy, (paymentSummary?.softCopyTotal || 0) === 0)}
+                                changeType={getTrendType(paymentSummary?.trends?.softCopy, (paymentSummary?.softCopyTotal || 0) === 0)}
+                                sparklineData={paymentSummary?.sparklines?.softCopy}
                                 icon={IndianRupee}
                                 iconContainerClassName="icon-badge-cyan border-cyan-500/20"
                                 glowClassName="bg-cyan-500/20"
                                 href="/orders"
                             />
                             <StatCard
+                                id="hard-copy-rev"
                                 title="Hard Copy Revenue"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.hardCopyTotal)}
-                                change={paymentSummary?.trends ? `${Math.abs(paymentSummary.trends.hardCopy)}%` : '0%'}
-                                changeType={paymentSummary?.trends?.hardCopy >= 0 ? 'up' : 'down'}
+                                change={formatTrendChange(paymentSummary?.trends?.hardCopy, (paymentSummary?.hardCopyTotal || 0) === 0)}
+                                changeType={getTrendType(paymentSummary?.trends?.hardCopy, (paymentSummary?.hardCopyTotal || 0) === 0)}
+                                sparklineData={paymentSummary?.sparklines?.hardCopy}
                                 icon={Wallet}
                                 iconContainerClassName="icon-badge-warning border-amber-500/20"
                                 glowClassName="bg-amber-500/20"
                                 href="/orders"
                             />
                             <StatCard
+                                id="total-collected"
                                 title="Total Collected"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.totalCollected)}
-                                change={paymentSummary?.trends ? `${Math.abs(paymentSummary.trends.collected)}%` : '0%'}
-                                changeType={paymentSummary?.trends?.collected >= 0 ? 'up' : 'down'}
+                                change={formatTrendChange(paymentSummary?.trends?.collected, (paymentSummary?.totalCollected || 0) === 0)}
+                                changeType={getTrendType(paymentSummary?.trends?.collected, (paymentSummary?.totalCollected || 0) === 0)}
+                                sparklineData={paymentSummary?.sparklines?.collected}
                                 icon={CreditCard}
                                 iconContainerClassName="icon-badge-purple border-purple-500/20"
                                 glowClassName="bg-purple-500/20"
                                 href="/orders"
                             />
                             <StatCard
+                                id="payment-pending"
                                 title="Payment Pending"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.totalPending)}
+                                change={formatTrendChange(paymentSummary?.trends?.pending, (paymentSummary?.totalPending || 0) === 0)}
+                                changeType={getTrendType(paymentSummary?.trends?.pending, (paymentSummary?.totalPending || 0) === 0)}
+                                sparklineData={paymentSummary?.sparklines?.pending}
                                 icon={Hourglass}
                                 iconContainerClassName="icon-badge-danger border-rose-500/20"
                                 glowClassName="bg-rose-500/20"

@@ -82,7 +82,7 @@ router.get('/stats', async (req, res, next) => {
         // so we only iterate over the small number of real orders in Node.js.
         const realOrderFields = await prisma.student.findMany({
             where: { NOT: { source: 'excel_import' } },
-            select: { customFields: true },
+            select: { id: true, status: true, customFields: true, createdAt: true },
         });
 
         const categories = { synopsis: 0, report: 0, assignment: 0, practical: 0, guessPaper: 0, studyGuide: 0, notes: 0 };
@@ -97,7 +97,36 @@ router.get('/stats', async (req, res, next) => {
             if (content.includes('notes'))                categories.notes++;
         }
 
-        const calcTrend = (curr, prev) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev * 100).toFixed(1);
+        // 7-day sparkline buckets (from 6 days ago up to today)
+        const dayBuckets = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            d.setHours(23, 59, 59, 999);
+            dayBuckets.push(d);
+        }
+
+        const activeStatuses = ['NEW_LEAD', 'REPORT_IN_PROGRESS', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED'];
+
+        const activeSparkline = dayBuckets.map(d =>
+            realOrderFields.filter(s => activeStatuses.includes(s.status) && s.createdAt <= d).length
+        );
+        const completedSparkline = dayBuckets.map(d =>
+            realOrderFields.filter(s => s.status === 'ALL_DONE' && s.createdAt <= d).length
+        );
+
+        // Previous week totals (as of 7 days ago)
+        const prevActive = realOrderFields.filter(s => activeStatuses.includes(s.status) && s.createdAt <= lastWeek).length;
+        const prevCompleted = realOrderFields.filter(s => s.status === 'ALL_DONE' && s.createdAt <= lastWeek).length;
+
+        const calcTrend = (curr, prev) => {
+            if (curr === prev) return 0;
+            if (prev === 0) return curr > 0 ? 100 : 0;
+            return Number((((curr - prev) / prev) * 100).toFixed(1));
+        };
+
+        const activeTrend = calcTrend(activeStudents, prevActive);
+        const completedTrend = calcTrend(alumniStudents, prevCompleted);
 
         res.json({
             success: true,
@@ -110,8 +139,12 @@ router.get('/stats', async (req, res, next) => {
                     today: todayStudents,
                     categories,
                     trends: {
-                        active: Number(calcTrend(thisWeekActive, lastWeekActive)),
-                        completed: Number(calcTrend(thisWeekCompleted, lastWeekCompleted))
+                        active: activeTrend,
+                        completed: completedTrend
+                    },
+                    sparklines: {
+                        active: activeSparkline,
+                        completed: completedSparkline
                     }
                 },
                 leads: {
@@ -607,10 +640,85 @@ router.get('/payment-summary', async (req, res, next) => {
             }
         }
 
-        const grandTotal = softCopyTotal + hardCopyTotal;
-        const totalPending = Math.max(0, grandTotal - totalCollected);
-        
-        const calcTrend = (curr, prev) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev * 100).toFixed(1);
+        // 7-day sparkline buckets (from 6 days ago up to today)
+        const dayBuckets = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            d.setHours(23, 59, 59, 999);
+            dayBuckets.push(d);
+        }
+
+        const softCopySparkline = dayBuckets.map(d => {
+            let sum = 0;
+            for (const student of allStudents) {
+                if (student.createdAt <= d) {
+                    const cf = student.customFields || {};
+                    const deliveryRaw = getField(cf, 'delivery type', 'delivery') || '';
+                    if (deliveryRaw.toLowerCase().includes('soft')) {
+                        sum += parseAmount(getField(cf, 'decided price', 'total order amount'));
+                    }
+                }
+            }
+            return sum;
+        });
+
+        const hardCopySparkline = dayBuckets.map(d => {
+            let sum = 0;
+            for (const student of allStudents) {
+                if (student.createdAt <= d) {
+                    const cf = student.customFields || {};
+                    const deliveryRaw = getField(cf, 'delivery type', 'delivery') || '';
+                    if (deliveryRaw.toLowerCase().includes('hard')) {
+                        sum += parseAmount(getField(cf, 'decided price', 'total order amount'));
+                    }
+                }
+            }
+            return sum;
+        });
+
+        const collectedSparkline = dayBuckets.map(d => {
+            let sum = 0;
+            for (const student of allStudents) {
+                if (student.createdAt <= d) {
+                    const cf = student.customFields || {};
+                    sum += parseAmount(getField(cf, 'advance paid', 'advance'));
+                }
+            }
+            return sum;
+        });
+
+        const pendingSparkline = dayBuckets.map((d, idx) => {
+            const grand = softCopySparkline[idx] + hardCopySparkline[idx];
+            return Math.max(0, grand - collectedSparkline[idx]);
+        });
+
+        // 7 days ago totals for trend calculation
+        let prevSoft = 0, prevHard = 0, prevCollected = 0;
+        for (const student of allStudents) {
+            if (student.createdAt <= lastWeek) {
+                const cf = student.customFields || {};
+                const deliveryRaw = (getField(cf, 'delivery type', 'delivery') || '').toLowerCase();
+                const decidedPrice = parseAmount(getField(cf, 'decided price', 'total order amount'));
+                const advancePaid = parseAmount(getField(cf, 'advance paid', 'advance'));
+
+                prevCollected += advancePaid;
+                if (deliveryRaw.includes('soft')) prevSoft += decidedPrice;
+                else if (deliveryRaw.includes('hard')) prevHard += decidedPrice;
+            }
+        }
+
+        const calcTrend = (curr, prev) => {
+            if (curr === prev) return 0;
+            if (prev === 0) return curr > 0 ? 100 : 0;
+            return Number((((curr - prev) / prev) * 100).toFixed(1));
+        };
+
+        const softTrend = calcTrend(softCopyTotal, prevSoft);
+        const hardTrend = calcTrend(hardCopyTotal, prevHard);
+        const collectedTrend = calcTrend(totalCollected, prevCollected);
+        const prevPending = Math.max(0, (prevSoft + prevHard) - prevCollected);
+        const pendingTrend = calcTrend(totalPending, prevPending);
 
         res.json({
             success: true,
@@ -623,9 +731,16 @@ router.get('/payment-summary', async (req, res, next) => {
                 softCopyPending: Math.max(0, softCopyTotal - softCopyCollected),
                 hardCopyPending: Math.max(0, hardCopyTotal - hardCopyCollected),
                 trends: {
-                    softCopy: Number(calcTrend(thisWeekSoftCopy, lastWeekSoftCopy)),
-                    hardCopy: Number(calcTrend(thisWeekHardCopy, lastWeekHardCopy)),
-                    collected: Number(calcTrend(thisWeekCollected, lastWeekCollected))
+                    softCopy: softTrend,
+                    hardCopy: hardTrend,
+                    collected: collectedTrend,
+                    pending: pendingTrend
+                },
+                sparklines: {
+                    softCopy: softCopySparkline,
+                    hardCopy: hardCopySparkline,
+                    collected: collectedSparkline,
+                    pending: pendingSparkline
                 }
             }
         });
