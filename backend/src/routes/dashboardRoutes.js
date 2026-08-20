@@ -11,6 +11,11 @@ router.get('/stats', async (req, res, next) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        const lastWeek = new Date(today);
+        lastWeek.setDate(today.getDate() - 7);
+        const twoWeeksAgo = new Date(today);
+        twoWeeksAgo.setDate(today.getDate() - 14);
+
         const [
             totalStudents,
             activeStudents,
@@ -23,6 +28,10 @@ router.get('/stats', async (req, res, next) => {
             todayStudents,
             todayLeads,
             recentImports,
+            thisWeekActive,
+            lastWeekActive,
+            thisWeekCompleted,
+            lastWeekCompleted
         ] = await Promise.all([
             // Student counts — exclude excel_import rows so dashboard only reflects real orders
             prisma.student.count({ where: { NOT: { source: 'excel_import' } } }),
@@ -54,6 +63,13 @@ router.get('/stats', async (req, res, next) => {
                     createdAt: true,
                 },
             }),
+            
+            // Trends data
+            prisma.student.count({ where: { NOT: { source: 'excel_import' }, status: { in: ['NEW_LEAD', 'REPORT_IN_PROGRESS', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED'] }, createdAt: { gte: lastWeek } } }),
+            prisma.student.count({ where: { NOT: { source: 'excel_import' }, status: { in: ['NEW_LEAD', 'REPORT_IN_PROGRESS', 'SYNOPSIS_SENT', 'GUIDE_ASSIGNED'] }, createdAt: { gte: twoWeeksAgo, lt: lastWeek } } }),
+            
+            prisma.student.count({ where: { NOT: { source: 'excel_import' }, status: 'ALL_DONE', createdAt: { gte: lastWeek } } }),
+            prisma.student.count({ where: { NOT: { source: 'excel_import' }, status: 'ALL_DONE', createdAt: { gte: twoWeeksAgo, lt: lastWeek } } }),
         ]);
 
         // Lead conversion rate
@@ -81,6 +97,8 @@ router.get('/stats', async (req, res, next) => {
             if (content.includes('notes'))                categories.notes++;
         }
 
+        const calcTrend = (curr, prev) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev * 100).toFixed(1);
+
         res.json({
             success: true,
             data: {
@@ -90,7 +108,11 @@ router.get('/stats', async (req, res, next) => {
                     inactive: inactiveStudents,
                     alumni: alumniStudents,
                     today: todayStudents,
-                    categories
+                    categories,
+                    trends: {
+                        active: Number(calcTrend(thisWeekActive, lastWeekActive)),
+                        completed: Number(calcTrend(thisWeekCompleted, lastWeekCompleted))
+                    }
                 },
                 leads: {
                     total: totalLeads,
@@ -522,10 +544,16 @@ router.get('/payment-summary', async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Access denied' });
         }
 
+        const today = new Date();
+        const lastWeek = new Date(today);
+        lastWeek.setDate(today.getDate() - 7);
+        const twoWeeksAgo = new Date(today);
+        twoWeeksAgo.setDate(today.getDate() - 14);
+
         // Exclude excel_import rows — payment summary should only reflect real orders
         const allStudents = await prisma.student.findMany({
             where: { NOT: { source: 'excel_import' } },
-            select: { customFields: true }
+            select: { customFields: true, createdAt: true }
         });
 
         const parseAmount = (val) => {
@@ -547,6 +575,9 @@ router.get('/payment-summary', async (req, res, next) => {
         let totalCollected = 0;
         let softCopyCollected = 0;
         let hardCopyCollected = 0;
+        
+        let thisWeekSoftCopy = 0, thisWeekHardCopy = 0, thisWeekCollected = 0;
+        let lastWeekSoftCopy = 0, lastWeekHardCopy = 0, lastWeekCollected = 0;
 
         for (const student of allStudents) {
             const cf = student.customFields || {};
@@ -556,19 +587,30 @@ router.get('/payment-summary', async (req, res, next) => {
             const decidedPrice = parseAmount(getField(cf, 'decided price', 'total order amount'));
             const advancePaid = parseAmount(getField(cf, 'advance paid', 'advance'));
 
+            const isThisWeek = student.createdAt >= lastWeek;
+            const isLastWeek = student.createdAt >= twoWeeksAgo && student.createdAt < lastWeek;
+
             totalCollected += advancePaid;
+            if (isThisWeek) thisWeekCollected += advancePaid;
+            if (isLastWeek) lastWeekCollected += advancePaid;
 
             if (delivery.includes('soft')) {
                 softCopyTotal += decidedPrice;
                 softCopyCollected += advancePaid;
+                if (isThisWeek) thisWeekSoftCopy += decidedPrice;
+                if (isLastWeek) lastWeekSoftCopy += decidedPrice;
             } else if (delivery.includes('hard')) {
                 hardCopyTotal += decidedPrice;
                 hardCopyCollected += advancePaid;
+                if (isThisWeek) thisWeekHardCopy += decidedPrice;
+                if (isLastWeek) lastWeekHardCopy += decidedPrice;
             }
         }
 
         const grandTotal = softCopyTotal + hardCopyTotal;
         const totalPending = Math.max(0, grandTotal - totalCollected);
+        
+        const calcTrend = (curr, prev) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev * 100).toFixed(1);
 
         res.json({
             success: true,
@@ -580,6 +622,11 @@ router.get('/payment-summary', async (req, res, next) => {
                 totalPending,
                 softCopyPending: Math.max(0, softCopyTotal - softCopyCollected),
                 hardCopyPending: Math.max(0, hardCopyTotal - hardCopyCollected),
+                trends: {
+                    softCopy: Number(calcTrend(thisWeekSoftCopy, lastWeekSoftCopy)),
+                    hardCopy: Number(calcTrend(thisWeekHardCopy, lastWeekHardCopy)),
+                    collected: Number(calcTrend(thisWeekCollected, lastWeekCollected))
+                }
             }
         });
     } catch (error) {

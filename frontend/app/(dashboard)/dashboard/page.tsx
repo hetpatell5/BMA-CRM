@@ -43,7 +43,7 @@ import { TeamFollowUpsWidget } from '@/components/dashboard/team-followups-widge
 function StatCard({
     title,
     value,
-    change = '1.50%',
+    change,
     changeType = 'up',
     icon: Icon,
     iconContainerClassName,
@@ -97,22 +97,24 @@ function StatCard({
             {/* Bottom Section */}
             <div className="p-4 pt-5 flex items-end justify-between relative">
                 <div className="space-y-3 z-10 relative">
-                    <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
                         {value}
                     </div>
                     
-                    <div className="flex items-center gap-2">
-                        <span className={cn(
-                            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold",
-                            bgClass, colorClass
-                        )}>
-                            {isUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                            {change}
-                        </span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                            Than last week
-                        </span>
-                    </div>
+                    {change !== undefined && (
+                        <div className="flex items-center gap-2">
+                            <span className={cn(
+                                "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold",
+                                bgClass, colorClass
+                            )}>
+                                {isUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                                {change}
+                            </span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                Than last week
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Sparkline Graphic */}
@@ -294,6 +296,8 @@ export default function DashboardPage() {
                             <StatCard
                                 title="Active Orders"
                                 value={formatNumber(stats?.students?.active || 0)}
+                                change={stats?.students?.trends ? `${Math.abs(stats.students.trends.active)}%` : '0%'}
+                                changeType={stats?.students?.trends?.active >= 0 ? 'up' : 'down'}
                                 icon={Activity}
                                 iconContainerClassName="icon-badge-primary border-primary/20"
                                 glowClassName="bg-primary/20"
@@ -302,6 +306,8 @@ export default function DashboardPage() {
                             <StatCard
                                 title="Completed Orders"
                                 value={formatNumber(stats?.students?.alumni || 0)}
+                                change={stats?.students?.trends ? `${Math.abs(stats.students.trends.completed)}%` : '0%'}
+                                changeType={stats?.students?.trends?.completed >= 0 ? 'up' : 'down'}
                                 icon={CheckCircle}
                                 iconContainerClassName="icon-badge-success border-emerald-500/20"
                                 glowClassName="bg-emerald-500/20"
@@ -310,6 +316,8 @@ export default function DashboardPage() {
                             <StatCard
                                 title="Soft Copy Revenue"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.softCopyTotal)}
+                                change={paymentSummary?.trends ? `${Math.abs(paymentSummary.trends.softCopy)}%` : '0%'}
+                                changeType={paymentSummary?.trends?.softCopy >= 0 ? 'up' : 'down'}
                                 icon={IndianRupee}
                                 iconContainerClassName="icon-badge-cyan border-cyan-500/20"
                                 glowClassName="bg-cyan-500/20"
@@ -318,6 +326,8 @@ export default function DashboardPage() {
                             <StatCard
                                 title="Hard Copy Revenue"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.hardCopyTotal)}
+                                change={paymentSummary?.trends ? `${Math.abs(paymentSummary.trends.hardCopy)}%` : '0%'}
+                                changeType={paymentSummary?.trends?.hardCopy >= 0 ? 'up' : 'down'}
                                 icon={Wallet}
                                 iconContainerClassName="icon-badge-warning border-amber-500/20"
                                 glowClassName="bg-amber-500/20"
@@ -326,6 +336,8 @@ export default function DashboardPage() {
                             <StatCard
                                 title="Total Collected"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.totalCollected)}
+                                change={paymentSummary?.trends ? `${Math.abs(paymentSummary.trends.collected)}%` : '0%'}
+                                changeType={paymentSummary?.trends?.collected >= 0 ? 'up' : 'down'}
                                 icon={CreditCard}
                                 iconContainerClassName="icon-badge-purple border-purple-500/20"
                                 glowClassName="bg-purple-500/20"
@@ -335,8 +347,8 @@ export default function DashboardPage() {
                                 title="Payment Pending"
                                 value={statsLoading || !paymentSummary ? '—' : formatCurrency(paymentSummary.totalPending)}
                                 icon={Hourglass}
-                                iconContainerClassName="icon-badge-danger border-red-500/20"
-                                glowClassName="bg-red-500/20"
+                                iconContainerClassName="icon-badge-danger border-rose-500/20"
+                                glowClassName="bg-rose-500/20"
                                 href="/orders"
                             />
                         </>
